@@ -17,3 +17,4 @@ C:\Users\jamiefeeny\Downloads\Oracle v1\SHPDiagnosticsViewer\obj\Debug\net8.0-wi
 C:\Users\jamiefeeny\Downloads\Oracle v1\SHPDiagnosticsViewer\obj\Debug\net8.0-windows\SHPDiagnosticsViewer.pdb
 C:\Users\jamiefeeny\Downloads\Oracle v1\SHPDiagnosticsViewer\obj\Debug\net8.0-windows\SHPDiagnosticsViewer.genruntimeconfig.cache
 C:\Users\jamiefeeny\Downloads\Oracle v1\SHPDiagnosticsViewer\obj\Debug\net8.0-windows\ref\SHPDiagnosticsViewer.dll
+C:\Users\jamiefeeny\Downloads\Oracle v1\SHPDiagnosticsViewer\obj\Debug\net8.0-windows\SHPDiagnosticsViewer.sourcelink.json

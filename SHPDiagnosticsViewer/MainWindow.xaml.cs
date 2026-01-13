@@ -25,6 +25,7 @@ public partial class MainWindow : Window
     private CancellationTokenSource? _socketCts;
     private bool _isConnecting;
     private string? _currentIp;
+    private readonly Dictionary<string, string> _friendlyNames = new(StringComparer.OrdinalIgnoreCase);
 
     public ObservableCollection<DriverEntry> Drivers { get; } = new();
 
@@ -108,7 +109,7 @@ public partial class MainWindow : Window
         Drivers.Clear();
     }
 
-    private void DiscoveredCombo_SelectionChanged(object sender, System.Windows.Controls.SelectionChangedEventArgs e)
+    private void DiscoveredCombo_SelectionChanged(object sender, SelectionChangedEventArgs e)
     {
         if (DiscoveredCombo.SelectedItem is string selected)
         {
@@ -258,6 +259,7 @@ public partial class MainWindow : Window
         await DisconnectAsync();
 
         _currentIp = ip;
+        _friendlyNames.Clear();
         _socket = new ClientWebSocket();
         _socket.Options.SetRequestHeader("Origin", $"http://{ip}");
         _socketCts = new CancellationTokenSource();
@@ -283,7 +285,6 @@ public partial class MainWindow : Window
         }
         catch
         {
-            // ignore
         }
 
         if (_socket != null)
@@ -297,7 +298,6 @@ public partial class MainWindow : Window
             }
             catch
             {
-                // ignore
             }
             finally
             {
@@ -397,6 +397,36 @@ public partial class MainWindow : Window
             if (root.TryGetProperty("messageType", out var messageTypeElement))
             {
                 var messageType = messageTypeElement.GetString() ?? "Unknown";
+                if (string.Equals(messageType, "echo", StringComparison.OrdinalIgnoreCase))
+                {
+                    var msg = root.TryGetProperty("message", out var msgEl) ? msgEl.GetString() ?? "" : "";
+                    if (!string.IsNullOrWhiteSpace(msg))
+                    {
+                        try
+                        {
+                            using var inner = JsonDocument.Parse(msg);
+                            var innerRoot = inner.RootElement;
+                            if (innerRoot.TryGetProperty("type", out var t) && innerRoot.TryGetProperty("resource", out var r))
+                            {
+                                var type = t.GetString();
+                                var res = r.GetString();
+                                return $"Echo {type}/{res}";
+                            }
+                        }
+                        catch
+                        {
+                        }
+                        return $"Echo {msg}";
+                    }
+                    return "Echo";
+                }
+
+                if (string.Equals(messageType, "LogLevels", StringComparison.OrdinalIgnoreCase))
+                {
+                    var summary = HandleLogLevels(root);
+                    return summary;
+                }
+
                 if (string.Equals(messageType, "MessageLog", StringComparison.OrdinalIgnoreCase))
                 {
                     var time = root.TryGetProperty("time", out var timeElement) ? timeElement.GetString() : "";
@@ -423,10 +453,72 @@ public partial class MainWindow : Window
         }
         catch
         {
-            // Ignore JSON errors and fall through to raw output.
         }
 
         return raw;
+    }
+
+    private string HandleLogLevels(JsonElement root)
+    {
+        var updates = new List<string>();
+        if (root.TryGetProperty("levels", out var levels) && levels.ValueKind == JsonValueKind.Array)
+        {
+            foreach (var level in levels.EnumerateArray())
+            {
+                var dName = level.TryGetProperty("dName", out var dn) ? dn.GetString() ?? "" : "";
+                var logLevel = ParseLogLevel(level);
+                if (string.IsNullOrWhiteSpace(dName))
+                {
+                    continue;
+                }
+
+                UpdateDriverFromLogLevel(dName, logLevel);
+                updates.Add($"{dName}={logLevel}");
+            }
+        }
+
+        return updates.Count > 0 ? $"LogLevels: {string.Join(", ", updates)}" : "LogLevels";
+    }
+
+    private static int ParseLogLevel(JsonElement levelElement)
+    {
+        if (levelElement.TryGetProperty("logLevel", out var ll))
+        {
+            if (ll.ValueKind == JsonValueKind.Number && ll.TryGetInt32(out var intVal))
+            {
+                return intVal;
+            }
+
+            if (ll.ValueKind == JsonValueKind.String && int.TryParse(ll.GetString(), out var strVal))
+            {
+                return strVal;
+            }
+        }
+
+        return 0;
+    }
+
+    private void UpdateDriverFromLogLevel(string dName, int level)
+    {
+        Dispatcher.Invoke(() =>
+        {
+            var existing = Drivers.FirstOrDefault(d => d.DName.Equals(dName, StringComparison.OrdinalIgnoreCase));
+            if (existing == null)
+            {
+                var displayName = _friendlyNames.TryGetValue(dName, out var friendly) ? friendly : dName;
+                existing = new DriverEntry(ParseDriverId(dName), displayName, dName);
+                Drivers.Add(existing);
+            }
+
+            existing.SelectedLevel = level;
+            existing.IsEnabled = level > 0;
+        });
+    }
+
+    private static int ParseDriverId(string dName)
+    {
+        var suffix = dName.Replace("DRIVER//", "", StringComparison.OrdinalIgnoreCase);
+        return int.TryParse(suffix, out var id) ? id : 0;
     }
 
     private void AppendLog(string line)
@@ -463,9 +555,9 @@ public partial class MainWindow : Window
             }
             catch (TaskCanceledException)
             {
-                // One quick retry in case of slow response.
                 json = await http.GetStringAsync(url);
             }
+
             var list = ParseDrivers(json);
 
             Dispatcher.Invoke(() =>
@@ -533,7 +625,7 @@ public partial class MainWindow : Window
         return results;
     }
 
-    private static bool TryBuildDriverEntry(JsonElement item, out DriverEntry entry)
+    private bool TryBuildDriverEntry(JsonElement item, out DriverEntry entry)
     {
         entry = null!;
         if (item.ValueKind != JsonValueKind.Object)
@@ -547,8 +639,15 @@ public partial class MainWindow : Window
         }
 
         var id = idElement.GetInt32();
-        var name = $"DRIVER//{id}";
-        entry = new DriverEntry(id, name);
+        var dName = $"DRIVER//{id}";
+        var name = item.TryGetProperty("name", out var nameElement) ? nameElement.GetString() ?? dName : dName;
+        if (string.IsNullOrWhiteSpace(name))
+        {
+            name = dName;
+        }
+
+        _friendlyNames[dName] = name;
+        entry = new DriverEntry(id, name, dName);
         return true;
     }
 
@@ -559,8 +658,7 @@ public partial class MainWindow : Window
             using var http = new HttpClient { Timeout = TimeSpan.FromMilliseconds(750) };
             var url = $"http://{ip}:5000/diagnostics/data/drivers";
             var json = await http.GetStringAsync(url);
-            var list = ParseDrivers(json);
-            return list.Count > 0;
+            return !string.IsNullOrWhiteSpace(json);
         }
         catch
         {
@@ -582,7 +680,8 @@ public partial class MainWindow : Window
         }
 
         var level = driver.SelectedLevel.ToString();
-        await SendLogLevelAsync(driver.TypeName, toggle.IsChecked == true ? level : "0");
+        await SendLogLevelAsync(driver.DName, toggle.IsChecked == true ? level : "0");
+        AppendLog($"[local] Set {driver.DName} to {(toggle.IsChecked == true ? level : "0")}");
     }
 
     private async void DriverLevelButton_Click(object sender, RoutedEventArgs e)
@@ -605,7 +704,8 @@ public partial class MainWindow : Window
 
         if (driver.IsEnabled)
         {
-            await SendLogLevelAsync(driver.TypeName, level.ToString());
+            await SendLogLevelAsync(driver.DName, level.ToString());
+            AppendLog($"[local] Set {driver.DName} to {level}");
         }
     }
 
@@ -614,17 +714,17 @@ public partial class MainWindow : Window
         private bool _isEnabled;
         private int _selectedLevel;
 
-        public DriverEntry(int id, string name)
+        public DriverEntry(int id, string name, string dName)
         {
             Id = id;
             Name = name;
+            DName = dName;
             SelectedLevel = 3;
         }
 
         public int Id { get; }
         public string Name { get; }
-
-        public string TypeName => $"DRIVER//{Id}";
+        public string DName { get; }
 
         public bool IsEnabled
         {

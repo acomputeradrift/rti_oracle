@@ -50,13 +50,13 @@
     <Border Grid.Row="2" BorderBrush="#CCCCCC" BorderThickness="1" CornerRadius="4" Padding="6" Margin="0,0,0,8">
       <StackPanel>
         <TextBlock Text="Driver Log Levels" FontWeight="SemiBold" Margin="0,0,0,6" />
-        <ScrollViewer Height="120" VerticalScrollBarVisibility="Auto">
+        <ScrollViewer MinHeight="80" MaxHeight="360" VerticalScrollBarVisibility="Auto">
           <ItemsControl ItemsSource="{Binding Drivers}">
             <ItemsControl.ItemTemplate>
               <DataTemplate>
                 <DockPanel Margin="0,0,0,6">
                   <ToggleButton Content="{Binding Name}" Width="260" Margin="0,0,4,0"
-                                IsChecked="{Binding IsEnabled}" Click="DriverToggle_Click"
+                                IsChecked="{Binding IsEnabled, Mode=TwoWay}" Click="DriverToggle_Click"
                                 Style="{StaticResource DriverToggleStyle}" />
                   <Button Content="1" Tag="1" Click="DriverLevelButton_Click">
                     <Button.Style>
