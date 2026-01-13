@@ -1,4 +1,5 @@
 using System;
+using System.Collections;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Collections.Generic;
@@ -15,6 +16,7 @@ using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
+using System.Windows.Data;
 
 namespace SHPDiagnosticsViewer;
 
@@ -26,6 +28,17 @@ public partial class MainWindow : Window
     private bool _isConnecting;
     private string? _currentIp;
     private readonly Dictionary<string, string> _friendlyNames = new(StringComparer.OrdinalIgnoreCase);
+    private static readonly string[] AnchorNames =
+    {
+        "EVENTS_INPUT",
+        "EVENTS_DRIVER",
+        "EVENTS_SCHEDULED",
+        "EVENTS_PERIODIC",
+        "EVENTS_SENSE",
+        "DEVICES_EXPANSION",
+        "DEVICES_RTIPANEL",
+        "USER_GENERAL"
+    };
 
     public ObservableCollection<DriverEntry> Drivers { get; } = new();
 
@@ -33,6 +46,10 @@ public partial class MainWindow : Window
     {
         InitializeComponent();
         DataContext = this;
+        if (CollectionViewSource.GetDefaultView(Drivers) is ListCollectionView view)
+        {
+            view.CustomSort = new DriverEntryComparer();
+        }
     }
 
     private async void DiscoverButton_Click(object sender, RoutedEventArgs e)
@@ -518,13 +535,13 @@ public partial class MainWindow : Window
             var existing = Drivers.FirstOrDefault(d => d.DName.Equals(dName, StringComparison.OrdinalIgnoreCase));
             if (existing == null)
             {
-                var displayName = _friendlyNames.TryGetValue(dName, out var friendly) ? friendly : dName;
+                var displayName = IsAnchorName(dName) ? dName : _friendlyNames.TryGetValue(dName, out var friendly) ? friendly : dName;
                 existing = new DriverEntry(ParseDriverId(dName), displayName, dName);
                 Drivers.Add(existing);
             }
             else
             {
-                if (_friendlyNames.TryGetValue(dName, out var friendly) && !string.IsNullOrWhiteSpace(friendly))
+                if (!IsAnchorName(dName) && _friendlyNames.TryGetValue(dName, out var friendly) && !string.IsNullOrWhiteSpace(friendly))
                 {
                     existing.UpdateName(friendly);
                 }
@@ -532,6 +549,7 @@ public partial class MainWindow : Window
 
             existing.SelectedLevel = level;
             existing.IsEnabled = level > 0;
+            RefreshDriverView();
         });
     }
 
@@ -594,6 +612,8 @@ public partial class MainWindow : Window
                         existing.UpdateName(entry.Name);
                     }
                 }
+
+                RefreshDriverView();
             });
 
             AppendLog($"[info] Loaded {list.Count} drivers");
@@ -676,6 +696,19 @@ public partial class MainWindow : Window
         _friendlyNames[dName] = name;
         entry = new DriverEntry(id, name, dName);
         return true;
+    }
+
+    private static bool IsAnchorName(string dName)
+    {
+        return AnchorNames.Any(anchor => string.Equals(anchor, dName, StringComparison.OrdinalIgnoreCase));
+    }
+
+    private void RefreshDriverView()
+    {
+        if (CollectionViewSource.GetDefaultView(Drivers) is ListCollectionView view)
+        {
+            view.Refresh();
+        }
     }
 
     private async Task<bool> IsRtiProcessorAsync(string ip)
@@ -798,6 +831,39 @@ public partial class MainWindow : Window
         private void OnPropertyChanged(string propertyName)
         {
             PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
+        }
+    }
+
+    private sealed class DriverEntryComparer : IComparer
+    {
+        public int Compare(object? x, object? y)
+        {
+            if (x is not DriverEntry a || y is not DriverEntry b)
+            {
+                return 0;
+            }
+
+            var aIndex = GetAnchorIndex(a.DName);
+            var bIndex = GetAnchorIndex(b.DName);
+            if (aIndex != bIndex)
+            {
+                return aIndex.CompareTo(bIndex);
+            }
+
+            return string.Compare(a.Name, b.Name, StringComparison.OrdinalIgnoreCase);
+        }
+
+        private static int GetAnchorIndex(string dName)
+        {
+            for (var i = 0; i < AnchorNames.Length; i++)
+            {
+                if (string.Equals(AnchorNames[i], dName, StringComparison.OrdinalIgnoreCase))
+                {
+                    return i;
+                }
+            }
+
+            return AnchorNames.Length + 1;
         }
     }
 }

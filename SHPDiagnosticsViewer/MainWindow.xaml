@@ -7,7 +7,7 @@
     <Style x:Key="LevelButtonStyle" TargetType="Button">
       <Setter Property="Width" Value="28" />
       <Setter Property="Height" Value="22" />
-      <Setter Property="Margin" Value="4,0,0,0" />
+      <Setter Property="Margin" Value="6,0,0,0" />
       <Setter Property="Padding" Value="0" />
       <Setter Property="Background" Value="#F3F3F3" />
       <Setter Property="BorderBrush" Value="#BDBDBD" />
@@ -18,6 +18,7 @@
       <Setter Property="Background" Value="#F3F3F3" />
       <Setter Property="BorderBrush" Value="#BDBDBD" />
       <Setter Property="BorderThickness" Value="1" />
+      <Setter Property="Height" Value="30" />
       <Style.Triggers>
         <Trigger Property="IsChecked" Value="True">
           <Setter Property="Background" Value="#D9F2D9" />
@@ -50,15 +51,30 @@
     <Border Grid.Row="2" BorderBrush="#CCCCCC" BorderThickness="1" CornerRadius="4" Padding="6" Margin="0,0,0,8">
       <StackPanel>
         <TextBlock Text="Driver Log Levels" FontWeight="SemiBold" Margin="0,0,0,6" />
-        <ScrollViewer MinHeight="80" MaxHeight="360" VerticalScrollBarVisibility="Auto">
+        <ScrollViewer Height="240"
+                      HorizontalScrollBarVisibility="Auto"
+                      VerticalScrollBarVisibility="Disabled">
           <ItemsControl ItemsSource="{Binding Drivers}">
+            <ItemsControl.ItemsPanel>
+              <ItemsPanelTemplate>
+                <WrapPanel Orientation="Vertical"
+                           ItemWidth="360"
+                           ItemHeight="30" />
+              </ItemsPanelTemplate>
+            </ItemsControl.ItemsPanel>
             <ItemsControl.ItemTemplate>
               <DataTemplate>
-                <DockPanel Margin="0,0,0,6">
-                  <ToggleButton Content="{Binding Name}" Width="260" Margin="0,0,4,0"
+                <Grid Width="360" Height="30" Margin="0,0,8,0">
+                  <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="240" />
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="Auto" />
+                  </Grid.ColumnDefinitions>
+                  <ToggleButton Grid.Column="0" Content="{Binding Name}" Margin="0,0,4,0"
                                 IsChecked="{Binding IsEnabled, Mode=TwoWay}" Click="DriverToggle_Click"
                                 Style="{StaticResource DriverToggleStyle}" />
-                  <Button Content="1" Tag="1" Click="DriverLevelButton_Click">
+                  <Button Grid.Column="1" Content="1" Tag="1" Click="DriverLevelButton_Click">
                     <Button.Style>
                       <Style TargetType="Button" BasedOn="{StaticResource LevelButtonStyle}">
                         <Style.Triggers>
@@ -73,7 +89,7 @@
                       </Style>
                     </Button.Style>
                   </Button>
-                  <Button Content="2" Tag="2" Click="DriverLevelButton_Click">
+                  <Button Grid.Column="2" Content="2" Tag="2" Click="DriverLevelButton_Click">
                     <Button.Style>
                       <Style TargetType="Button" BasedOn="{StaticResource LevelButtonStyle}">
                         <Style.Triggers>
@@ -88,7 +104,7 @@
                       </Style>
                     </Button.Style>
                   </Button>
-                  <Button Content="3" Tag="3" Click="DriverLevelButton_Click">
+                  <Button Grid.Column="3" Content="3" Tag="3" Click="DriverLevelButton_Click">
                     <Button.Style>
                       <Style TargetType="Button" BasedOn="{StaticResource LevelButtonStyle}">
                         <Style.Triggers>
@@ -103,7 +119,7 @@
                       </Style>
                     </Button.Style>
                   </Button>
-                </DockPanel>
+                </Grid>
               </DataTemplate>
             </ItemsControl.ItemTemplate>
           </ItemsControl>
