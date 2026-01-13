@@ -739,8 +739,10 @@ public partial class MainWindow : Window
             return;
         }
 
-        var level = driver.SelectedLevel.ToString();
-        await SendLogLevelAsync(driver.DName, toggle.IsChecked == true ? level : "0");
+        var isOn = toggle.IsChecked == true;
+        driver.IsEnabled = isOn;
+        var level = isOn ? driver.SelectedLevel.ToString() : "0";
+        await SendLogLevelAsync(driver.DName, level);
         AppendLog($"[local] Set {driver.DName} to {(toggle.IsChecked == true ? level : "0")}");
     }
 
@@ -757,16 +759,14 @@ public partial class MainWindow : Window
         }
 
         driver.SelectedLevel = level;
+        driver.IsEnabled = true;
         if (_socket == null || _socket.State != WebSocketState.Open)
         {
             return;
         }
 
-        if (driver.IsEnabled)
-        {
-            await SendLogLevelAsync(driver.DName, level.ToString());
-            AppendLog($"[local] Set {driver.DName} to {level}");
-        }
+        await SendLogLevelAsync(driver.DName, level.ToString());
+        AppendLog($"[local] Set {driver.DName} to {level}");
     }
 
     public class DriverEntry : INotifyPropertyChanged
