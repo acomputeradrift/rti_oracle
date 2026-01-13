@@ -461,6 +461,8 @@ public partial class MainWindow : Window
     private string HandleLogLevels(JsonElement root)
     {
         var updates = new List<string>();
+        var uniqueNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var driverCount = 0;
         if (root.TryGetProperty("levels", out var levels) && levels.ValueKind == JsonValueKind.Array)
         {
             foreach (var level in levels.EnumerateArray())
@@ -472,12 +474,23 @@ public partial class MainWindow : Window
                     continue;
                 }
 
+                if (uniqueNames.Add(dName) && dName.StartsWith("DRIVER//", StringComparison.OrdinalIgnoreCase))
+                {
+                    driverCount++;
+                }
+
                 UpdateDriverFromLogLevel(dName, logLevel);
                 updates.Add($"{dName}={logLevel}");
             }
         }
 
-        return updates.Count > 0 ? $"LogLevels: {string.Join(", ", updates)}" : "LogLevels";
+        if (updates.Count == 0)
+        {
+            return "LogLevels";
+        }
+
+        var summary = $"LogLevels ({uniqueNames.Count} total, {driverCount} drivers): ";
+        return summary + string.Join(", ", updates);
     }
 
     private static int ParseLogLevel(JsonElement levelElement)
@@ -508,6 +521,13 @@ public partial class MainWindow : Window
                 var displayName = _friendlyNames.TryGetValue(dName, out var friendly) ? friendly : dName;
                 existing = new DriverEntry(ParseDriverId(dName), displayName, dName);
                 Drivers.Add(existing);
+            }
+            else
+            {
+                if (_friendlyNames.TryGetValue(dName, out var friendly) && !string.IsNullOrWhiteSpace(friendly))
+                {
+                    existing.UpdateName(friendly);
+                }
             }
 
             existing.SelectedLevel = level;
@@ -562,10 +582,17 @@ public partial class MainWindow : Window
 
             Dispatcher.Invoke(() =>
             {
-                Drivers.Clear();
                 foreach (var entry in list)
                 {
-                    Drivers.Add(entry);
+                    var existing = Drivers.FirstOrDefault(d => d.DName.Equals(entry.DName, StringComparison.OrdinalIgnoreCase));
+                    if (existing == null)
+                    {
+                        Drivers.Add(entry);
+                    }
+                    else
+                    {
+                        existing.UpdateName(entry.Name);
+                    }
                 }
             });
 
@@ -713,18 +740,30 @@ public partial class MainWindow : Window
     {
         private bool _isEnabled;
         private int _selectedLevel;
+        private string _name;
 
         public DriverEntry(int id, string name, string dName)
         {
             Id = id;
-            Name = name;
+            _name = name;
             DName = dName;
             SelectedLevel = 3;
         }
 
         public int Id { get; }
-        public string Name { get; }
+        public string Name => _name;
         public string DName { get; }
+
+        public void UpdateName(string name)
+        {
+            if (string.Equals(_name, name, StringComparison.Ordinal))
+            {
+                return;
+            }
+
+            _name = name;
+            OnPropertyChanged(nameof(Name));
+        }
 
         public bool IsEnabled
         {
