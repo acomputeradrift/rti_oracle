@@ -128,14 +128,59 @@
     </Border>
 
     <Border Grid.Row="3" BorderBrush="#CCCCCC" BorderThickness="1" CornerRadius="4" Padding="6">
-      <TextBox x:Name="LogTextBox"
-               FontFamily="Consolas"
-               FontSize="12"
-               IsReadOnly="True"
-               TextWrapping="Wrap"
-               VerticalScrollBarVisibility="Auto"
-               HorizontalScrollBarVisibility="Auto"
-               AcceptsReturn="True" />
+      <Grid>
+        <Grid.RowDefinitions>
+          <RowDefinition Height="Auto" />
+          <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
+        <TextBlock Text="Diagnostics" FontWeight="SemiBold" Margin="0,0,0,6" />
+        <Grid Grid.Row="1">
+          <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="*" />
+            <ColumnDefinition Width="12" />
+            <ColumnDefinition Width="*" />
+          </Grid.ColumnDefinitions>
+
+          <Border Grid.Column="0" BorderBrush="#DDDDDD" BorderThickness="1" CornerRadius="3" Padding="6">
+            <Grid>
+              <Grid.RowDefinitions>
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="*" />
+              </Grid.RowDefinitions>
+              <TextBlock Text="Raw Output" FontWeight="SemiBold" Margin="0,0,0,6" />
+              <TextBox x:Name="RawLogTextBox"
+                       Grid.Row="1"
+                       FontFamily="Consolas"
+                       FontSize="12"
+                       IsReadOnly="True"
+                       TextWrapping="Wrap"
+                       VerticalScrollBarVisibility="Auto"
+                       HorizontalScrollBarVisibility="Auto"
+                       AcceptsReturn="True" />
+            </Grid>
+          </Border>
+
+          <Border Grid.Column="2" BorderBrush="#DDDDDD" BorderThickness="1" CornerRadius="3" Padding="6">
+            <Grid>
+              <Grid.RowDefinitions>
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="*" />
+              </Grid.RowDefinitions>
+              <TextBlock Text="Processed Output" FontWeight="SemiBold" Margin="0,0,0,6" />
+              <TextBox x:Name="ProcessedLogTextBox"
+                       Grid.Row="1"
+                       FontFamily="Consolas"
+                       FontSize="12"
+                       IsReadOnly="True"
+                       TextWrapping="Wrap"
+                       VerticalScrollBarVisibility="Auto"
+                       HorizontalScrollBarVisibility="Auto"
+                       AcceptsReturn="True"
+                       Text="No processed information available" />
+            </Grid>
+          </Border>
+        </Grid>
+      </Grid>
     </Border>
   </Grid>
 </Window>

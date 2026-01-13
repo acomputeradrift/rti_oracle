@@ -568,15 +568,15 @@ public partial class MainWindow : Window
                 return;
             }
 
-            var newText = LogTextBox.Text + line + Environment.NewLine;
+            var newText = RawLogTextBox.Text + line + Environment.NewLine;
             if (newText.Length > MaxLogChars)
             {
                 newText = newText.Substring(newText.Length - MaxLogChars);
             }
 
-            LogTextBox.Text = newText;
-            LogTextBox.CaretIndex = LogTextBox.Text.Length;
-            LogTextBox.ScrollToEnd();
+            RawLogTextBox.Text = newText;
+            RawLogTextBox.CaretIndex = RawLogTextBox.Text.Length;
+            RawLogTextBox.ScrollToEnd();
         });
     }
 
