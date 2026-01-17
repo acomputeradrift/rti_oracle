@@ -18,3 +18,23 @@ C:\Users\jamiefeeny\Downloads\Oracle v1\SHPDiagnosticsViewer\obj\Debug\net8.0-wi
 C:\Users\jamiefeeny\Downloads\Oracle v1\SHPDiagnosticsViewer\obj\Debug\net8.0-windows\SHPDiagnosticsViewer.genruntimeconfig.cache
 C:\Users\jamiefeeny\Downloads\Oracle v1\SHPDiagnosticsViewer\obj\Debug\net8.0-windows\ref\SHPDiagnosticsViewer.dll
 C:\Users\jamiefeeny\Downloads\Oracle v1\SHPDiagnosticsViewer\obj\Debug\net8.0-windows\SHPDiagnosticsViewer.sourcelink.json
+Y:\Desktop\Development\Oracle\SHPDiagnosticsViewer\bin\Debug\net8.0-windows\SHPDiagnosticsViewer.exe
+Y:\Desktop\Development\Oracle\SHPDiagnosticsViewer\bin\Debug\net8.0-windows\SHPDiagnosticsViewer.deps.json
+Y:\Desktop\Development\Oracle\SHPDiagnosticsViewer\bin\Debug\net8.0-windows\SHPDiagnosticsViewer.runtimeconfig.json
+Y:\Desktop\Development\Oracle\SHPDiagnosticsViewer\bin\Debug\net8.0-windows\SHPDiagnosticsViewer.dll
+Y:\Desktop\Development\Oracle\SHPDiagnosticsViewer\bin\Debug\net8.0-windows\SHPDiagnosticsViewer.pdb
+Y:\Desktop\Development\Oracle\SHPDiagnosticsViewer\obj\Debug\net8.0-windows\MainWindow.baml
+Y:\Desktop\Development\Oracle\SHPDiagnosticsViewer\obj\Debug\net8.0-windows\MainWindow.g.cs
+Y:\Desktop\Development\Oracle\SHPDiagnosticsViewer\obj\Debug\net8.0-windows\App.g.cs
+Y:\Desktop\Development\Oracle\SHPDiagnosticsViewer\obj\Debug\net8.0-windows\SHPDiagnosticsViewer_MarkupCompile.cache
+Y:\Desktop\Development\Oracle\SHPDiagnosticsViewer\obj\Debug\net8.0-windows\SHPDiagnosticsViewer.g.resources
+Y:\Desktop\Development\Oracle\SHPDiagnosticsViewer\obj\Debug\net8.0-windows\SHPDiagnosticsViewer.GeneratedMSBuildEditorConfig.editorconfig
+Y:\Desktop\Development\Oracle\SHPDiagnosticsViewer\obj\Debug\net8.0-windows\SHPDiagnosticsViewer.AssemblyInfoInputs.cache
+Y:\Desktop\Development\Oracle\SHPDiagnosticsViewer\obj\Debug\net8.0-windows\SHPDiagnosticsViewer.AssemblyInfo.cs
+Y:\Desktop\Development\Oracle\SHPDiagnosticsViewer\obj\Debug\net8.0-windows\SHPDiagnosticsViewer.csproj.CoreCompileInputs.cache
+Y:\Desktop\Development\Oracle\SHPDiagnosticsViewer\obj\Debug\net8.0-windows\SHPDiagnosticsViewer.sourcelink.json
+Y:\Desktop\Development\Oracle\SHPDiagnosticsViewer\obj\Debug\net8.0-windows\SHPDiagnosticsViewer.dll
+Y:\Desktop\Development\Oracle\SHPDiagnosticsViewer\obj\Debug\net8.0-windows\refint\SHPDiagnosticsViewer.dll
+Y:\Desktop\Development\Oracle\SHPDiagnosticsViewer\obj\Debug\net8.0-windows\SHPDiagnosticsViewer.pdb
+Y:\Desktop\Development\Oracle\SHPDiagnosticsViewer\obj\Debug\net8.0-windows\SHPDiagnosticsViewer.genruntimeconfig.cache
+Y:\Desktop\Development\Oracle\SHPDiagnosticsViewer\obj\Debug\net8.0-windows\ref\SHPDiagnosticsViewer.dll

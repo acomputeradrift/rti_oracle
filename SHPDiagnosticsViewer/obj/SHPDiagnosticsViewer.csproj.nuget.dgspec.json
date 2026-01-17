@@ -1,17 +1,17 @@
 {
   "format": 1,
   "restore": {
-    "C:\\Users\\jamiefeeny\\Downloads\\Oracle v1\\SHPDiagnosticsViewer\\SHPDiagnosticsViewer.csproj": {}
+    "Y:\\Desktop\\Development\\Oracle\\SHPDiagnosticsViewer\\SHPDiagnosticsViewer.csproj": {}
   },
   "projects": {
-    "C:\\Users\\jamiefeeny\\Downloads\\Oracle v1\\SHPDiagnosticsViewer\\SHPDiagnosticsViewer.csproj": {
+    "Y:\\Desktop\\Development\\Oracle\\SHPDiagnosticsViewer\\SHPDiagnosticsViewer.csproj": {
       "version": "1.0.0",
       "restore": {
-        "projectUniqueName": "C:\\Users\\jamiefeeny\\Downloads\\Oracle v1\\SHPDiagnosticsViewer\\SHPDiagnosticsViewer.csproj",
+        "projectUniqueName": "Y:\\Desktop\\Development\\Oracle\\SHPDiagnosticsViewer\\SHPDiagnosticsViewer.csproj",
         "projectName": "SHPDiagnosticsViewer",
-        "projectPath": "C:\\Users\\jamiefeeny\\Downloads\\Oracle v1\\SHPDiagnosticsViewer\\SHPDiagnosticsViewer.csproj",
+        "projectPath": "Y:\\Desktop\\Development\\Oracle\\SHPDiagnosticsViewer\\SHPDiagnosticsViewer.csproj",
         "packagesPath": "C:\\Users\\jamiefeeny\\.nuget\\packages\\",
-        "outputPath": "C:\\Users\\jamiefeeny\\Downloads\\Oracle v1\\SHPDiagnosticsViewer\\obj\\",
+        "outputPath": "Y:\\Desktop\\Development\\Oracle\\SHPDiagnosticsViewer\\obj\\",
         "projectStyle": "PackageReference",
         "configFilePaths": [
           "C:\\Users\\jamiefeeny\\AppData\\Roaming\\NuGet\\NuGet.Config"

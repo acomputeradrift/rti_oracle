@@ -13,7 +13,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("SHPDiagnosticsViewer")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+8a0447d8b0e1ce81ae8a778ab31c26b5cc7cb45f")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+cab712d0fb2cf2275dbe4c88e898cb32bb1be81f")]
 [assembly: System.Reflection.AssemblyProductAttribute("SHPDiagnosticsViewer")]
 [assembly: System.Reflection.AssemblyTitleAttribute("SHPDiagnosticsViewer")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]

@@ -1,32 +1,24 @@
 using System;
 using System.Collections;
 using System.Collections.ObjectModel;
-using System.ComponentModel;
 using System.Collections.Generic;
+using System.ComponentModel;
 using System.Linq;
-using System.Net;
-using System.Net.Http;
-using System.Net.NetworkInformation;
-using System.Net.Sockets;
-using System.Net.WebSockets;
-using System.Text;
 using System.Text.Json;
-using System.Threading;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
 using System.Windows.Data;
+using SHPDiagnosticsViewer.DiagnosticsTransport;
 
 namespace SHPDiagnosticsViewer;
 
 public partial class MainWindow : Window
 {
     private const int MaxLogChars = 200_000;
-    private ClientWebSocket? _socket;
-    private CancellationTokenSource? _socketCts;
+    private readonly IDiagnosticsTransport _transport;
     private bool _isConnecting;
-    private string? _currentIp;
     private readonly Dictionary<string, string> _friendlyNames = new(StringComparer.OrdinalIgnoreCase);
     private static readonly string[] AnchorNames =
     {
@@ -50,6 +42,27 @@ public partial class MainWindow : Window
         {
             view.CustomSort = new DriverEntryComparer();
         }
+
+        _transport = new LegacyWebSocketDiagnosticsTransport();
+        _transport.RawMessageReceived += Transport_RawMessageReceived;
+        _transport.TransportInfo += Transport_TransportInfo;
+        _transport.TransportError += Transport_TransportError;
+    }
+
+    private void Transport_RawMessageReceived(object? sender, string raw)
+    {
+        var line = FormatMessage(raw);
+        AppendLog(line);
+    }
+
+    private void Transport_TransportInfo(object? sender, string message)
+    {
+        AppendLog(message);
+    }
+
+    private void Transport_TransportError(object? sender, string message)
+    {
+        AppendLog(message);
     }
 
     private async void DiscoverButton_Click(object sender, RoutedEventArgs e)
@@ -59,7 +72,7 @@ public partial class MainWindow : Window
 
         try
         {
-            var results = await DiscoverAsync(TimeSpan.FromSeconds(2));
+            var results = await _transport.DiscoverAsync(TimeSpan.FromSeconds(2));
             DiscoveredCombo.ItemsSource = results.OrderBy(ip => ip).ToList();
             if (results.Count == 1)
             {
@@ -99,7 +112,9 @@ public partial class MainWindow : Window
 
         try
         {
-            await ConnectAsync(ip);
+            _friendlyNames.Clear();
+            await _transport.ConnectAsync(ip);
+            await LoadDriversAsync(ip);
             StatusText.Text = "Connected";
             DisconnectButton.IsEnabled = true;
         }
@@ -118,7 +133,7 @@ public partial class MainWindow : Window
 
     private async void DisconnectButton_Click(object sender, RoutedEventArgs e)
     {
-        await DisconnectAsync();
+        await _transport.DisconnectAsync();
         StatusText.Text = "Disconnected";
         DisconnectButton.IsEnabled = false;
         ConnectButton.IsEnabled = true;
@@ -131,276 +146,6 @@ public partial class MainWindow : Window
         if (DiscoveredCombo.SelectedItem is string selected)
         {
             IpTextBox.Text = selected;
-        }
-    }
-
-    private async Task<List<string>> DiscoverAsync(TimeSpan timeout)
-    {
-        var candidates = await DiscoverCandidatesAsync(timeout);
-        var verified = await FilterRtiProcessorsAsync(candidates);
-        if (verified.Count > 0)
-        {
-            return verified;
-        }
-
-        var subnetHits = await ScanLocalSubnetAsync();
-        return subnetHits;
-    }
-
-    private async Task<List<string>> DiscoverCandidatesAsync(TimeSpan timeout)
-    {
-        var results = new HashSet<string>();
-        using var udp = new UdpClient(AddressFamily.InterNetwork);
-        udp.EnableBroadcast = true;
-        udp.MulticastLoopback = false;
-
-        var request =
-            "M-SEARCH * HTTP/1.1\r\n" +
-            "HOST: 239.255.255.250:1900\r\n" +
-            "MAN: \"ssdp:discover\"\r\n" +
-            "MX: 1\r\n" +
-            "ST: ssdp:all\r\n\r\n";
-
-        var data = Encoding.ASCII.GetBytes(request);
-        await udp.SendAsync(data, data.Length, new IPEndPoint(IPAddress.Parse("239.255.255.250"), 1900));
-
-        var stopAt = DateTime.UtcNow + timeout;
-        while (DateTime.UtcNow < stopAt)
-        {
-            var remaining = stopAt - DateTime.UtcNow;
-            if (remaining <= TimeSpan.Zero)
-            {
-                break;
-            }
-
-            var receiveTask = udp.ReceiveAsync();
-            var completed = await Task.WhenAny(receiveTask, Task.Delay(remaining));
-            if (completed != receiveTask)
-            {
-                break;
-            }
-
-            var result = await receiveTask;
-            var ip = result.RemoteEndPoint.Address.ToString();
-            results.Add(ip);
-        }
-
-        return results.ToList();
-    }
-
-    private async Task<List<string>> FilterRtiProcessorsAsync(List<string> candidates)
-    {
-        var matches = new List<string>();
-        foreach (var ip in candidates)
-        {
-            if (await IsRtiProcessorAsync(ip))
-            {
-                matches.Add(ip);
-            }
-        }
-        return matches;
-    }
-
-    private async Task<List<string>> ScanLocalSubnetAsync()
-    {
-        var localIp = GetLocalIPv4();
-        if (string.IsNullOrWhiteSpace(localIp))
-        {
-            AppendLog("[error] Unable to determine local IP for subnet scan.");
-            return new List<string>();
-        }
-
-        var parts = localIp.Split('.');
-        if (parts.Length != 4)
-        {
-            return new List<string>();
-        }
-
-        var prefix = $"{parts[0]}.{parts[1]}.{parts[2]}";
-        AppendLog($"[info] SSDP discovery empty, scanning subnet {prefix}.0/24");
-
-        var candidates = Enumerable.Range(1, 254).Select(i => $"{prefix}.{i}").ToList();
-        var results = new List<string>();
-        using var gate = new SemaphoreSlim(32);
-        var tasks = candidates.Select(async ip =>
-        {
-            await gate.WaitAsync();
-            try
-            {
-                if (await IsRtiProcessorAsync(ip))
-                {
-                    lock (results)
-                    {
-                        results.Add(ip);
-                    }
-                }
-            }
-            finally
-            {
-                gate.Release();
-            }
-        });
-
-        await Task.WhenAll(tasks);
-        return results.Distinct().ToList();
-    }
-
-    private static string? GetLocalIPv4()
-    {
-        foreach (var ni in NetworkInterface.GetAllNetworkInterfaces())
-        {
-            if (ni.OperationalStatus != OperationalStatus.Up)
-            {
-                continue;
-            }
-
-            if (ni.NetworkInterfaceType == NetworkInterfaceType.Loopback)
-            {
-                continue;
-            }
-
-            foreach (var ua in ni.GetIPProperties().UnicastAddresses)
-            {
-                if (ua.Address.AddressFamily == AddressFamily.InterNetwork)
-                {
-                    return ua.Address.ToString();
-                }
-            }
-        }
-
-        return null;
-    }
-
-    private async Task ConnectAsync(string ip)
-    {
-        await DisconnectAsync();
-
-        _currentIp = ip;
-        _friendlyNames.Clear();
-        _socket = new ClientWebSocket();
-        _socket.Options.SetRequestHeader("Origin", $"http://{ip}");
-        _socketCts = new CancellationTokenSource();
-
-        var uri = new Uri($"ws://{ip}:1234/diagnosticswss");
-        await _socket.ConnectAsync(uri, _socketCts.Token);
-
-        AppendLog("[info] Connected to WebSocket");
-
-        await SendSubscribeAsync("MessageLog", "true");
-        await SendSubscribeAsync("Sysvar", "true");
-
-        _ = Task.Run(() => ReceiveLoopAsync(_socket, _socketCts.Token));
-
-        await LoadDriversAsync(ip);
-    }
-
-    private async Task DisconnectAsync()
-    {
-        try
-        {
-            _socketCts?.Cancel();
-        }
-        catch
-        {
-        }
-
-        if (_socket != null)
-        {
-            try
-            {
-                if (_socket.State == WebSocketState.Open)
-                {
-                    await _socket.CloseAsync(WebSocketCloseStatus.NormalClosure, "Closing", CancellationToken.None);
-                }
-            }
-            catch
-            {
-            }
-            finally
-            {
-                _socket.Dispose();
-                _socket = null;
-            }
-        }
-    }
-
-    private async Task SendSubscribeAsync(string resource, string value)
-    {
-        var payload = new
-        {
-            type = "Subscribe",
-            resource,
-            value
-        };
-
-        await SendJsonAsync(payload);
-    }
-
-    private async Task SendLogLevelAsync(string type, string level)
-    {
-        var payload = new
-        {
-            type = "Subscribe",
-            resource = "LogLevel",
-            value = new
-            {
-                type,
-                level
-            }
-        };
-
-        await SendJsonAsync(payload);
-    }
-
-    private async Task SendJsonAsync<T>(T payload)
-    {
-        if (_socket == null || _socket.State != WebSocketState.Open)
-        {
-            return;
-        }
-
-        var json = JsonSerializer.Serialize(payload);
-        var bytes = Encoding.UTF8.GetBytes(json);
-        await _socket.SendAsync(new ArraySegment<byte>(bytes), WebSocketMessageType.Text, true, _socketCts?.Token ?? CancellationToken.None);
-    }
-
-    private async Task ReceiveLoopAsync(ClientWebSocket socket, CancellationToken token)
-    {
-        var buffer = new byte[8192];
-        while (!token.IsCancellationRequested && socket.State == WebSocketState.Open)
-        {
-            try
-            {
-                var messageBuffer = new ArraySegment<byte>(buffer);
-                using var stream = new System.IO.MemoryStream();
-                WebSocketReceiveResult? result;
-                do
-                {
-                    result = await socket.ReceiveAsync(messageBuffer, token);
-                    if (result.MessageType == WebSocketMessageType.Close)
-                    {
-                        await Dispatcher.InvokeAsync(async () => await DisconnectAsync());
-                        return;
-                    }
-
-                    stream.Write(buffer, 0, result.Count);
-                }
-                while (!result.EndOfMessage);
-
-                var text = Encoding.UTF8.GetString(stream.ToArray());
-                var line = FormatMessage(text);
-                AppendLog(line);
-            }
-            catch (OperationCanceledException)
-            {
-                return;
-            }
-            catch (Exception ex)
-            {
-                AppendLog($"[error] WebSocket error: {ex.Message}");
-                await Dispatcher.InvokeAsync(async () => await DisconnectAsync());
-                return;
-            }
         }
     }
 
@@ -584,28 +329,17 @@ public partial class MainWindow : Window
     {
         try
         {
-            using var http = new HttpClient { Timeout = TimeSpan.FromSeconds(8) };
-            var url = $"http://{ip}:5000/diagnostics/data/drivers";
-            string json;
-            try
-            {
-                json = await http.GetStringAsync(url);
-            }
-            catch (TaskCanceledException)
-            {
-                json = await http.GetStringAsync(url);
-            }
-
-            var list = ParseDrivers(json);
+            var list = await _transport.LoadDriversAsync(ip);
 
             Dispatcher.Invoke(() =>
             {
                 foreach (var entry in list)
                 {
+                    _friendlyNames[entry.DName] = entry.Name;
                     var existing = Drivers.FirstOrDefault(d => d.DName.Equals(entry.DName, StringComparison.OrdinalIgnoreCase));
                     if (existing == null)
                     {
-                        Drivers.Add(entry);
+                        Drivers.Add(new DriverEntry(entry.Id, entry.Name, entry.DName));
                     }
                     else
                     {
@@ -624,80 +358,6 @@ public partial class MainWindow : Window
         }
     }
 
-    private List<DriverEntry> ParseDrivers(string json)
-    {
-        var results = new List<DriverEntry>();
-        using var doc = JsonDocument.Parse(json);
-        JsonElement root = doc.RootElement;
-
-        if (root.ValueKind == JsonValueKind.Object && root.TryGetProperty("drivers", out var driversElement))
-        {
-            root = driversElement;
-        }
-
-        if (root.ValueKind == JsonValueKind.Array)
-        {
-            foreach (var item in root.EnumerateArray())
-            {
-                if (TryBuildDriverEntry(item, out var entry))
-                {
-                    results.Add(entry);
-                }
-            }
-        }
-        else if (root.ValueKind == JsonValueKind.Object)
-        {
-            foreach (var property in root.EnumerateObject())
-            {
-                if (property.Value.ValueKind == JsonValueKind.Array)
-                {
-                    foreach (var item in property.Value.EnumerateArray())
-                    {
-                        if (TryBuildDriverEntry(item, out var entry))
-                        {
-                            results.Add(entry);
-                        }
-                    }
-                }
-                else if (property.Value.ValueKind == JsonValueKind.Object)
-                {
-                    if (TryBuildDriverEntry(property.Value, out var entry))
-                    {
-                        results.Add(entry);
-                    }
-                }
-            }
-        }
-
-        return results;
-    }
-
-    private bool TryBuildDriverEntry(JsonElement item, out DriverEntry entry)
-    {
-        entry = null!;
-        if (item.ValueKind != JsonValueKind.Object)
-        {
-            return false;
-        }
-
-        if (!item.TryGetProperty("id", out var idElement))
-        {
-            return false;
-        }
-
-        var id = idElement.GetInt32();
-        var dName = $"DRIVER//{id}";
-        var name = item.TryGetProperty("name", out var nameElement) ? nameElement.GetString() ?? dName : dName;
-        if (string.IsNullOrWhiteSpace(name))
-        {
-            name = dName;
-        }
-
-        _friendlyNames[dName] = name;
-        entry = new DriverEntry(id, name, dName);
-        return true;
-    }
-
     private static bool IsAnchorName(string dName)
     {
         return AnchorNames.Any(anchor => string.Equals(anchor, dName, StringComparison.OrdinalIgnoreCase));
@@ -711,21 +371,6 @@ public partial class MainWindow : Window
         }
     }
 
-    private async Task<bool> IsRtiProcessorAsync(string ip)
-    {
-        try
-        {
-            using var http = new HttpClient { Timeout = TimeSpan.FromMilliseconds(750) };
-            var url = $"http://{ip}:5000/diagnostics/data/drivers";
-            var json = await http.GetStringAsync(url);
-            return !string.IsNullOrWhiteSpace(json);
-        }
-        catch
-        {
-            return false;
-        }
-    }
-
     private async void DriverToggle_Click(object sender, RoutedEventArgs e)
     {
         if (sender is not ToggleButton toggle || toggle.DataContext is not DriverEntry driver)
@@ -733,7 +378,7 @@ public partial class MainWindow : Window
             return;
         }
 
-        if (_socket == null || _socket.State != WebSocketState.Open)
+        if (!_transport.IsConnected)
         {
             driver.IsEnabled = false;
             return;
@@ -742,7 +387,7 @@ public partial class MainWindow : Window
         var isOn = toggle.IsChecked == true;
         driver.IsEnabled = isOn;
         var level = isOn ? driver.SelectedLevel.ToString() : "0";
-        await SendLogLevelAsync(driver.DName, level);
+        await _transport.SendLogLevelAsync(driver.DName, level);
         AppendLog($"[local] Set {driver.DName} to {(toggle.IsChecked == true ? level : "0")}");
     }
 
@@ -760,12 +405,12 @@ public partial class MainWindow : Window
 
         driver.SelectedLevel = level;
         driver.IsEnabled = true;
-        if (_socket == null || _socket.State != WebSocketState.Open)
+        if (!_transport.IsConnected)
         {
             return;
         }
 
-        await SendLogLevelAsync(driver.DName, level.ToString());
+        await _transport.SendLogLevelAsync(driver.DName, level.ToString());
         AppendLog($"[local] Set {driver.DName} to {level}");
     }
 
