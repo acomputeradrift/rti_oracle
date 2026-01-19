@@ -203,6 +203,12 @@ public partial class MainWindow : Window
         }
     }
 
+    private void ClearDiagnostics_Click(object sender, RoutedEventArgs e)
+    {
+        RawLogTextBox.Clear();
+        _rawLineNumber = 1;
+    }
+
     private string FormatMessage(string raw)
     {
         try

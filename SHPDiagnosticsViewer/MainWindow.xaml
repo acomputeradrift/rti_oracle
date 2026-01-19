@@ -135,7 +135,18 @@
           <RowDefinition Height="Auto" />
           <RowDefinition Height="*" />
         </Grid.RowDefinitions>
-        <TextBlock Text="Diagnostics" FontWeight="SemiBold" Margin="0,0,0,6" />
+        <Grid Margin="0,0,0,6">
+          <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="*" />
+            <ColumnDefinition Width="Auto" />
+          </Grid.ColumnDefinitions>
+          <TextBlock Text="Diagnostics" FontWeight="SemiBold" VerticalAlignment="Center" />
+          <Button Grid.Column="1"
+                  Content="Clear"
+                  Padding="10,2"
+                  Margin="8,0,0,0"
+                  Click="ClearDiagnostics_Click" />
+        </Grid>
         <Grid Grid.Row="1">
           <Grid.ColumnDefinitions>
             <ColumnDefinition Width="*" />
