@@ -120,8 +120,8 @@ Changes require updates to:
 
 ## 8. Architecture Acknowledgement
 
-Acknowledged by: Jamie Feeny  
-Date: <<<YYYY-MM-DD>>>
+Acknowledged by: **Jamie Feeny**  
+Date: **2026-01-18**
 
 Acknowledgement confirms:
 - Review and acceptance of architectural constraints

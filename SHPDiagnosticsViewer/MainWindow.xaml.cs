@@ -53,8 +53,7 @@ public partial class MainWindow : Window
     {
         if (_useTcpCapture)
         {
-            var rawLine = StripViewerPrefix(raw);
-            AppendLog($"{_rawLineNumber++}\t{rawLine}", true);
+            AppendLog($"{_rawLineNumber++}\t{raw}", true);
             return;
         }
 
@@ -378,33 +377,6 @@ public partial class MainWindow : Window
             RawLogTextBox.CaretIndex = RawLogTextBox.Text.Length;
             RawLogTextBox.ScrollToEnd();
         });
-    }
-
-    private static string StripViewerPrefix(string line)
-    {
-        var twxIndex = line.IndexOf("TWxPort", StringComparison.Ordinal);
-        var rtiIndex = line.IndexOf("RTiPanel", StringComparison.Ordinal);
-        var index = -1;
-
-        if (twxIndex >= 0 && rtiIndex >= 0)
-        {
-            index = Math.Min(twxIndex, rtiIndex);
-        }
-        else if (twxIndex >= 0)
-        {
-            index = twxIndex;
-        }
-        else if (rtiIndex >= 0)
-        {
-            index = rtiIndex;
-        }
-
-        if (index <= 0)
-        {
-            return line;
-        }
-
-        return line.Substring(index);
     }
 
     private async Task LoadDriversAsync(string ip)
