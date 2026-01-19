@@ -17,8 +17,10 @@ namespace SHPDiagnosticsViewer;
 public partial class MainWindow : Window
 {
     private const int MaxLogChars = 200_000;
-    private readonly IDiagnosticsTransport _transport;
+    private IDiagnosticsTransport _transport;
     private bool _isConnecting;
+    private bool _useTcpCapture;
+    private int _rawLineNumber = 1;
     private readonly Dictionary<string, string> _friendlyNames = new(StringComparer.OrdinalIgnoreCase);
     private static readonly string[] AnchorNames =
     {
@@ -44,25 +46,62 @@ public partial class MainWindow : Window
         }
 
         _transport = new LegacyWebSocketDiagnosticsTransport();
-        _transport.RawMessageReceived += Transport_RawMessageReceived;
-        _transport.TransportInfo += Transport_TransportInfo;
-        _transport.TransportError += Transport_TransportError;
+        RegisterTransportHandlers(_transport);
     }
 
     private void Transport_RawMessageReceived(object? sender, string raw)
     {
-        var line = FormatMessage(raw);
-        AppendLog(line);
+        if (_useTcpCapture)
+        {
+            var rawLine = StripViewerPrefix(raw);
+            AppendLog($"{_rawLineNumber++}\t{rawLine}", true);
+            return;
+        }
+
+        var formattedLine = FormatMessage(raw);
+        AppendLog(formattedLine);
     }
 
     private void Transport_TransportInfo(object? sender, string message)
     {
+        if (_useTcpCapture)
+        {
+            return;
+        }
+
         AppendLog(message);
     }
 
     private void Transport_TransportError(object? sender, string message)
     {
+        if (_useTcpCapture)
+        {
+            return;
+        }
+
         AppendLog(message);
+    }
+
+    private void RegisterTransportHandlers(IDiagnosticsTransport transport)
+    {
+        transport.RawMessageReceived += Transport_RawMessageReceived;
+        transport.TransportInfo += Transport_TransportInfo;
+        transport.TransportError += Transport_TransportError;
+    }
+
+    private void UnregisterTransportHandlers(IDiagnosticsTransport transport)
+    {
+        transport.RawMessageReceived -= Transport_RawMessageReceived;
+        transport.TransportInfo -= Transport_TransportInfo;
+        transport.TransportError -= Transport_TransportError;
+    }
+
+    private void SetTransport(IDiagnosticsTransport transport, bool useTcpCapture)
+    {
+        UnregisterTransportHandlers(_transport);
+        _transport = transport;
+        _useTcpCapture = useTcpCapture;
+        RegisterTransportHandlers(_transport);
     }
 
     private async void DiscoverButton_Click(object sender, RoutedEventArgs e)
@@ -113,8 +152,23 @@ public partial class MainWindow : Window
         try
         {
             _friendlyNames.Clear();
+            var useTcpCapture = TcpCaptureCheckBox.IsChecked == true;
+            var sendProbe = SendProbeCheckBox.IsChecked == true;
+            if (useTcpCapture)
+            {
+                SetTransport(new TcpCaptureDiagnosticsTransport(2113, sendProbe), true);
+            }
+            else if (_transport is not LegacyWebSocketDiagnosticsTransport)
+            {
+                SetTransport(new LegacyWebSocketDiagnosticsTransport(), false);
+            }
+            _useTcpCapture = useTcpCapture;
+
             await _transport.ConnectAsync(ip);
-            await LoadDriversAsync(ip);
+            if (!_useTcpCapture)
+            {
+                await LoadDriversAsync(ip);
+            }
             StatusText.Text = "Connected";
             DisconnectButton.IsEnabled = true;
         }
@@ -134,6 +188,7 @@ public partial class MainWindow : Window
     private async void DisconnectButton_Click(object sender, RoutedEventArgs e)
     {
         await _transport.DisconnectAsync();
+        _rawLineNumber = 1;
         StatusText.Text = "Disconnected";
         DisconnectButton.IsEnabled = false;
         ConnectButton.IsEnabled = true;
@@ -304,11 +359,11 @@ public partial class MainWindow : Window
         return int.TryParse(suffix, out var id) ? id : 0;
     }
 
-    private void AppendLog(string line)
+    private void AppendLog(string line, bool allowEmpty = false)
     {
         Dispatcher.Invoke(() =>
         {
-            if (string.IsNullOrWhiteSpace(line))
+            if (!allowEmpty && string.IsNullOrWhiteSpace(line))
             {
                 return;
             }
@@ -323,6 +378,33 @@ public partial class MainWindow : Window
             RawLogTextBox.CaretIndex = RawLogTextBox.Text.Length;
             RawLogTextBox.ScrollToEnd();
         });
+    }
+
+    private static string StripViewerPrefix(string line)
+    {
+        var twxIndex = line.IndexOf("TWxPort", StringComparison.Ordinal);
+        var rtiIndex = line.IndexOf("RTiPanel", StringComparison.Ordinal);
+        var index = -1;
+
+        if (twxIndex >= 0 && rtiIndex >= 0)
+        {
+            index = Math.Min(twxIndex, rtiIndex);
+        }
+        else if (twxIndex >= 0)
+        {
+            index = twxIndex;
+        }
+        else if (rtiIndex >= 0)
+        {
+            index = rtiIndex;
+        }
+
+        if (index <= 0)
+        {
+            return line;
+        }
+
+        return line.Substring(index);
     }
 
     private async Task LoadDriversAsync(string ip)

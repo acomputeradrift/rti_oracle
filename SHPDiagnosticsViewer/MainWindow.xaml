@@ -39,7 +39,9 @@
       <TextBox x:Name="IpTextBox" Width="220" Height="26" Margin="0,0,8,0" />
       <Button x:Name="ConnectButton" Content="Connect" Width="90" Height="26" Margin="0,0,8,0" Click="ConnectButton_Click" />
       <Button x:Name="DisconnectButton" Content="Disconnect" Width="90" Height="26" IsEnabled="False" Click="DisconnectButton_Click" />
-      <TextBlock x:Name="StatusText" Text="Idle" VerticalAlignment="Center" Margin="12,0,0,0" />
+      <TextBlock x:Name="StatusText" Text="Idle" VerticalAlignment="Center" Margin="12,0,0,8" />
+      <CheckBox x:Name="TcpCaptureCheckBox" Content="TCP Capture (RAW)" VerticalAlignment="Center" Margin="12,0,0,0" />
+      <CheckBox x:Name="SendProbeCheckBox" Content="Send probe on connect (diagnostic)" VerticalAlignment="Center" Margin="12,0,0,0" />
     </StackPanel>
 
     <StackPanel Orientation="Horizontal" Grid.Row="1" Margin="0,0,0,8">
@@ -137,7 +139,7 @@
         <Grid Grid.Row="1">
           <Grid.ColumnDefinitions>
             <ColumnDefinition Width="*" />
-            <ColumnDefinition Width="12" />
+            <ColumnDefinition Width="8" />
             <ColumnDefinition Width="*" />
           </Grid.ColumnDefinitions>
 
@@ -153,12 +155,20 @@
                        FontFamily="Consolas"
                        FontSize="12"
                        IsReadOnly="True"
-                       TextWrapping="Wrap"
+                       TextWrapping="NoWrap"
+                       Padding="0"
                        VerticalScrollBarVisibility="Auto"
                        HorizontalScrollBarVisibility="Auto"
                        AcceptsReturn="True" />
             </Grid>
           </Border>
+
+          <GridSplitter Grid.Column="1"
+                        Width="8"
+                        HorizontalAlignment="Stretch"
+                        VerticalAlignment="Stretch"
+                        Background="#E0E0E0"
+                        ShowsPreview="False" />
 
           <Border Grid.Column="2" BorderBrush="#DDDDDD" BorderThickness="1" CornerRadius="3" Padding="6">
             <Grid>

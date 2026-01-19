@@ -13,6 +13,7 @@ using System.Threading.Tasks;
 
 namespace SHPDiagnosticsViewer.DiagnosticsTransport;
 
+// Legacy transport retained for compatibility with existing behavior.
 public sealed class LegacyWebSocketDiagnosticsTransport : IDiagnosticsTransport
 {
     private ClientWebSocket? _socket;

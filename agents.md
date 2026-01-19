@@ -1,202 +1,140 @@
-# agents.md  
-RTI Diagnostics Application — AI Execution Rules
+# agents.md
+## AI Agent Operating Contract (RTI Oracle / Codex / VS Code)
 
-## 1. Purpose of This File
-
-This file defines **how the AI must behave** while working on this project.
-
-It exists to:
-- Enforce correct development order
-- Prevent scope creep
-- Require tests and validation
-- Eliminate undocumented assumptions
-- Ensure deterministic, reviewable output
-
-If a task is not explicitly permitted here, the AI must ask before proceeding.
+> **Status:** REQUIRED  
+> **Scope:** Governs all AI agent behavior for this repository  
+> **Priority:** Overrides prompts, tool defaults, and inferred behavior
 
 ---
 
-## 2. High-Level Agent Mandate
+## 1. Purpose
 
-The AI acts as a **deterministic engineering agent**, not a product designer.
+This contract defines exactly how AI agents (including Codex) are allowed to behave while working in this repository.
 
-The AI must:
-- Implement only what is explicitly scoped
-- Work in small, reviewable steps
-- Prefer clarity over cleverness
-- Never assume undocumented RTI behavior
-- Never silently skip validation or testing
+Any behavior not explicitly allowed here is forbidden.
 
 ---
 
-## 3. Allowed Task Categories
+## 2. Absolute Environment Assumptions (DO NOT EDIT)
 
-The AI is allowed to perform only the following categories of work:
+- Development environment: **Visual Studio Code**
+- AI interface: **Codex**
+- Version control: **Git**
+- Documentation: **Markdown**
+- All work must be traceable, reviewable, and reversible
 
-1. Documentation updates (scope-consistent)
-2. Architecture definition (non-implementation)
-3. Code implementation (after approval)
-4. Unit test creation
-5. Refactoring (scope-preserving)
-6. Bug fixing
-7. Test failure analysis
-8. Build and run instructions
-9. Logging and diagnostics instrumentation
-
-Anything else requires explicit approval.
+Agents must assume:
+- No external context beyond repository contents
+- No memory across sessions
+- No intent beyond what is written in repository docs
 
 ---
 
-## 4. Required Development Order
+## 3. Project Identity (RTI Oracle)
 
-The AI must follow this order strictly:
-
-1. **Clarify inputs and outputs**
-2. **Define interfaces and data shapes**
-3. **Write unit tests**
-4. **Write implementation**
-5. **Run tests**
-6. **Fix failures**
-7. **Request review before proceeding**
-
-Skipping steps is not allowed.
+- **Project Name:** RTI Oracle  
+- **Repository Purpose:** A diagnostics and log-analysis application for RTI Smart Home Processor (SHP) systems that captures diagnostic output, maps it using project reference files, and produces cleaner human-readable outputs and reports.
 
 ---
 
-## 5. Testing Rules (Mandatory)
+## 4. Agent Authority Level
 
-### 5.1 Unit Tests
-
-- Every non-trivial function must have unit tests
-- Tests must be written **before or alongside** implementation
-- Tests must:
-  - Use realistic RTI diagnostics samples
-  - Include edge cases
-  - Include malformed input cases
-
-### 5.2 Test Constraints
-
-- Tests must be deterministic
-- No network calls in unit tests
-- No reliance on real RTI hardware in tests
-- Mock all external dependencies
-
-If a function cannot be unit tested, the AI must explain why.
-
----
-
-## 6. Logging Rules
-
-The AI must add logging at:
-
-- SHP connection lifecycle events
-- WebSocket subscribe / unsubscribe actions
-- Incoming diagnostics message boundaries
-- Parsing failures
-- Mapping failures
-- Filter application
-- Export operations
-
-Logging must:
-- Be structured
-- Be human-readable
-- Never leak raw JSON into the UI layer
-
----
-
-## 7. Error Handling Rules
-
-The AI must:
-
-- Fail loudly on invalid assumptions
-- Surface errors to the UI in a controlled way
-- Never silently swallow parsing or mapping errors
-- Distinguish between:
-  - Transport errors
-  - Data errors
-  - Mapping errors
-  - User input errors
-
----
-
-## 8. State & Data Integrity Rules
-
-- Raw diagnostics data is immutable once captured
-- Processed data must always be derivable from raw data
-- No hidden mutation of log state
-- No cross-session data leakage
-
-If caching is introduced, it must be explicit and documented.
-
----
-
-## 9. UI Discipline Rules
-
-The AI must respect the **five defined UI areas**:
-
-1. Discovery / Connection / File Uploads  
-2. Driver Log Level Controls  
-3. Session Controls / Filtering / Export  
-4. Raw Logs  
-5. Processed Logs  
+**TEST_FIRST**
 
 Rules:
-- No UI element may perform multiple responsibilities
-- Filtering applies to both log windows
-- Raw Logs never show JSON
-- Processed Logs never show raw data
+- Agents may write or modify `.md` docs
+- Agents may write tests
+- Agents may write implementation only after tests exist and explicit approval is given
 
 ---
 
-## 10. External Knowledge Constraints
+## 5. Hard System Safety Boundary (NON-NEGOTIABLE)
 
-The AI must **not**:
+RTI Oracle is a diagnostics system with constrained control.
 
-- Invent undocumented RTI APIs
-- Assume access to sysvar names
-- Assume APEX internals beyond what is parsed
-- Assume stability of diagnostics formats without validation
+Agents must enforce:
+- Oracle may control SHP output only via **Driver Log Level settings**
+- Oracle must never introduce control features beyond diagnostic verbosity
+- `.APEX` and project spreadsheets are read-only inputs
 
-If external knowledge is required:
-- The AI must ask explicitly
-- The AI must not proceed until confirmed
+Violations require refusal.
 
 ---
 
-## 11. Change Control
+## 6. Forbidden Agent Behaviors
 
-Before making **any** of the following, the AI must ask:
-
-- Adding a new feature
-- Changing UI layout
-- Introducing persistence
-- Introducing concurrency
-- Introducing background workers
-- Changing data flow direction
-
----
-
-## 12. Output Discipline
-
-When responding, the AI must:
-
-- State exactly what it is about to do
-- Limit changes to the approved scope
-- Provide copy-pastable output
-- Avoid partial or implied implementations
+Agents must never:
+- Invent requirements or features
+- Assume unwritten intent
+- Write code before required docs exist
+- Modify multiple files without instruction
+- Refactor without request
+- Add future hooks
+- Introduce dependencies without approval
+- Fill placeholders silently
+- Continue under ambiguity
 
 ---
 
-## 13. Stopping Rule
+## 7. Required Confirmations
 
-If requirements are ambiguous, conflicting, or missing:
-
-- The AI must stop
-- Ask a clarifying question
-- Wait for instruction
-
-Proceeding under uncertainty is forbidden.
+Explicit approval required before:
+- Writing implementation code
+- Changing architecture or boundaries
+- Adding dependencies
+- Changing data contracts or invariants
+- Proceeding from tests to implementation
 
 ---
 
-## END OF FILE
+## 8. Placeholder Detection Rule
+
+Unresolved placeholders include:
+- `<<<LIKE_THIS>>>`
+- `[[REPLACE_ME]]`
+- `__FILL_THIS_IN__`
+- `TODO: PROJECT SPECIFIC`
+- `???`
+
+If present, the agent must stop.
+
+---
+
+## 9. Output Honesty Rules
+
+The system must never:
+- Pretend mappings exist
+- Hide unresolved IDs
+- Guess names
+- Claim data not derived from inputs
+
+Missing data must be marked explicitly.
+
+---
+
+## 10. Change Discipline
+
+- One logical change per step
+- Minimal diffs
+- Reversible changes
+- Traceable to requirements
+
+---
+
+## 11. Escalation Behavior
+
+On conflict or ambiguity:
+1. Stop
+2. State blocker
+3. Ask one precise question
+
+---
+
+## 12. Contract Acknowledgement
+
+Acknowledged by: **Jamie Feeny**  
+Date: **2026-01-18**
+
+---
+
+END OF AGENT CONTRACT
