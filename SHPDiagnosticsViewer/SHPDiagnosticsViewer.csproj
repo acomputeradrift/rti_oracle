@@ -8,4 +8,8 @@
     <AssemblyName>SHPDiagnosticsViewer</AssemblyName>
     <RootNamespace>SHPDiagnosticsViewer</RootNamespace>
   </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Data.Sqlite" Version="8.0.5" />
+  </ItemGroup>
 </Project>

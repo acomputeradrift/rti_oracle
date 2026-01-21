@@ -10,6 +10,7 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
 using System.Windows.Data;
+using Microsoft.Win32;
 using SHPDiagnosticsViewer.DiagnosticsTransport;
 
 namespace SHPDiagnosticsViewer;
@@ -201,6 +202,27 @@ public partial class MainWindow : Window
         {
             IpTextBox.Text = selected;
         }
+    }
+
+    private void UploadProject_Click(object sender, RoutedEventArgs e)
+    {
+        var dialog = new OpenFileDialog
+        {
+            Filter = "RTI Project (*.apex)|*.apex|All files (*.*)|*.*",
+            CheckFileExists = true,
+            Multiselect = false
+        };
+
+        if (dialog.ShowDialog(this) != true)
+        {
+            return;
+        }
+
+        var preview = new ProjectDataPreviewWindow(dialog.FileName)
+        {
+            Owner = this
+        };
+        preview.ShowDialog();
     }
 
     private void ClearDiagnostics_Click(object sender, RoutedEventArgs e)

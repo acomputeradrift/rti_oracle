@@ -1,31 +1,35 @@
 {
   "format": 1,
   "restore": {
-    "y:\\desktop\\development\\oracle\\SHPDiagnosticsViewer.Tests\\SHPDiagnosticsViewer.Tests.csproj": {}
+    "Y:\\Desktop\\Development\\Oracle\\SHPDiagnosticsViewer.Tests\\SHPDiagnosticsViewer.Tests.csproj": {}
   },
   "projects": {
-    "y:\\desktop\\development\\oracle\\SHPDiagnosticsViewer.Tests\\SHPDiagnosticsViewer.Tests.csproj": {
+    "Y:\\Desktop\\Development\\Oracle\\SHPDiagnosticsViewer.Tests\\SHPDiagnosticsViewer.Tests.csproj": {
       "version": "1.0.0",
       "restore": {
-        "projectUniqueName": "y:\\desktop\\development\\oracle\\SHPDiagnosticsViewer.Tests\\SHPDiagnosticsViewer.Tests.csproj",
+        "projectUniqueName": "Y:\\Desktop\\Development\\Oracle\\SHPDiagnosticsViewer.Tests\\SHPDiagnosticsViewer.Tests.csproj",
         "projectName": "SHPDiagnosticsViewer.Tests",
-        "projectPath": "y:\\desktop\\development\\oracle\\SHPDiagnosticsViewer.Tests\\SHPDiagnosticsViewer.Tests.csproj",
+        "projectPath": "Y:\\Desktop\\Development\\Oracle\\SHPDiagnosticsViewer.Tests\\SHPDiagnosticsViewer.Tests.csproj",
         "packagesPath": "C:\\Users\\jamiefeeny\\.nuget\\packages\\",
-        "outputPath": "y:\\desktop\\development\\oracle\\SHPDiagnosticsViewer.Tests\\obj\\",
+        "outputPath": "Y:\\Desktop\\Development\\Oracle\\SHPDiagnosticsViewer.Tests\\obj\\",
         "projectStyle": "PackageReference",
         "configFilePaths": [
           "C:\\Users\\jamiefeeny\\AppData\\Roaming\\NuGet\\NuGet.Config"
         ],
         "originalTargetFrameworks": [
-          "net8.0"
+          "net8.0-windows"
         ],
         "sources": {
           "https://api.nuget.org/v3/index.json": {}
         },
         "frameworks": {
-          "net8.0": {
-            "targetAlias": "net8.0",
-            "projectReferences": {}
+          "net8.0-windows7.0": {
+            "targetAlias": "net8.0-windows",
+            "projectReferences": {
+              "Y:\\Desktop\\Development\\Oracle\\SHPDiagnosticsViewer\\SHPDiagnosticsViewer.csproj": {
+                "projectPath": "Y:\\Desktop\\Development\\Oracle\\SHPDiagnosticsViewer\\SHPDiagnosticsViewer.csproj"
+              }
+            }
           }
         },
         "warningProperties": {
@@ -40,8 +44,8 @@
         }
       },
       "frameworks": {
-        "net8.0": {
-          "targetAlias": "net8.0",
+        "net8.0-windows7.0": {
+          "targetAlias": "net8.0-windows",
           "dependencies": {
             "Microsoft.NET.Test.Sdk": {
               "target": "Package",
@@ -72,6 +76,73 @@
           "frameworkReferences": {
             "Microsoft.NETCore.App": {
               "privateAssets": "all"
+            }
+          },
+          "runtimeIdentifierGraphPath": "C:\\Program Files\\dotnet\\sdk\\8.0.416/PortableRuntimeIdentifierGraph.json"
+        }
+      }
+    },
+    "Y:\\Desktop\\Development\\Oracle\\SHPDiagnosticsViewer\\SHPDiagnosticsViewer.csproj": {
+      "version": "1.0.0",
+      "restore": {
+        "projectUniqueName": "Y:\\Desktop\\Development\\Oracle\\SHPDiagnosticsViewer\\SHPDiagnosticsViewer.csproj",
+        "projectName": "SHPDiagnosticsViewer",
+        "projectPath": "Y:\\Desktop\\Development\\Oracle\\SHPDiagnosticsViewer\\SHPDiagnosticsViewer.csproj",
+        "packagesPath": "C:\\Users\\jamiefeeny\\.nuget\\packages\\",
+        "outputPath": "Y:\\Desktop\\Development\\Oracle\\SHPDiagnosticsViewer\\obj\\",
+        "projectStyle": "PackageReference",
+        "configFilePaths": [
+          "C:\\Users\\jamiefeeny\\AppData\\Roaming\\NuGet\\NuGet.Config"
+        ],
+        "originalTargetFrameworks": [
+          "net8.0-windows"
+        ],
+        "sources": {
+          "https://api.nuget.org/v3/index.json": {}
+        },
+        "frameworks": {
+          "net8.0-windows7.0": {
+            "targetAlias": "net8.0-windows",
+            "projectReferences": {}
+          }
+        },
+        "warningProperties": {
+          "warnAsError": [
+            "NU1605"
+          ]
+        },
+        "restoreAuditProperties": {
+          "enableAudit": "true",
+          "auditLevel": "low",
+          "auditMode": "direct"
+        }
+      },
+      "frameworks": {
+        "net8.0-windows7.0": {
+          "targetAlias": "net8.0-windows",
+          "dependencies": {
+            "Microsoft.Data.Sqlite": {
+              "target": "Package",
+              "version": "[8.0.5, )"
+            }
+          },
+          "imports": [
+            "net461",
+            "net462",
+            "net47",
+            "net471",
+            "net472",
+            "net48",
+            "net481"
+          ],
+          "assetTargetFallback": true,
+          "warn": true,
+          "frameworkReferences": {
+            "Microsoft.NETCore.App": {
+              "privateAssets": "all"
+            },
+            "Microsoft.WindowsDesktop.App.WPF": {
+              "privateAssets": "none"
             }
           },
           "runtimeIdentifierGraphPath": "C:\\Program Files\\dotnet\\sdk\\8.0.416/PortableRuntimeIdentifierGraph.json"

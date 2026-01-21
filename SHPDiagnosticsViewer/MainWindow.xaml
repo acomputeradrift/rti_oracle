@@ -33,8 +33,12 @@
       <RowDefinition Height="Auto" />
       <RowDefinition Height="*" />
     </Grid.RowDefinitions>
+    <Grid.ColumnDefinitions>
+      <ColumnDefinition Width="*" />
+      <ColumnDefinition Width="320" />
+    </Grid.ColumnDefinitions>
 
-    <StackPanel Orientation="Horizontal" Grid.Row="0" Margin="0,0,0,8">
+    <StackPanel Orientation="Horizontal" Grid.Row="0" Grid.Column="0" Margin="0,0,0,8">
       <TextBlock Text="SHP IP:" VerticalAlignment="Center" Margin="0,0,8,0" />
       <TextBox x:Name="IpTextBox" Width="220" Height="26" Margin="0,0,8,0" />
       <Button x:Name="ConnectButton" Content="Connect" Width="90" Height="26" Margin="0,0,8,0" Click="ConnectButton_Click" />
@@ -44,13 +48,13 @@
       <CheckBox x:Name="SendProbeCheckBox" Content="Send probe on connect (diagnostic)" VerticalAlignment="Center" Margin="12,0,0,0" />
     </StackPanel>
 
-    <StackPanel Orientation="Horizontal" Grid.Row="1" Margin="0,0,0,8">
+    <StackPanel Orientation="Horizontal" Grid.Row="1" Grid.Column="0" Margin="0,0,0,8">
       <Button x:Name="DiscoverButton" Content="Discover" Width="90" Height="26" Margin="0,0,8,0" Click="DiscoverButton_Click" />
       <TextBlock Text="Discovered:" VerticalAlignment="Center" Margin="0,0,8,0" />
       <ComboBox x:Name="DiscoveredCombo" Width="260" Height="26" SelectionChanged="DiscoveredCombo_SelectionChanged" />
     </StackPanel>
 
-    <Border Grid.Row="2" BorderBrush="#CCCCCC" BorderThickness="1" CornerRadius="4" Padding="6" Margin="0,0,0,8">
+    <Border Grid.Row="2" Grid.Column="0" Grid.ColumnSpan="2" BorderBrush="#CCCCCC" BorderThickness="1" CornerRadius="4" Padding="6" Margin="0,0,0,8">
       <StackPanel>
         <TextBlock Text="Driver Log Levels" FontWeight="SemiBold" Margin="0,0,0,6" />
         <ScrollViewer Height="240"
@@ -129,7 +133,7 @@
       </StackPanel>
     </Border>
 
-    <Border Grid.Row="3" BorderBrush="#CCCCCC" BorderThickness="1" CornerRadius="4" Padding="6">
+    <Border Grid.Row="3" Grid.Column="0" Grid.ColumnSpan="2" BorderBrush="#CCCCCC" BorderThickness="1" CornerRadius="4" Padding="6">
       <Grid>
         <Grid.RowDefinitions>
           <RowDefinition Height="Auto" />
@@ -202,6 +206,13 @@
           </Border>
         </Grid>
       </Grid>
+    </Border>
+
+    <Border Grid.Row="0" Grid.RowSpan="2" Grid.Column="1" BorderBrush="#CCCCCC" BorderThickness="1" CornerRadius="4" Padding="8" Margin="12,0,0,8">
+      <StackPanel>
+        <TextBlock Text="Project Data" FontWeight="SemiBold" Margin="0,0,0,8" />
+        <Button Content="Upload Project (.apex)" Width="180" Height="28" Click="UploadProject_Click" />
+      </StackPanel>
     </Border>
   </Grid>
 </Window>
