@@ -11,15 +11,20 @@ public sealed class ProjectDataExtractionResult
     public List<DiagnosticsMappingEntry> DiagnosticsMapping { get; } = new();
     public List<ProjectReportEntry> ProjectReport { get; } = new();
     public List<ProjectTestEntry> ProjectTest { get; } = new();
+    public ApexDiscoveryPreloadResult ApexDiscoveryPreload { get; set; } = new();
 }
 
 public sealed record DiagnosticsMappingEntry(
     int DeviceId,
     string DeviceName,
     int RtiAddress,
+    int PageIndex,
     int PageId,
     int PageNameId,
-    string PageName);
+    string PageName)
+{
+    public int PageNumber => PageIndex + 1;
+}
 
 public sealed record ProjectReportEntry(
     string EntityType,
@@ -99,6 +104,7 @@ public sealed class ProjectDataExtractor : IProjectDataExtractor
                     device.DeviceId,
                     device.Name,
                     rtiAddress,
+                    page.PageIndex,
                     page.PageId,
                     page.PageNameId,
                     pageName ?? ""));
@@ -113,7 +119,7 @@ public sealed class ProjectDataExtractor : IProjectDataExtractor
                 return deviceCompare;
             }
 
-            return left.PageId.CompareTo(right.PageId);
+            return left.PageIndex.CompareTo(right.PageIndex);
         });
 
         Report(progress, "Building project report", 65);
@@ -268,6 +274,7 @@ public sealed class ProjectDataExtractor : IProjectDataExtractor
         });
 
         Report(progress, "Complete", 100);
+        result.ApexDiscoveryPreload = ApexDiscoveryPreloadExtractor.Extract(apexPath);
         return result;
     }
 
@@ -284,6 +291,11 @@ public sealed class ProjectDataExtractor : IProjectDataExtractor
         using var reader = command.ExecuteReader();
         while (reader.Read())
         {
+            if (reader.IsDBNull(0) || reader.IsDBNull(1))
+            {
+                continue;
+            }
+
             results.Add(new DeviceRow(reader.GetInt32(0), reader.GetInt32(1), reader.IsDBNull(2) ? "" : reader.GetString(2)));
         }
         return results;
@@ -297,6 +309,11 @@ public sealed class ProjectDataExtractor : IProjectDataExtractor
         using var reader = command.ExecuteReader();
         while (reader.Read())
         {
+            if (reader.IsDBNull(0) || reader.IsDBNull(2) || reader.IsDBNull(3))
+            {
+                continue;
+            }
+
             results.Add(new RoomRow(reader.GetInt32(0), reader.IsDBNull(1) ? "" : reader.GetString(1), reader.GetInt32(2), reader.GetInt32(3)));
         }
         return results;
@@ -310,6 +327,11 @@ public sealed class ProjectDataExtractor : IProjectDataExtractor
         using var reader = command.ExecuteReader();
         while (reader.Read())
         {
+            if (reader.IsDBNull(0) || reader.IsDBNull(1) || reader.IsDBNull(2))
+            {
+                continue;
+            }
+
             results.Add(new PortLabelRow(reader.GetInt32(0), reader.GetInt32(1), reader.GetInt32(2), reader.IsDBNull(3) ? "" : reader.GetString(3)));
         }
         return results;
@@ -323,6 +345,11 @@ public sealed class ProjectDataExtractor : IProjectDataExtractor
         using var reader = command.ExecuteReader();
         while (reader.Read())
         {
+            if (reader.IsDBNull(0))
+            {
+                continue;
+            }
+
             results.Add(new PageNameRow(reader.GetInt32(0), reader.IsDBNull(1) ? "" : reader.GetString(1)));
         }
         return results;
@@ -336,6 +363,11 @@ public sealed class ProjectDataExtractor : IProjectDataExtractor
         using var reader = command.ExecuteReader();
         while (reader.Read())
         {
+            if (reader.IsDBNull(0) || reader.IsDBNull(1))
+            {
+                continue;
+            }
+
             results.Add(new RtiDeviceRow(reader.GetInt32(0), reader.GetInt32(1)));
         }
         return results;
@@ -345,11 +377,16 @@ public sealed class ProjectDataExtractor : IProjectDataExtractor
     {
         var results = new List<RtiDevicePageRow>();
         using var command = connection.CreateCommand();
-        command.CommandText = "SELECT RTIAddress, PageId, PageNameId FROM RTIDevicePageData ORDER BY RTIAddress, PageId";
+        command.CommandText = "SELECT RTIAddress, PageId, PageNameId, PageOrder FROM RTIDevicePageData ORDER BY RTIAddress, PageOrder";
         using var reader = command.ExecuteReader();
         while (reader.Read())
         {
-            results.Add(new RtiDevicePageRow(reader.GetInt32(0), reader.GetInt32(1), reader.GetInt32(2)));
+            if (reader.IsDBNull(0) || reader.IsDBNull(1) || reader.IsDBNull(2) || reader.IsDBNull(3))
+            {
+                continue;
+            }
+
+            results.Add(new RtiDevicePageRow(reader.GetInt32(0), reader.GetInt32(1), reader.GetInt32(2), reader.GetInt32(3)));
         }
         return results;
     }
@@ -362,6 +399,11 @@ public sealed class ProjectDataExtractor : IProjectDataExtractor
         using var reader = command.ExecuteReader();
         while (reader.Read())
         {
+            if (reader.IsDBNull(0) || reader.IsDBNull(1) || reader.IsDBNull(2))
+            {
+                continue;
+            }
+
             results.Add(new SourceLabelRow(reader.GetInt32(0), reader.GetInt32(1), reader.GetInt32(2), reader.IsDBNull(3) ? "" : reader.GetString(3)));
         }
         return results;
@@ -375,6 +417,11 @@ public sealed class ProjectDataExtractor : IProjectDataExtractor
         using var reader = command.ExecuteReader();
         while (reader.Read())
         {
+            if (reader.IsDBNull(0) || reader.IsDBNull(1))
+            {
+                continue;
+            }
+
             results.Add(new LayerRow(reader.GetInt32(0), reader.GetInt32(1), reader.IsDBNull(2) ? (int?)null : reader.GetInt32(2)));
         }
         return results;
@@ -388,6 +435,11 @@ public sealed class ProjectDataExtractor : IProjectDataExtractor
         using var reader = command.ExecuteReader();
         while (reader.Read())
         {
+            if (reader.IsDBNull(0) || reader.IsDBNull(1) || reader.IsDBNull(2))
+            {
+                continue;
+            }
+
             results.Add(new ButtonRow(reader.GetInt32(0), reader.GetInt32(1), reader.GetInt32(2), reader.IsDBNull(3) ? "" : reader.GetString(3)));
         }
         return results;
@@ -398,7 +450,7 @@ public sealed class ProjectDataExtractor : IProjectDataExtractor
     private sealed record PortLabelRow(int PortLabelId, int RtiAddress, int LabelKey, string LabelName);
     private sealed record PageNameRow(int PageNameId, string PageName);
     private sealed record RtiDeviceRow(int DeviceId, int RtiAddress);
-    private sealed record RtiDevicePageRow(int RtiAddress, int PageId, int PageNameId);
+    private sealed record RtiDevicePageRow(int RtiAddress, int PageId, int PageNameId, int PageIndex);
     private sealed record SourceLabelRow(int SourceLabelId, int RtiAddress, int LabelIndex, string LabelName);
     private sealed record LayerRow(int PageId, int SharedLayerId, int? SourceId);
     private sealed record ButtonRow(int ButtonId, int SharedLayerId, int ButtonTagId, string Text);

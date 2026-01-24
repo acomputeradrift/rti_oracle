@@ -27,6 +27,8 @@ public sealed class ProjectDataExtractorTests
             entry.DeviceId == 6
             && entry.DeviceName == "RTiPanel (iPhone X or newer)"
             && entry.RtiAddress == 1
+            && entry.PageIndex == 0
+            && entry.PageNumber == 1
             && entry.PageId == 1
             && entry.PageNameId == 258
             && entry.PageName == "Home (Global)");
