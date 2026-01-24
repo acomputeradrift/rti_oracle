@@ -1,0 +1,2 @@
+frame.time,ip.src,tcp.srcport,ip.dst,tcp.dstport,tls.handshake.extensions_server_name
+Jan 20, 2026 15:48:42.825504000 CST,192.168.4.2,39777,34.198.43.24,443,api.rticontrol.com

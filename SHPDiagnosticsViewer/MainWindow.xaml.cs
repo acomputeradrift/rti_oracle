@@ -22,6 +22,7 @@ public partial class MainWindow : Window
     private bool _isConnecting;
     private bool _useTcpCapture;
     private int _rawLineNumber = 1;
+    private readonly WebSocketMessageFormatter _messageFormatter = new(DateOnly.FromDateTime(DateTime.Today));
     private readonly Dictionary<string, string> _friendlyNames = new(StringComparer.OrdinalIgnoreCase);
     private static readonly string[] AnchorNames =
     {
@@ -58,7 +59,13 @@ public partial class MainWindow : Window
             return;
         }
 
-        var formattedLine = FormatMessage(raw);
+        var formattedLine = FormatMessage(raw, out var isLogLine);
+        if (isLogLine)
+        {
+            AppendLog($"{_rawLineNumber++} {formattedLine}");
+            return;
+        }
+
         AppendLog(formattedLine);
     }
 
@@ -151,6 +158,7 @@ public partial class MainWindow : Window
 
         try
         {
+            _messageFormatter.Reset(DateOnly.FromDateTime(DateTime.Today));
             _friendlyNames.Clear();
             var useTcpCapture = TcpCaptureCheckBox.IsChecked == true;
             var sendProbe = SendProbeCheckBox.IsChecked == true;
@@ -189,6 +197,7 @@ public partial class MainWindow : Window
     {
         await _transport.DisconnectAsync();
         _rawLineNumber = 1;
+        _messageFormatter.Reset(DateOnly.FromDateTime(DateTime.Today));
         StatusText.Text = "Disconnected";
         DisconnectButton.IsEnabled = false;
         ConnectButton.IsEnabled = true;
@@ -229,77 +238,27 @@ public partial class MainWindow : Window
     {
         RawLogTextBox.Clear();
         _rawLineNumber = 1;
+        _messageFormatter.Reset(DateOnly.FromDateTime(DateTime.Today));
     }
 
-    private string FormatMessage(string raw)
+    private string FormatMessage(string raw, out bool isLogLine)
     {
         try
         {
             using var doc = JsonDocument.Parse(raw);
             var root = doc.RootElement;
-
-            if (root.TryGetProperty("messageType", out var messageTypeElement))
+            if (root.TryGetProperty("messageType", out var messageTypeElement)
+                && string.Equals(messageTypeElement.GetString(), "LogLevels", StringComparison.OrdinalIgnoreCase))
             {
-                var messageType = messageTypeElement.GetString() ?? "Unknown";
-                if (string.Equals(messageType, "echo", StringComparison.OrdinalIgnoreCase))
-                {
-                    var msg = root.TryGetProperty("message", out var msgEl) ? msgEl.GetString() ?? "" : "";
-                    if (!string.IsNullOrWhiteSpace(msg))
-                    {
-                        try
-                        {
-                            using var inner = JsonDocument.Parse(msg);
-                            var innerRoot = inner.RootElement;
-                            if (innerRoot.TryGetProperty("type", out var t) && innerRoot.TryGetProperty("resource", out var r))
-                            {
-                                var type = t.GetString();
-                                var res = r.GetString();
-                                return $"Echo {type}/{res}";
-                            }
-                        }
-                        catch
-                        {
-                        }
-                        return $"Echo {msg}";
-                    }
-                    return "Echo";
-                }
-
-                if (string.Equals(messageType, "LogLevels", StringComparison.OrdinalIgnoreCase))
-                {
-                    var summary = HandleLogLevels(root);
-                    return summary;
-                }
-
-                if (string.Equals(messageType, "MessageLog", StringComparison.OrdinalIgnoreCase))
-                {
-                    var time = root.TryGetProperty("time", out var timeElement) ? timeElement.GetString() : "";
-                    var text = root.TryGetProperty("text", out var textElement) ? textElement.GetString() : "";
-                    return $"[{time}] {text}".Trim();
-                }
-
-                if (string.Equals(messageType, "Sysvar", StringComparison.OrdinalIgnoreCase))
-                {
-                    var id = root.TryGetProperty("sysvarid", out var idElement) ? idElement.ToString() : "?";
-                    var val = root.TryGetProperty("sysvarval", out var valElement) ? valElement.ToString() : "?";
-                    return $"Sysvar id={id} val={val}";
-                }
-
-                return $"{messageType} {raw}";
-            }
-
-            if (root.TryGetProperty("type", out var typeElement) && root.TryGetProperty("resource", out var resElement))
-            {
-                var type = typeElement.GetString();
-                var resource = resElement.GetString();
-                return $"{type}/{resource} {raw}";
+                isLogLine = false;
+                return HandleLogLevels(root);
             }
         }
         catch
         {
         }
 
-        return raw;
+        return _messageFormatter.Format(raw, out isLogLine);
     }
 
     private string HandleLogLevels(JsonElement root)

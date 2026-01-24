@@ -1,0 +1,3 @@
+frame.time,ip.src,tcp.srcport,ip.dst,tcp.dstport,http.request.method,http.request.uri,http.user_agent
+Jan 20, 2026 15:48:29.420810000 CST,192.168.4.2,59883,192.168.1.143,1234,GET,/diagnosticswss,Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36
+Jan 20, 2026 15:49:17.157294000 CST,192.168.4.2,50094,192.168.1.143,1234,GET,/diagnosticswss,Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36
