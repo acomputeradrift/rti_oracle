@@ -46,4 +46,19 @@ public sealed class ApexDiscoveryPreloadTests
         Assert.Equal("TCP", driver.Config["ConnectionType"]);
         Assert.False(driver.Config.ContainsKey("DebugTrace"));
     }
+
+    [Fact]
+    public void Ad64ConfigUsesCountsToLimitNames()
+    {
+        // Requirement: mission.md - Core Capabilities #3/#5; invariants.md - Explicit Mapping.
+        var result = ApexDiscoveryPreloadExtractor.Extract(ApexPath);
+
+        Assert.True(result.DriverConfigMap.TryGetValue(4, out var driver));
+        Assert.Equal("RTI AD-64", driver.DeviceName);
+        Assert.False(driver.Config.ContainsKey("GroupCount"));
+        Assert.True(driver.Config.ContainsKey("GroupName8"));
+        Assert.False(driver.Config.ContainsKey("Connection0"));
+        Assert.False(driver.Config.ContainsKey("ZoneName17"));
+        Assert.False(driver.Config.ContainsKey("SourceName10"));
+    }
 }

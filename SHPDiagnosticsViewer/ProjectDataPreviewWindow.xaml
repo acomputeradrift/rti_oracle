@@ -71,6 +71,7 @@
     </TabControl>
 
     <StackPanel Grid.Row="2" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,8,0,0">
+      <Button Content="Download Diagnostics Mapping" Width="220" Margin="0,0,8,0" Click="DownloadDiagnosticsMapping_Click" />
       <Button Content="Close" Width="90" Click="Close_Click" />
     </StackPanel>
   </Grid>

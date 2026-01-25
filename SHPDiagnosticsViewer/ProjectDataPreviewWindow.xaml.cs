@@ -1,7 +1,9 @@
 using System;
 using System.Collections.ObjectModel;
+using System.IO;
 using System.Threading.Tasks;
 using System.Windows;
+using Microsoft.Win32;
 using SHPDiagnosticsViewer.ProjectData;
 
 namespace SHPDiagnosticsViewer;
@@ -10,6 +12,7 @@ public partial class ProjectDataPreviewWindow : Window
 {
     private readonly string _apexPath;
     private readonly IProjectDataExtractor _extractor;
+    private ApexDiscoveryPreloadResult? _preload;
 
     public ObservableCollection<DiagnosticsMappingEntry> DiagnosticsMapping { get; } = new();
     public ObservableCollection<DriverConfigMapEntry> DriverConfigEntries { get; } = new();
@@ -69,6 +72,7 @@ public partial class ProjectDataPreviewWindow : Window
                     entry.Value.VariableName ?? ""));
             }
 
+            _preload = result.ApexDiscoveryPreload;
             UpdateProgress(new ProjectDataExtractionProgress("Complete", 100));
         }
         catch (Exception ex)
@@ -87,6 +91,43 @@ public partial class ProjectDataPreviewWindow : Window
     private void Close_Click(object sender, RoutedEventArgs e)
     {
         Close();
+    }
+
+    private void DownloadDiagnosticsMapping_Click(object sender, RoutedEventArgs e)
+    {
+        if (DiagnosticsMapping.Count == 0)
+        {
+            MessageBox.Show(this, "No diagnostics mapping rows available.", "Project Data Preview", MessageBoxButton.OK, MessageBoxImage.Information);
+            return;
+        }
+
+        var dialog = new SaveFileDialog
+        {
+            Filter = "Excel Workbook (*.xlsx)|*.xlsx|All files (*.*)|*.*",
+            FileName = "diagnostics_mapping.xlsx",
+            OverwritePrompt = true
+        };
+
+        if (dialog.ShowDialog(this) != true)
+        {
+            return;
+        }
+
+        try
+        {
+            if (_preload is null)
+            {
+                MessageBox.Show(this, "Preload data not available.", "Project Data Preview", MessageBoxButton.OK, MessageBoxImage.Error);
+                return;
+            }
+
+            DiagnosticsMappingExporter.Export(dialog.FileName, DiagnosticsMapping, _preload);
+            MessageBox.Show(this, $"Saved to {Path.GetFileName(dialog.FileName)}", "Project Data Preview", MessageBoxButton.OK, MessageBoxImage.Information);
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show(this, ex.Message, "Project Data Preview", MessageBoxButton.OK, MessageBoxImage.Error);
+        }
     }
 
     private static string ResolveSysVarName(ApexDiscoveryPreloadResult preload, string driverName, string value)

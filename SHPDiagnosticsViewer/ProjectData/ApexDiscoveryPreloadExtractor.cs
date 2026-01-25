@@ -46,6 +46,11 @@ public static class ApexDiscoveryPreloadExtractor
 
     private static void LoadPageIndexMap(SqliteConnection connection, Dictionary<string, string> map)
     {
+        if (DriverProfiles.DriverProfileCatalog.Internal().Count == 0)
+        {
+            return;
+        }
+
         using var command = connection.CreateCommand();
         command.CommandText = """
 SELECT
@@ -146,20 +151,42 @@ ORDER BY d.DeviceId, p.PageOrder;
             }
         }
 
+        var registry = DriverProfiles.DriverProfileRegistryFactory.CreateDefault();
         foreach (var (driverDeviceId, configs) in configsByDriver)
         {
+            driverDeviceIds.TryGetValue(driverDeviceId, out var deviceId);
+            deviceNames.TryGetValue(deviceId, out var deviceName);
+            var profile = registry.Find(deviceName ?? "");
+
             var limits = ExtractLimits(configs);
             var filtered = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
-            foreach (var (name, value) in configs)
+            if (profile is null || (profile.DiscoveryKeys.Count == 0 && profile.DiscoveryPrefixes.Count == 0))
             {
-                if (ShouldIncludeConfig(name, limits))
+                foreach (var (name, value) in configs)
                 {
-                    filtered[name] = value;
+                    if (ShouldIncludeConfig(name, limits))
+                    {
+                        filtered[name] = value;
+                    }
+                }
+            }
+            else
+            {
+                var counts = ExtractCounts(configs, profile.DiscoveryKeys);
+                foreach (var (name, value) in configs)
+                {
+                    if (profile.DiscoveryKeys.Contains(name, StringComparer.OrdinalIgnoreCase))
+                    {
+                        continue;
+                    }
+
+                    if (TryIncludeByPrefix(profile.DiscoveryPrefixes, counts, name))
+                    {
+                        filtered[name] = value;
+                    }
                 }
             }
 
-            driverDeviceIds.TryGetValue(driverDeviceId, out var deviceId);
-            deviceNames.TryGetValue(deviceId, out var deviceName);
             deviceDisplayNames.TryGetValue(deviceId, out var deviceDisplayName);
             map[driverDeviceId] = new DriverConfigEntry(deviceName ?? "", deviceDisplayName ?? "", filtered);
         }
@@ -305,6 +332,53 @@ ORDER BY d.DeviceId, p.PageOrder;
         }
 
         return limits;
+    }
+
+    private static Dictionary<string, int> ExtractCounts(List<(string Name, string Value)> configs, IReadOnlyList<string> keys)
+    {
+        var counts = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+        foreach (var (name, value) in configs)
+        {
+            if (!keys.Contains(name, StringComparer.OrdinalIgnoreCase))
+            {
+                continue;
+            }
+
+            if (int.TryParse(value, NumberStyles.Integer, CultureInfo.InvariantCulture, out var intValue))
+            {
+                counts[name] = intValue;
+            }
+        }
+        return counts;
+    }
+
+    private static bool TryIncludeByPrefix(IReadOnlyList<string> prefixes, Dictionary<string, int> counts, string name)
+    {
+        foreach (var prefix in prefixes)
+        {
+            if (!name.StartsWith(prefix, StringComparison.OrdinalIgnoreCase))
+            {
+                continue;
+            }
+
+            var suffix = name[prefix.Length..];
+            if (!int.TryParse(suffix, NumberStyles.Integer, CultureInfo.InvariantCulture, out var index))
+            {
+                return false;
+            }
+
+            var countKey = prefix.EndsWith("Name", StringComparison.OrdinalIgnoreCase)
+                ? $"{prefix[..^4]}Count"
+                : $"{prefix}Count";
+            if (counts.TryGetValue(countKey, out var maxIndex))
+            {
+                return index <= maxIndex;
+            }
+
+            return false;
+        }
+
+        return false;
     }
 
     private static bool ShouldIncludeConfig(string name, ConfigLimits limits)
