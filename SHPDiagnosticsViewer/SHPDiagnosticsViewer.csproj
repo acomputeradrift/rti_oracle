@@ -12,4 +12,10 @@
   <ItemGroup>
     <PackageReference Include="Microsoft.Data.Sqlite" Version="8.0.5" />
   </ItemGroup>
+
+  <ItemGroup>
+    <Resource Include="..\UserInterface\feeny-logo-100-circle-black-back.png">
+      <Link>feeny-logo-100-circle-black-back.png</Link>
+    </Resource>
+  </ItemGroup>
 </Project>

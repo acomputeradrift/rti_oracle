@@ -73,6 +73,10 @@ public partial class ProjectDataPreviewWindow : Window
             }
 
             _preload = result.ApexDiscoveryPreload;
+            if (Owner is MainWindow mainWindow)
+            {
+                mainWindow.InitializeProcessing(result);
+            }
             UpdateProgress(new ProjectDataExtractionProgress("Complete", 100));
         }
         catch (Exception ex)

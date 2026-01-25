@@ -39,9 +39,17 @@
     </Grid.ColumnDefinitions>
 
     <StackPanel Orientation="Horizontal" Grid.Row="0" Grid.Column="0" Margin="0,0,0,8">
+      <Image Source="pack://application:,,,/feeny-logo-100-circle-black-back.png"
+             Width="28"
+             Height="28"
+             Margin="0,0,8,0"
+             Stretch="Uniform" />
       <TextBlock Text="SHP IP:" VerticalAlignment="Center" Margin="0,0,8,0" />
       <TextBox x:Name="IpTextBox" Width="220" Height="26" Margin="0,0,8,0" />
-      <Button x:Name="ConnectButton" Content="Connect" Width="90" Height="26" Margin="0,0,8,0" Click="ConnectButton_Click" />
+      <Button x:Name="ConnectButton" Content="Connect" Width="90" Height="26" Margin="0,0,8,0"
+              IsEnabled="False"
+              ToolTip="Upload a project (.apex) to enable connecting."
+              Click="ConnectButton_Click" />
       <Button x:Name="DisconnectButton" Content="Disconnect" Width="90" Height="26" IsEnabled="False" Click="DisconnectButton_Click" />
       <TextBlock x:Name="StatusText" Text="Idle" VerticalAlignment="Center" Margin="12,0,0,8" />
       <CheckBox x:Name="TcpCaptureCheckBox" Content="TCP Capture (RAW)" VerticalAlignment="Center" Margin="12,0,0,0" />
@@ -192,16 +200,20 @@
                 <RowDefinition Height="*" />
               </Grid.RowDefinitions>
               <TextBlock Text="Processed Output" FontWeight="SemiBold" Margin="0,0,0,6" />
-              <TextBox x:Name="ProcessedLogTextBox"
+              <RichTextBox x:Name="ProcessedLogTextBox"
                        Grid.Row="1"
                        FontFamily="Consolas"
                        FontSize="12"
                        IsReadOnly="True"
-                       TextWrapping="Wrap"
+                       Background="Black"
+                       Foreground="White"
                        VerticalScrollBarVisibility="Auto"
                        HorizontalScrollBarVisibility="Auto"
-                       AcceptsReturn="True"
-                       Text="No processed information available" />
+                       AcceptsReturn="True">
+                <FlowDocument>
+                  <Paragraph>No processed information available</Paragraph>
+                </FlowDocument>
+              </RichTextBox>
             </Grid>
           </Border>
         </Grid>
@@ -210,7 +222,7 @@
 
     <Border Grid.Row="0" Grid.RowSpan="2" Grid.Column="1" BorderBrush="#CCCCCC" BorderThickness="1" CornerRadius="4" Padding="8" Margin="12,0,0,8">
       <StackPanel>
-        <TextBlock Text="Project Data" FontWeight="SemiBold" Margin="0,0,0,8" />
+        <TextBlock x:Name="ProjectDataHeaderText" Text="Project Data" FontWeight="SemiBold" Margin="0,0,0,8" />
         <Button Content="Upload Project (.apex)" Width="180" Height="28" Click="UploadProject_Click" />
       </StackPanel>
     </Border>

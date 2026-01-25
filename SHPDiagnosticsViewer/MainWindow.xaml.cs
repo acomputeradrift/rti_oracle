@@ -3,6 +3,7 @@ using System.Collections;
 using System.Collections.ObjectModel;
 using System.Collections.Generic;
 using System.ComponentModel;
+using System.IO;
 using System.Linq;
 using System.Text.Json;
 using System.Threading.Tasks;
@@ -10,20 +11,28 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
 using System.Windows.Data;
+using System.Windows.Documents;
+using System.Windows.Media;
 using Microsoft.Win32;
 using SHPDiagnosticsViewer.DiagnosticsTransport;
+using SHPDiagnosticsViewer.ProjectData;
+using SHPDiagnosticsViewer.ProcessingEngine;
 
 namespace SHPDiagnosticsViewer;
 
 public partial class MainWindow : Window
 {
     private const int MaxLogChars = 200_000;
+    private const string ProcessedPlaceholderText = "No processed information available";
     private IDiagnosticsTransport _transport;
     private bool _isConnecting;
     private bool _useTcpCapture;
     private int _rawLineNumber = 1;
+    private bool _apexUploaded;
     private readonly WebSocketMessageFormatter _messageFormatter = new(DateOnly.FromDateTime(DateTime.Today));
     private readonly Dictionary<string, string> _friendlyNames = new(StringComparer.OrdinalIgnoreCase);
+    private readonly Dictionary<string, int> _deviceNameToId = new(StringComparer.OrdinalIgnoreCase);
+    private ProcessingEngine.ProcessingEngine? _processingEngine;
     private static readonly string[] AnchorNames =
     {
         "EVENTS_INPUT",
@@ -139,6 +148,12 @@ public partial class MainWindow : Window
 
     private async void ConnectButton_Click(object sender, RoutedEventArgs e)
     {
+        if (!_apexUploaded)
+        {
+            StatusText.Text = "Upload project first";
+            return;
+        }
+
         var ip = IpTextBox.Text.Trim();
         if (string.IsNullOrWhiteSpace(ip))
         {
@@ -232,11 +247,18 @@ public partial class MainWindow : Window
             Owner = this
         };
         preview.ShowDialog();
+        _apexUploaded = true;
+        ProjectDataHeaderText.Text = $"Project Data: {Path.GetFileName(dialog.FileName)}";
+        if (!_isConnecting)
+        {
+            ConnectButton.IsEnabled = true;
+        }
     }
 
     private void ClearDiagnostics_Click(object sender, RoutedEventArgs e)
     {
         RawLogTextBox.Clear();
+        ClearProcessedOutput();
         _rawLineNumber = 1;
         _messageFormatter.Reset(DateOnly.FromDateTime(DateTime.Today));
     }
@@ -363,6 +385,11 @@ public partial class MainWindow : Window
             RawLogTextBox.Text = newText;
             RawLogTextBox.CaretIndex = RawLogTextBox.Text.Length;
             RawLogTextBox.ScrollToEnd();
+
+            if (_processingEngine != null)
+            {
+                AppendProcessedLineIfNumbered(line);
+            }
         });
     }
 
@@ -397,6 +424,143 @@ public partial class MainWindow : Window
         {
             AppendLog($"[error] Failed to load drivers: {ex.Message}");
         }
+    }
+
+    public void InitializeProcessing(ProjectDataExtractionResult result)
+    {
+        _deviceNameToId.Clear();
+        foreach (var entry in result.DiagnosticsMapping)
+        {
+            if (!_deviceNameToId.ContainsKey(entry.DeviceName))
+            {
+                _deviceNameToId[entry.DeviceName] = entry.DeviceId;
+            }
+        }
+
+        var context = new ProcessingContext(_deviceNameToId, result.ApexDiscoveryPreload.PageIndexMap);
+        _processingEngine = new ProcessingEngine.ProcessingEngine(context);
+
+        var processed = ProcessingEngineRunner.ProcessNumberedLines(
+            RawLogTextBox.Text.Split(new[] { Environment.NewLine }, StringSplitOptions.RemoveEmptyEntries),
+            _processingEngine);
+
+        SetProcessedOutput(processed, showPlaceholderIfEmpty: true);
+    }
+
+    private void AppendProcessedLineIfNumbered(string line)
+    {
+        if (_processingEngine is null)
+        {
+            return;
+        }
+
+        var processed = ProcessingEngineRunner.ProcessNumberedLines(new[] { line }, _processingEngine);
+        if (processed.Count == 0)
+        {
+            return;
+        }
+
+        AppendProcessedLine(processed[0]);
+    }
+
+    private void ClearProcessedOutput()
+    {
+        ProcessedLogTextBox.Document.Blocks.Clear();
+    }
+
+    private void SetProcessedOutput(IEnumerable<string> lines, bool showPlaceholderIfEmpty)
+    {
+        ProcessedLogTextBox.Document.Blocks.Clear();
+
+        var paragraph = new Paragraph();
+        var hasLines = false;
+        foreach (var line in lines)
+        {
+            if (string.IsNullOrWhiteSpace(line))
+            {
+                continue;
+            }
+
+            if (hasLines)
+            {
+                paragraph.Inlines.Add(new LineBreak());
+            }
+
+            var category = ProcessedLineClassifier.DetermineCategory(line);
+            var run = new Run(line)
+            {
+                Foreground = ProcessedLineClassifier.GetBrush(category)
+            };
+            paragraph.Inlines.Add(run);
+            hasLines = true;
+        }
+
+        if (!hasLines && showPlaceholderIfEmpty)
+        {
+            paragraph.Inlines.Add(new Run(ProcessedPlaceholderText)
+            {
+                Foreground = ProcessedLineClassifier.GetBrush(ProcessedLineCategory.Default)
+            });
+            hasLines = true;
+        }
+
+        if (hasLines)
+        {
+            ProcessedLogTextBox.Document.Blocks.Add(paragraph);
+        }
+    }
+
+    private bool IsProcessedPlaceholderVisible()
+    {
+        if (ProcessedLogTextBox.Document.Blocks.Count != 1)
+        {
+            return false;
+        }
+
+        if (ProcessedLogTextBox.Document.Blocks.FirstBlock is not Paragraph paragraph)
+        {
+            return false;
+        }
+
+        if (paragraph.Inlines.Count != 1)
+        {
+            return false;
+        }
+
+        if (paragraph.Inlines.FirstInline is not Run run)
+        {
+            return false;
+        }
+
+        return string.Equals(run.Text, ProcessedPlaceholderText, StringComparison.Ordinal);
+    }
+
+    private void AppendProcessedLine(string line)
+    {
+        if (IsProcessedPlaceholderVisible())
+        {
+            ProcessedLogTextBox.Document.Blocks.Clear();
+        }
+
+        var paragraph = ProcessedLogTextBox.Document.Blocks.FirstBlock as Paragraph;
+        if (paragraph == null)
+        {
+            paragraph = new Paragraph();
+            ProcessedLogTextBox.Document.Blocks.Add(paragraph);
+        }
+
+        if (paragraph.Inlines.Count > 0)
+        {
+            paragraph.Inlines.Add(new LineBreak());
+        }
+
+        var category = ProcessedLineClassifier.DetermineCategory(line);
+        var run = new Run(line)
+        {
+            Foreground = ProcessedLineClassifier.GetBrush(category)
+        };
+        paragraph.Inlines.Add(run);
+        ProcessedLogTextBox.ScrollToEnd();
     }
 
     private static bool IsAnchorName(string dName)
