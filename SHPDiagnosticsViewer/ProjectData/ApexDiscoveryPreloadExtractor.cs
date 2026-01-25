@@ -162,11 +162,22 @@ ORDER BY d.DeviceId, p.PageOrder;
             var filtered = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
             if (profile is null || (profile.DiscoveryKeys.Count == 0 && profile.DiscoveryPrefixes.Count == 0))
             {
-                foreach (var (name, value) in configs)
+                if (string.Equals(deviceName, "System Variable Events", StringComparison.OrdinalIgnoreCase)
+                    || (deviceName?.StartsWith("System Variable Events", StringComparison.OrdinalIgnoreCase) ?? false))
                 {
-                    if (ShouldIncludeConfig(name, limits))
+                    foreach (var entry in FilterSystemVariableEvents(configs))
                     {
-                        filtered[name] = value;
+                        filtered[entry.Name] = entry.Value;
+                    }
+                }
+                else
+                {
+                    foreach (var (name, value) in configs)
+                    {
+                        if (ShouldIncludeConfig(name, limits))
+                        {
+                            filtered[name] = value;
+                        }
                     }
                 }
             }
@@ -424,5 +435,125 @@ ORDER BY d.DeviceId, p.PageOrder;
         public int? MaxSources { get; set; }
         public int? Inputs { get; set; }
         public int? Outputs { get; set; }
+    }
+
+    private static IEnumerable<(string Name, string Value)> FilterSystemVariableEvents(List<(string Name, string Value)> configs)
+    {
+        var booleanMacro = new Dictionary<int, string>();
+        var integerMacro = new Dictionary<int, string>();
+        foreach (var (name, value) in configs)
+        {
+            if (TryParseConfigKey(name, "Config_Boolean", "Macro", out var booleanIndex))
+            {
+                booleanMacro[booleanIndex] = value ?? "";
+                continue;
+            }
+
+            if (TryParseConfigKey(name, "Config_Integer", "Macro", out var integerIndex))
+            {
+                integerMacro[integerIndex] = value ?? "";
+            }
+        }
+
+        foreach (var (name, value) in configs)
+        {
+            if (string.Equals(name, "Config_PersistEnabledStates", StringComparison.OrdinalIgnoreCase))
+            {
+                continue;
+            }
+
+            if (string.Equals(value, "(not set)", StringComparison.OrdinalIgnoreCase))
+            {
+                continue;
+            }
+
+            if (TryParseConfigIndex(name, "Config_Boolean", out var booleanIndex))
+            {
+                if (!booleanMacro.TryGetValue(booleanIndex, out var macro) || string.IsNullOrWhiteSpace(macro))
+                {
+                    continue;
+                }
+
+                yield return (name, value);
+                continue;
+            }
+
+            if (TryParseConfigIndex(name, "Config_Integer", out var integerIndex))
+            {
+                if (!integerMacro.TryGetValue(integerIndex, out var macro)
+                    || string.IsNullOrWhiteSpace(macro)
+                    || string.Equals(macro, "0", StringComparison.OrdinalIgnoreCase))
+                {
+                    continue;
+                }
+
+                yield return (name, value);
+                continue;
+            }
+
+            yield return (name, value);
+        }
+    }
+
+    private static bool TryParseConfigKey(string name, string prefix, string? suffix, out int index)
+    {
+        index = 0;
+        if (!name.StartsWith(prefix, StringComparison.OrdinalIgnoreCase))
+        {
+            return false;
+        }
+
+        var remainder = name.Substring(prefix.Length);
+        if (string.IsNullOrEmpty(remainder))
+        {
+            return false;
+        }
+
+        var suffixIndex = remainder.Length;
+        if (!string.IsNullOrEmpty(suffix))
+        {
+            if (!remainder.EndsWith(suffix, StringComparison.OrdinalIgnoreCase))
+            {
+                return false;
+            }
+            suffixIndex -= suffix.Length;
+        }
+
+        if (suffixIndex <= 0)
+        {
+            return false;
+        }
+
+        var numberText = remainder.Substring(0, suffixIndex);
+        return int.TryParse(numberText, NumberStyles.Integer, CultureInfo.InvariantCulture, out index);
+    }
+
+    private static bool TryParseConfigIndex(string name, string prefix, out int index)
+    {
+        index = 0;
+        if (!name.StartsWith(prefix, StringComparison.OrdinalIgnoreCase))
+        {
+            return false;
+        }
+
+        var remainder = name.Substring(prefix.Length);
+        if (string.IsNullOrEmpty(remainder))
+        {
+            return false;
+        }
+
+        var digitCount = 0;
+        while (digitCount < remainder.Length && char.IsDigit(remainder[digitCount]))
+        {
+            digitCount++;
+        }
+
+        if (digitCount == 0)
+        {
+            return false;
+        }
+
+        var numberText = remainder.Substring(0, digitCount);
+        return int.TryParse(numberText, NumberStyles.Integer, CultureInfo.InvariantCulture, out index);
     }
 }

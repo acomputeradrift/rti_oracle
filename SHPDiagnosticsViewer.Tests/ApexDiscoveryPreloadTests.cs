@@ -61,4 +61,24 @@ public sealed class ApexDiscoveryPreloadTests
         Assert.False(driver.Config.ContainsKey("ZoneName17"));
         Assert.False(driver.Config.ContainsKey("SourceName10"));
     }
+
+    [Fact]
+    public void SystemVariableEventsSkipsEmptyAndNotSetConfigGroups()
+    {
+        // Requirement: mission.md - Core Capabilities #3/#5; invariants.md - Output Honesty.
+        var result = ApexDiscoveryPreloadExtractor.Extract(ApexPath);
+
+        Assert.True(result.DriverConfigMap.TryGetValue(54, out var driver));
+        Assert.Equal("System Variable Events", driver.DeviceName);
+        Assert.False(driver.Config.ContainsKey("Config_Boolean1Macro"));
+        Assert.False(driver.Config.ContainsKey("Config_Boolean1Sysvar"));
+        Assert.False(driver.Config.ContainsKey("Config_Boolean1Type"));
+        Assert.False(driver.Config.ContainsKey("Config_Integer5Macro"));
+        Assert.False(driver.Config.ContainsKey("Config_Integer5Sysvar"));
+        Assert.False(driver.Config.ContainsKey("Config_Integer5Type"));
+        Assert.False(driver.Config.ContainsKey("Config_Integer5Value"));
+        Assert.False(driver.Config.ContainsKey("Config_Combo1VarA"));
+        Assert.False(driver.Config.ContainsKey("Config_PersistEnabledStates"));
+        Assert.True(driver.Config.ContainsKey("Config_Integer1Sysvar"));
+    }
 }

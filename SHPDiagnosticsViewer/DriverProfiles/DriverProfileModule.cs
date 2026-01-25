@@ -51,6 +51,12 @@ public sealed class DriverProfileRegistry
                     return profile;
                 }
             }
+
+            if (string.Equals(profile.DeviceName, "System Variable Events", StringComparison.OrdinalIgnoreCase)
+                && deviceName.StartsWith("System Variable Events", StringComparison.OrdinalIgnoreCase))
+            {
+                return profile;
+            }
         }
 
         return null;
@@ -92,7 +98,7 @@ public static class DriverProfileCatalog
 {
     public static IReadOnlyList<DriverProfileDefinition> All()
     {
-        return new[] { RtiAd64Profile.Definition, RtiInternalProfile.Definition };
+        return new[] { RtiAd64Profile.Definition, RtiInternalProfile.Definition, RtiSystemVariableEventsProfile.Definition };
     }
 
     public static IReadOnlyList<DriverProfileDefinition> Internal()

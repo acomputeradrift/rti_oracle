@@ -6,7 +6,8 @@
 - Provide reusable structure for new driver profiles.
 
 ## Scope and Constraints
-- Profiles are documentation artifacts that describe how to interpret `.apex` inputs.
+- ~~Profiles are documentation artifacts that describe how to interpret `.apex` inputs.~~
+- Profiles are code-backed definitions used by Apex Discovery and Analysis Engine.
 - `.apex` files and project spreadsheets are read-only inputs.
 - Profiles may only influence diagnostics verbosity via Driver Log Level settings.
 - Do not invent mappings; unresolved identifiers must be explicit.
@@ -39,6 +40,15 @@
 - Apex Discovery reads `.apex` data using profile-defined queries.
 - Discovery output is passed to the Analysis Engine as lookup data.
 - Analysis Engine formats logs using the profile mappings.
+
+## Current Implementation (Code)
+- Profile definitions live in code:
+  - `SHPDiagnosticsViewer/DriverProfiles/RtiAd64Profile.cs`
+  - `SHPDiagnosticsViewer/DriverProfiles/RtiInternalProfile.cs`
+- Profile catalog and lookup live in:
+  - `SHPDiagnosticsViewer/DriverProfiles/DriverProfileModule.cs`
+- Apex Discovery consults profiles to filter driver config fields before output.
+- The internal RTI profile is always included and is not tied to a device name.
 
 ## Reusable Profile Template
 
@@ -87,6 +97,9 @@ Example mapping usage:
 - `.apex` files are read-only inputs.
 - Do not infer names; only map if data exists in `.apex`.
 ```
+
+## Reusable Profile Template (Code)
+- `DriverProfiles/DriverProfileTemplate.cs` (code template for new profiles)
 
 ## Snippets from Existing Profiles
 

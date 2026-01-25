@@ -15,6 +15,8 @@
 - If a profile is found, use it to determine which fields to extract.
 - Apex Discovery extracts fields and produces normalized lookup data.
 - Analysis Engine uses the same profile plus lookup data to map/format log lines.
+-
+- Internal RTI profile is always included (no deviceName match required).
 
 ## Data Handoff Contract
 - Apex Discovery outputs a profile-keyed lookup bundle.
@@ -31,6 +33,7 @@
 Each profile must define:
 - Identification: driver name (deviceName) and optional aliases.
 - Discovery extraction: tables, fields, filters, joins.
+- Discovery keys/prefixes for field selection (e.g., `GroupCount` gates `GroupName*`).
 - Analysis mapping: ID resolution steps, formatting rules, unresolved handling.
 - Output expectations: preserve raw identifiers and raw log line references.
 
@@ -44,3 +47,11 @@ Each profile must define:
 - Profiles are documentation artifacts and must not modify `.apex` inputs.
 - Profiles may only influence diagnostics verbosity via Driver Log Level settings.
 - Do not invent mappings or infer missing data.
+
+## Current Implementations (Code)
+- Profile catalog: `SHPDiagnosticsViewer/DriverProfiles/DriverProfileModule.cs`
+- AD-64 profile: `SHPDiagnosticsViewer/DriverProfiles/RtiAd64Profile.cs`
+  - Uses `GroupCount`, `SourceCount`, `ZoneCount` to gate `GroupName*`, `SourceName*`, `ZoneName*`
+  - Count keys are not included in output; they only limit extraction
+- Internal RTI profile: `SHPDiagnosticsViewer/DriverProfiles/RtiInternalProfile.cs`
+  - Always included and used for page mapping extraction
