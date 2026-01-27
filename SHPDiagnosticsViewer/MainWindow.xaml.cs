@@ -23,6 +23,7 @@ namespace SHPDiagnosticsViewer;
 public partial class MainWindow : Window
 {
     private const int MaxLogChars = 200_000;
+    private const double DriverLogDefaultHeight = 160;
     private const string ProcessedPlaceholderText = "No processed information available";
     private IDiagnosticsTransport _transport;
     private bool _isConnecting;
@@ -131,7 +132,7 @@ public partial class MainWindow : Window
             DiscoveredCombo.ItemsSource = results.OrderBy(ip => ip).ToList();
             if (results.Count == 1)
             {
-                IpTextBox.Text = results[0];
+                IpComboBox.Text = results[0];
             }
             StatusText.Text = results.Count == 0 ? "No devices found" : $"Found {results.Count}";
         }
@@ -154,7 +155,7 @@ public partial class MainWindow : Window
             return;
         }
 
-        var ip = IpTextBox.Text.Trim();
+        var ip = IpComboBox.Text.Trim();
         if (string.IsNullOrWhiteSpace(ip))
         {
             StatusText.Text = "Enter an IP";
@@ -224,8 +225,20 @@ public partial class MainWindow : Window
     {
         if (DiscoveredCombo.SelectedItem is string selected)
         {
-            IpTextBox.Text = selected;
+            IpComboBox.Text = selected;
         }
+    }
+
+    private void DriverLogLevelsToggleButton_Checked(object sender, RoutedEventArgs e)
+    {
+        DriverLogRow.Height = new GridLength(DriverLogDefaultHeight);
+        DriverLogSplitter.Visibility = Visibility.Visible;
+    }
+
+    private void DriverLogLevelsToggleButton_Unchecked(object sender, RoutedEventArgs e)
+    {
+        DriverLogRow.Height = GridLength.Auto;
+        DriverLogSplitter.Visibility = Visibility.Collapsed;
     }
 
     private void UploadProject_Click(object sender, RoutedEventArgs e)
@@ -248,7 +261,9 @@ public partial class MainWindow : Window
         };
         preview.ShowDialog();
         _apexUploaded = true;
-        ProjectDataHeaderText.Text = $"Project Data: {Path.GetFileName(dialog.FileName)}";
+        var fileName = Path.GetFileName(dialog.FileName);
+        ProjectDataHeaderText.Text = $"Project Data: {fileName}";
+        ProjectFileNameText.Text = fileName;
         if (!_isConnecting)
         {
             ConnectButton.IsEnabled = true;

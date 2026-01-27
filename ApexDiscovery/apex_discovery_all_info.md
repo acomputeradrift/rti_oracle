@@ -165,6 +165,42 @@ Use IDs from tables to preserve referential mapping for later correlation with d
 ## Known limits from our data
 - Some tables are empty in the sample project (`NetworkConfig`, `RS232Data`, `IR`, etc.).
 - Driver log‑level flags are not stored in the `.apex` file in an obvious table; those were observed in the ID11 push payload and appear to be embedded project resources.
+- `NetworkConfig`/`WlanConfig` do not store device IPs in the sampled projects; device IP fields live in `RTIDeviceData`.
+
+---
+
+## Processor IP Address Extraction (XP main/expansion)
+
+### Where the IP lives
+- IP settings are stored per device in `RTIDeviceData` (not `NetworkConfig`/`WlanConfig`).
+- Relevant columns for adapter 0:
+  - `NetUseDhcp` (0 = static, 1 = DHCP)
+  - `IpaddressAdapter0`, `NetmaskAdapter0`, `GatewayAdapter0`, `Dns1Adapter0`, `Dns2Adapter0`
+- Relevant columns for adapter 1 (if used):
+  - `DhcpEnabledAdapter1` (0 = static, 1 = DHCP)
+  - `IpAddressAdapter1`, `NetmaskAdapter1`, `GatewayAdapter1`, `Dns1_Adapter1`, `Dns2_Adapter1`
+
+### Trust rule (required)
+- Only trust `IpaddressAdapter0` when `NetUseDhcp = 0`.
+- Only trust `IpAddressAdapter1` when `DhcpEnabledAdapter1 = 0`.
+- If DHCP is enabled, the stored IP may be stale or a default and must be treated as **unknown**.
+
+### IP encoding
+- IP fields are stored as signed 32‑bit integers.
+- Convert to unsigned, then to dotted IPv4 using **big‑endian** order.
+  - Example: `171974882` → `10.64.32.226`
+  - Example: `-256` → `255.255.255.0`
+
+### How to locate XP processors
+- XP devices usually appear in `Devices` with names/models like `XP‑8`, `XP‑8v`, `XP‑3`, etc.
+- Query example to locate XP devices:
+  - `SELECT DeviceId, Name, Manufacturer, Model, Type FROM Devices WHERE Name LIKE 'XP-%' OR Model LIKE 'XP-%' OR Type LIKE 'XP-%';`
+- Join those `DeviceId` values to `RTIDeviceData` to read the IP fields.
+
+### Main vs expansion processor (current evidence)
+- The `.apex` schema does not explicitly label an XP device as "main" vs "expansion."
+- In sampled data, expansion hardware appears in `ExpansionDevices` (no XP rows there), while the XP controller appears as a `Devices` row.
+- If a project includes multiple XP devices, they will appear as multiple `Devices` rows; assign "main" vs "expansion" only if a reliable, explicit marker exists in the DB.
 
 ---
 
