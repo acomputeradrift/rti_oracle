@@ -1,6 +1,8 @@
 using System;
+using System.Collections.Generic;
 using System.Reflection;
 using System.Threading;
+using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Documents;
 using SHPDiagnosticsViewer.ProjectData;
@@ -16,8 +18,7 @@ public sealed class MainWindowProcessedOutputTests
         RunOnSta(() =>
         {
             var window = new MainWindow();
-            var rawLog = GetTextBox(window, "RawLogTextBox");
-            rawLog.Text = "1 [2026-01-24 10:00:00.000] Change to page 1 on device 'RTiPanel (iPhone X or newer)'";
+            InvokeAppendLog(window, "1 [2026-01-24 10:00:00.000] Change to page 1 on device 'RTiPanel (iPhone X or newer)'");
 
             var result = BuildResult();
             window.InitializeProcessing(result);
@@ -60,6 +61,95 @@ public sealed class MainWindowProcessedOutputTests
         });
     }
 
+    [Fact]
+    public void ProcessedLogScrollsHorizontallyOnlyWhenNeeded()
+    {
+        RunOnSta(() =>
+        {
+            var window = new MainWindow
+            {
+                Width = 900,
+                Height = 700
+            };
+            window.Show();
+            window.UpdateLayout();
+
+            InvokeSetProcessedOutput(window, new[] { "Short line." });
+            window.UpdateLayout();
+
+            var processed = GetRichTextBox(window, "ProcessedLogTextBox");
+            FlushLayout(processed);
+            var viewport = processed.ViewportWidth;
+            Assert.True(viewport > 0);
+            Assert.InRange(processed.Document.PageWidth, viewport - 1, viewport + 1);
+            Assert.Equal(processed.Document.PageWidth, processed.Document.ColumnWidth);
+            Assert.Equal(1, GetVisualLineCount(processed));
+
+            InvokeSetProcessedOutput(window, new[] { new string('X', 500) });
+            window.UpdateLayout();
+            FlushLayout(processed);
+
+            Assert.True(processed.Document.PageWidth > processed.ViewportWidth);
+            Assert.Equal(1, GetVisualLineCount(processed));
+            window.Hide();
+        });
+    }
+
+    [Fact]
+    public void ProcessedLogUsesMeasuredWidthWhenViewportUnavailable()
+    {
+        RunOnSta(() =>
+        {
+            var window = new MainWindow
+            {
+                Width = 900,
+                Height = 700
+            };
+            window.Show();
+            window.UpdateLayout();
+            InvokeSetProcessedOutput(window, new[] { new string('X', 300) });
+            window.UpdateLayout();
+
+            var processed = GetRichTextBox(window, "ProcessedLogTextBox");
+            FlushLayout(processed);
+            Assert.False(double.IsNaN(processed.Document.PageWidth));
+            Assert.Equal(processed.Document.PageWidth, processed.Document.ColumnWidth);
+            Assert.True(processed.Document.PageWidth > 0);
+            window.Hide();
+        });
+    }
+
+    [Fact]
+    public void ProcessedLogKeepsWidthWhenResizingPane()
+    {
+        RunOnSta(() =>
+        {
+            var window = new MainWindow
+            {
+                Width = 900,
+                Height = 700
+            };
+            window.Show();
+            window.UpdateLayout();
+
+            var longLine = new string('X', 400);
+            InvokeSetProcessedOutput(window, new[] { longLine });
+            window.UpdateLayout();
+
+            var processed = GetRichTextBox(window, "ProcessedLogTextBox");
+            FlushLayout(processed);
+            var initialWidth = processed.Document.PageWidth;
+            Assert.True(initialWidth > 0);
+
+            window.Width = 700;
+            window.UpdateLayout();
+            FlushLayout(processed);
+
+            Assert.True(processed.Document.PageWidth >= processed.ViewportWidth);
+            window.Hide();
+        });
+    }
+
     private static ProjectDataExtractionResult BuildResult()
     {
         var result = new ProjectDataExtractionResult();
@@ -98,6 +188,45 @@ public sealed class MainWindowProcessedOutputTests
         var richText = (RichTextBox)field!.GetValue(window)!;
         richText.Document.Blocks.Clear();
         richText.Document.Blocks.Add(new Paragraph(new Run(value)));
+    }
+
+    private static RichTextBox GetRichTextBox(MainWindow window, string fieldName)
+    {
+        var field = typeof(MainWindow).GetField(fieldName, BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public);
+        Assert.NotNull(field);
+        return (RichTextBox)field!.GetValue(window)!;
+    }
+
+    private static int GetVisualLineCount(RichTextBox richTextBox)
+    {
+        var pointer = richTextBox.Document.ContentStart;
+        var count = 1;
+        while (true)
+        {
+            var next = pointer.GetLineStartPosition(1);
+            if (next == null)
+            {
+                break;
+            }
+
+            count++;
+            pointer = next;
+        }
+
+        return count;
+    }
+
+    private static void FlushLayout(FrameworkElement element)
+    {
+        element.Dispatcher.Invoke(() => { }, System.Windows.Threading.DispatcherPriority.Loaded);
+        element.UpdateLayout();
+    }
+
+    private static void InvokeSetProcessedOutput(MainWindow window, IEnumerable<string> lines)
+    {
+        var method = typeof(MainWindow).GetMethod("SetProcessedOutput", BindingFlags.Instance | BindingFlags.NonPublic);
+        Assert.NotNull(method);
+        method!.Invoke(window, new object[] { lines, false });
     }
 
     private static void InvokeAppendLog(MainWindow window, string line)

@@ -3,6 +3,7 @@ using System.Collections;
 using System.Collections.ObjectModel;
 using System.Collections.Generic;
 using System.ComponentModel;
+using System.Globalization;
 using System.IO;
 using System.Linq;
 using System.Text.Json;
@@ -13,10 +14,12 @@ using System.Windows.Controls.Primitives;
 using System.Windows.Data;
 using System.Windows.Documents;
 using System.Windows.Media;
+using System.Windows.Threading;
 using Microsoft.Win32;
 using SHPDiagnosticsViewer.DiagnosticsTransport;
 using SHPDiagnosticsViewer.ProjectData;
 using SHPDiagnosticsViewer.ProcessingEngine;
+using SHPDiagnosticsViewer.Settings;
 
 namespace SHPDiagnosticsViewer;
 
@@ -25,11 +28,42 @@ public partial class MainWindow : Window
     private const int MaxLogChars = 200_000;
     private const double DriverLogDefaultHeight = 160;
     private const string ProcessedPlaceholderText = "No processed information available";
+    private const string FilterInvalidKeywordMessage = "Invalid keyword filter. Use comma-separated terms, with optional +include / -exclude.";
+    private const string FilterInvalidDateMessage = "Invalid date/time filter. Use yyyy-MM-dd HH:mm.";
+    private const string FilterInvalidRangeMessage = "Invalid date/time range. Start must be before End.";
+    private const double ProcessedWidthPadding = 12;
+    private static readonly TimeSpan FindDebounceInterval = TimeSpan.FromMilliseconds(200);
+    private static readonly string[] DateTimeFormats =
+    {
+        "yyyy-MM-dd HH:mm"
+    };
     private IDiagnosticsTransport _transport;
     private bool _isConnecting;
     private bool _useTcpCapture;
     private int _rawLineNumber = 1;
     private bool _apexUploaded;
+    private string? _projectFilePath;
+    private bool _isUpdatingRecentProjects;
+    private int _processedVisibleLineCount;
+    private bool _pendingProcessedLayoutUpdate;
+    private bool _filterActive;
+    private int _filteredRawCount;
+    private DateTime? _filterStart;
+    private DateTime? _filterEnd;
+    private bool _isUpdatingStartPicker;
+    private bool _isUpdatingEndPicker;
+    private DateTime? _minRawLogTimestamp;
+    private DateTime? _maxRawLogTimestamp;
+    private readonly FindState _rawFindState = new();
+    private readonly FindState _processedFindState = new();
+    private readonly DispatcherTimer _rawFindTimer = new();
+    private readonly DispatcherTimer _processedFindTimer = new();
+    private readonly OracleSettingsStore _settingsStore = new();
+    private OracleSettings _settings = new();
+    private List<string> _filterIncludeTerms = new();
+    private List<string> _filterExcludeTerms = new();
+    private readonly List<string> _rawLogLines = new();
+    private readonly List<string> _processedLogLines = new();
     private readonly WebSocketMessageFormatter _messageFormatter = new(DateOnly.FromDateTime(DateTime.Today));
     private readonly Dictionary<string, string> _friendlyNames = new(StringComparer.OrdinalIgnoreCase);
     private readonly Dictionary<string, int> _deviceNameToId = new(StringComparer.OrdinalIgnoreCase);
@@ -51,6 +85,10 @@ public partial class MainWindow : Window
     public MainWindow()
     {
         InitializeComponent();
+        ConfigureLogOutputBoxes();
+        ConfigureFilterControls();
+        ConfigureFindTimers();
+        LoadSettings();
         DataContext = this;
         if (CollectionViewSource.GetDefaultView(Drivers) is ListCollectionView view)
         {
@@ -59,6 +97,966 @@ public partial class MainWindow : Window
 
         _transport = new LegacyWebSocketDiagnosticsTransport();
         RegisterTransportHandlers(_transport);
+    }
+
+    private void ConfigureLogOutputBoxes()
+    {
+        RawLogTextBox.TextWrapping = TextWrapping.NoWrap;
+        RawLogTextBox.HorizontalScrollBarVisibility = ScrollBarVisibility.Auto;
+        RawLogTextBox.VerticalScrollBarVisibility = ScrollBarVisibility.Auto;
+        RawLogTextBox.Padding = new Thickness(0);
+
+        ProcessedLogTextBox.HorizontalScrollBarVisibility = ScrollBarVisibility.Auto;
+        ProcessedLogTextBox.VerticalScrollBarVisibility = ScrollBarVisibility.Auto;
+        ProcessedLogTextBox.Padding = new Thickness(0);
+        ProcessedLogTextBox.Document.PagePadding = new Thickness(0);
+        ProcessedLogTextBox.Loaded += (_, _) => QueueProcessedLayoutUpdate();
+        ProcessedLogTextBox.SizeChanged += (_, _) => QueueProcessedLayoutUpdate();
+    }
+
+    private void ConfigureFilterControls()
+    {
+        InitializeTimePickers();
+        UpdateFilterApplyState();
+        UpdateDateTimePickerBounds();
+    }
+
+    private void ConfigureFindTimers()
+    {
+        _rawFindTimer.Interval = FindDebounceInterval;
+        _rawFindTimer.Tick += (_, _) =>
+        {
+            _rawFindTimer.Stop();
+            ExecuteRawFind();
+        };
+
+        _processedFindTimer.Interval = FindDebounceInterval;
+        _processedFindTimer.Tick += (_, _) =>
+        {
+            _processedFindTimer.Stop();
+            ExecuteProcessedFind();
+        };
+    }
+
+    private void LoadSettings()
+    {
+        _settings = _settingsStore.Load();
+        UpdateRecentProjectList();
+    }
+
+    private void UpdateRecentProjectList(string? selectFilePath = null)
+    {
+        _isUpdatingRecentProjects = true;
+        RecentProjectComboBox.ItemsSource = _settings.RecentProjects;
+        RecentProjectComboBox.SelectedItem = null;
+        if (!string.IsNullOrWhiteSpace(selectFilePath))
+        {
+            var selected = _settings.RecentProjects.FirstOrDefault(entry =>
+                string.Equals(entry.FilePath, selectFilePath, StringComparison.OrdinalIgnoreCase));
+            if (selected != null)
+            {
+                RecentProjectComboBox.SelectedItem = selected;
+            }
+        }
+        _isUpdatingRecentProjects = false;
+    }
+
+    private void InitializeTimePickers()
+    {
+        for (var hour = 0; hour < 24; hour++)
+        {
+            var value = hour.ToString("00", CultureInfo.InvariantCulture);
+            FilterStartHourCombo.Items.Add(value);
+            FilterEndHourCombo.Items.Add(value);
+        }
+
+        for (var minute = 0; minute < 60; minute++)
+        {
+            var value = minute.ToString("00", CultureInfo.InvariantCulture);
+            FilterStartMinuteCombo.Items.Add(value);
+            FilterEndMinuteCombo.Items.Add(value);
+        }
+    }
+
+    private void FilterKeywordTextBox_TextChanged(object sender, TextChangedEventArgs e)
+    {
+        UpdateFilterApplyState();
+    }
+
+    private void FilterStartTextBox_TextChanged(object sender, TextChangedEventArgs e)
+    {
+        UpdateFilterApplyState();
+    }
+
+    private void FilterEndTextBox_TextChanged(object sender, TextChangedEventArgs e)
+    {
+        UpdateFilterApplyState();
+    }
+
+    private void FilterStartPickerButton_Click(object sender, RoutedEventArgs e)
+    {
+        UpdateDateTimePickerBounds();
+        SyncPickerFromText(FilterStartTextBox.Text, FilterStartCalendar, FilterStartHourCombo, FilterStartMinuteCombo, isStart: true);
+        FilterStartDatePopup.IsOpen = true;
+    }
+
+    private void FilterEndPickerButton_Click(object sender, RoutedEventArgs e)
+    {
+        UpdateDateTimePickerBounds();
+        SyncPickerFromText(FilterEndTextBox.Text, FilterEndCalendar, FilterEndHourCombo, FilterEndMinuteCombo, isStart: false);
+        FilterEndDatePopup.IsOpen = true;
+    }
+
+    private void FilterStartCalendar_SelectedDatesChanged(object? sender, SelectionChangedEventArgs e)
+    {
+        if (FilterStartCalendar.SelectedDate is null)
+        {
+            return;
+        }
+
+        UpdateDateTimeTextFromPicker(FilterStartTextBox, FilterStartCalendar, FilterStartHourCombo, FilterStartMinuteCombo, isStart: true);
+    }
+
+    private void FilterEndCalendar_SelectedDatesChanged(object? sender, SelectionChangedEventArgs e)
+    {
+        if (FilterEndCalendar.SelectedDate is null)
+        {
+            return;
+        }
+
+        UpdateDateTimeTextFromPicker(FilterEndTextBox, FilterEndCalendar, FilterEndHourCombo, FilterEndMinuteCombo, isStart: false);
+    }
+
+    private void FilterStartTimeCombo_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (_isUpdatingStartPicker)
+        {
+            return;
+        }
+
+        UpdateDateTimeTextFromPicker(FilterStartTextBox, FilterStartCalendar, FilterStartHourCombo, FilterStartMinuteCombo, isStart: true);
+    }
+
+    private void FilterEndTimeCombo_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (_isUpdatingEndPicker)
+        {
+            return;
+        }
+
+        UpdateDateTimeTextFromPicker(FilterEndTextBox, FilterEndCalendar, FilterEndHourCombo, FilterEndMinuteCombo, isStart: false);
+    }
+
+    private void FilterApplyButton_Click(object sender, RoutedEventArgs e)
+    {
+        if (!TryParseKeywordFilter(FilterKeywordTextBox.Text, out var include, out var exclude, out _)
+            || !TryParseDateRange(FilterStartTextBox.Text, FilterEndTextBox.Text, out var start, out var end, out _))
+        {
+            UpdateFilterApplyState();
+            return;
+        }
+
+        _filterIncludeTerms = include;
+        _filterExcludeTerms = exclude;
+        _filterStart = start;
+        _filterEnd = end;
+        _filterActive = _filterIncludeTerms.Count > 0 || _filterExcludeTerms.Count > 0 || _filterStart.HasValue || _filterEnd.HasValue;
+
+        ApplyCurrentFilter();
+    }
+
+    private void FilterClearButton_Click(object sender, RoutedEventArgs e)
+    {
+        FilterKeywordTextBox.Text = "";
+        FilterStartTextBox.Text = "";
+        FilterEndTextBox.Text = "";
+        FilterStartCalendar.SelectedDate = null;
+        FilterEndCalendar.SelectedDate = null;
+        _filterIncludeTerms = new List<string>();
+        _filterExcludeTerms = new List<string>();
+        _filterStart = null;
+        _filterEnd = null;
+        _filterActive = false;
+        ApplyCurrentFilter();
+        UpdateFilterApplyState();
+    }
+
+    private void RawFindTextBox_TextChanged(object sender, TextChangedEventArgs e)
+    {
+        _rawFindTimer.Stop();
+        _rawFindTimer.Start();
+    }
+
+    private void ProcessedFindTextBox_TextChanged(object sender, TextChangedEventArgs e)
+    {
+        _processedFindTimer.Stop();
+        _processedFindTimer.Start();
+    }
+
+    private void RawFindPrevButton_Click(object sender, RoutedEventArgs e)
+    {
+        MoveFindSelection(_rawFindState, RawLogTextBox, moveNext: false, isProcessed: false);
+        UpdateMatchLabel(_rawFindState, RawFindCountText, isProcessed: false);
+    }
+
+    private void RawFindNextButton_Click(object sender, RoutedEventArgs e)
+    {
+        MoveFindSelection(_rawFindState, RawLogTextBox, moveNext: true, isProcessed: false);
+        UpdateMatchLabel(_rawFindState, RawFindCountText, isProcessed: false);
+    }
+
+    private void RawFindClearButton_Click(object sender, RoutedEventArgs e)
+    {
+        RawFindTextBox.Text = "";
+        ResetFindState(_rawFindState, RawFindCountText, RawFindPrevButton, RawFindNextButton);
+        RawLogTextBox.Select(0, 0);
+    }
+
+    private void ProcessedFindPrevButton_Click(object sender, RoutedEventArgs e)
+    {
+        MoveFindSelection(_processedFindState, ProcessedLogTextBox, moveNext: false, isProcessed: true);
+        UpdateMatchLabel(_processedFindState, ProcessedFindCountText, isProcessed: true);
+    }
+
+    private void ProcessedFindNextButton_Click(object sender, RoutedEventArgs e)
+    {
+        MoveFindSelection(_processedFindState, ProcessedLogTextBox, moveNext: true, isProcessed: true);
+        UpdateMatchLabel(_processedFindState, ProcessedFindCountText, isProcessed: true);
+    }
+
+    private void ProcessedFindClearButton_Click(object sender, RoutedEventArgs e)
+    {
+        ProcessedFindTextBox.Text = "";
+        ResetFindState(_processedFindState, ProcessedFindCountText, ProcessedFindPrevButton, ProcessedFindNextButton);
+        ProcessedLogTextBox.Selection.Select(ProcessedLogTextBox.Document.ContentStart, ProcessedLogTextBox.Document.ContentStart);
+    }
+
+    private void UpdateFilterApplyState()
+    {
+        var keywordValid = TryParseKeywordFilter(FilterKeywordTextBox.Text, out _, out _, out var keywordError);
+        var dateValid = TryParseDateRange(FilterStartTextBox.Text, FilterEndTextBox.Text, out _, out _, out var dateError);
+
+        string? error = null;
+        if (!keywordValid)
+        {
+            error = keywordError;
+        }
+        else if (!dateValid)
+        {
+            error = dateError;
+        }
+
+        FilterApplyButton.IsEnabled = error == null;
+        FilterApplyButton.ToolTip = error;
+    }
+
+    private static void UpdateFindState(FindState state, string query, string text, TextBlock countText, Button prevButton, Button nextButton, bool resetIndex)
+    {
+        state.Matches.Clear();
+        state.ProcessedMatches.Clear();
+        var previousIndex = state.CurrentIndex;
+        var previousQuery = state.Query;
+        state.Query = query ?? "";
+
+        if (!string.IsNullOrWhiteSpace(query))
+        {
+            var index = 0;
+            while (index <= text.Length - query.Length)
+            {
+                index = text.IndexOf(query, index, StringComparison.OrdinalIgnoreCase);
+                if (index < 0)
+                {
+                    break;
+                }
+
+                state.Matches.Add(index);
+                index += query.Length;
+            }
+        }
+
+        var hasMatches = state.Matches.Count > 0;
+        prevButton.IsEnabled = hasMatches;
+        nextButton.IsEnabled = hasMatches;
+        if (!hasMatches)
+        {
+            state.CurrentIndex = -1;
+            UpdateMatchLabel(state, countText, isProcessed: false);
+            return;
+        }
+
+        if (resetIndex || !string.Equals(previousQuery, state.Query, StringComparison.Ordinal))
+        {
+            state.CurrentIndex = 0;
+            UpdateMatchLabel(state, countText, isProcessed: false);
+            return;
+        }
+
+        state.CurrentIndex = previousIndex;
+        if (state.CurrentIndex < 0)
+        {
+            state.CurrentIndex = 0;
+        }
+        else if (state.CurrentIndex >= state.Matches.Count)
+        {
+            state.CurrentIndex = state.Matches.Count - 1;
+        }
+        UpdateMatchLabel(state, countText, isProcessed: false);
+    }
+
+    private void UpdateProcessedFindState(FindState state, string query, TextBlock countText, Button prevButton, Button nextButton, bool resetIndex)
+    {
+        state.Matches.Clear();
+        state.ProcessedMatches.Clear();
+        var previousIndex = state.CurrentIndex;
+        var previousQuery = state.Query;
+        state.Query = query ?? "";
+
+        if (!string.IsNullOrWhiteSpace(query))
+        {
+            var paragraph = ProcessedLogTextBox.Document.Blocks.FirstBlock as Paragraph;
+            if (paragraph != null)
+            {
+                var lineIndex = 0;
+                var lineStart = paragraph.ContentStart;
+                foreach (var inline in paragraph.Inlines)
+                {
+                    if (inline is Run run)
+                    {
+                        var text = run.Text ?? "";
+                        if (text.Length > 0)
+                        {
+                            var startIndex = 0;
+                            while (startIndex <= text.Length - query.Length)
+                            {
+                                var matchIndex = text.IndexOf(query, startIndex, StringComparison.OrdinalIgnoreCase);
+                                if (matchIndex < 0)
+                                {
+                                    break;
+                                }
+
+                                var pointer = run.ContentStart.GetPositionAtOffset(matchIndex, LogicalDirection.Forward);
+                                if (pointer != null)
+                                {
+                                    state.ProcessedMatches.Add(new ProcessedMatch(pointer, lineIndex, lineStart));
+                                }
+
+                                startIndex = matchIndex + query.Length;
+                            }
+                        }
+                    }
+                    else if (inline is LineBreak)
+                    {
+                        lineIndex++;
+                        lineStart = inline.ContentEnd;
+                    }
+                }
+            }
+        }
+
+        var hasMatches = state.ProcessedMatches.Count > 0;
+        prevButton.IsEnabled = hasMatches;
+        nextButton.IsEnabled = hasMatches;
+        if (!hasMatches)
+        {
+            state.CurrentIndex = -1;
+            UpdateMatchLabel(state, countText, isProcessed: true);
+            return;
+        }
+
+        if (resetIndex || !string.Equals(previousQuery, state.Query, StringComparison.Ordinal))
+        {
+            state.CurrentIndex = 0;
+            UpdateMatchLabel(state, countText, isProcessed: true);
+            return;
+        }
+
+        state.CurrentIndex = previousIndex;
+        if (state.CurrentIndex < 0)
+        {
+            state.CurrentIndex = 0;
+        }
+        else if (state.CurrentIndex >= state.ProcessedMatches.Count)
+        {
+            state.CurrentIndex = state.ProcessedMatches.Count - 1;
+        }
+        UpdateMatchLabel(state, countText, isProcessed: true);
+    }
+
+    private static void ResetFindState(FindState state, TextBlock countText, Button prevButton, Button nextButton)
+    {
+        state.Matches.Clear();
+        state.ProcessedMatches.Clear();
+        state.CurrentIndex = -1;
+        state.Query = "";
+        countText.Text = "Match: None";
+        prevButton.IsEnabled = false;
+        nextButton.IsEnabled = false;
+    }
+
+    private static void UpdateMatchLabel(FindState state, TextBlock countText, bool isProcessed)
+    {
+        var total = isProcessed ? state.ProcessedMatches.Count : state.Matches.Count;
+        if (total == 0)
+        {
+            countText.Text = "Match: None";
+            return;
+        }
+
+        var current = Math.Clamp(state.CurrentIndex + 1, 1, total);
+        countText.Text = $"Match: {current}/{total}";
+    }
+
+    private void ExecuteRawFind()
+    {
+        UpdateFindState(_rawFindState, RawFindTextBox.Text, RawLogTextBox.Text, RawFindCountText, RawFindPrevButton, RawFindNextButton, resetIndex: true);
+        SelectFindMatch(_rawFindState, RawLogTextBox, isProcessed: false);
+    }
+
+    private void ExecuteProcessedFind()
+    {
+        UpdateProcessedFindState(_processedFindState, ProcessedFindTextBox.Text, ProcessedFindCountText, ProcessedFindPrevButton, ProcessedFindNextButton, resetIndex: true);
+        SelectFindMatch(_processedFindState, ProcessedLogTextBox, isProcessed: true);
+    }
+
+    private void SelectFindMatch(FindState state, Control logControl, bool isProcessed)
+    {
+        if (isProcessed)
+        {
+            if (state.ProcessedMatches.Count == 0 || state.CurrentIndex < 0 || state.CurrentIndex >= state.ProcessedMatches.Count)
+            {
+                return;
+            }
+
+            SelectProcessedMatch(state, (RichTextBox)logControl);
+            return;
+        }
+
+        if (state.Matches.Count == 0 || state.CurrentIndex < 0 || state.CurrentIndex >= state.Matches.Count)
+        {
+            return;
+        }
+
+        SelectRawMatch(state, (TextBox)logControl);
+    }
+
+    private void MoveFindSelection(FindState state, Control logControl, bool moveNext, bool isProcessed)
+    {
+        var matchCount = isProcessed ? state.ProcessedMatches.Count : state.Matches.Count;
+        if (matchCount == 0)
+        {
+            return;
+        }
+
+        if (moveNext)
+        {
+            state.CurrentIndex = (state.CurrentIndex + 1) % matchCount;
+        }
+        else
+        {
+            state.CurrentIndex = state.CurrentIndex <= 0 ? matchCount - 1 : state.CurrentIndex - 1;
+        }
+
+        SelectFindMatch(state, logControl, isProcessed);
+    }
+
+    private void SelectRawMatch(FindState state, TextBox logTextBox)
+    {
+        var start = state.Matches[state.CurrentIndex];
+        logTextBox.Select(start, state.Query.Length);
+
+        EnsureTextBoxSelectionVisible(logTextBox, start);
+    }
+
+    private void SelectProcessedMatch(FindState state, RichTextBox logTextBox)
+    {
+        var match = state.ProcessedMatches[state.CurrentIndex];
+        var startPointer = match.Start;
+        var endPointer = startPointer.GetPositionAtOffset(state.Query.Length, LogicalDirection.Forward);
+        if (startPointer == null || endPointer == null)
+        {
+            return;
+        }
+
+        logTextBox.Selection.Select(startPointer, endPointer);
+        EnsureRichTextSelectionVisible(logTextBox, startPointer);
+    }
+
+    private void EnsureTextBoxSelectionVisible(TextBox logTextBox, int selectionStart)
+    {
+        logTextBox.UpdateLayout();
+        var scrollViewer = FindVisualChild<ScrollViewer>(logTextBox);
+        if (scrollViewer == null)
+        {
+            return;
+        }
+
+        var rect = logTextBox.GetRectFromCharacterIndex(selectionStart);
+        if (rect.IsEmpty || scrollViewer.ViewportHeight <= 0)
+        {
+            var lineIndex = logTextBox.GetLineIndexFromCharacterIndex(selectionStart);
+            logTextBox.ScrollToLine(lineIndex);
+            return;
+        }
+
+        var yInViewport = rect.Top - scrollViewer.VerticalOffset;
+        if (yInViewport < 0)
+        {
+            scrollViewer.ScrollToVerticalOffset(scrollViewer.VerticalOffset + yInViewport);
+            logTextBox.UpdateLayout();
+            return;
+        }
+
+        var bottom = yInViewport + rect.Height;
+        if (bottom > scrollViewer.ViewportHeight)
+        {
+            var delta = bottom - scrollViewer.ViewportHeight;
+            scrollViewer.ScrollToVerticalOffset(scrollViewer.VerticalOffset + delta);
+            logTextBox.UpdateLayout();
+        }
+    }
+
+    private void EnsureRichTextSelectionVisible(RichTextBox logTextBox, TextPointer selectionStart)
+    {
+        logTextBox.UpdateLayout();
+        var scrollViewer = FindVisualChild<ScrollViewer>(logTextBox);
+        if (scrollViewer == null)
+        {
+            return;
+        }
+
+        var rect = selectionStart.GetCharacterRect(LogicalDirection.Forward);
+        if (rect.IsEmpty || scrollViewer.ViewportHeight <= 0)
+        {
+            return;
+        }
+
+        var yInViewport = rect.Top - scrollViewer.VerticalOffset;
+        if (yInViewport < 0)
+        {
+            scrollViewer.ScrollToVerticalOffset(scrollViewer.VerticalOffset + yInViewport);
+            logTextBox.UpdateLayout();
+            return;
+        }
+
+        var bottom = yInViewport + rect.Height;
+        if (bottom > scrollViewer.ViewportHeight)
+        {
+            var delta = bottom - scrollViewer.ViewportHeight;
+            scrollViewer.ScrollToVerticalOffset(scrollViewer.VerticalOffset + delta);
+            logTextBox.UpdateLayout();
+        }
+    }
+
+    private static T? FindVisualChild<T>(DependencyObject root) where T : DependencyObject
+    {
+        var count = VisualTreeHelper.GetChildrenCount(root);
+        for (var i = 0; i < count; i++)
+        {
+            var child = VisualTreeHelper.GetChild(root, i);
+            if (child is T match)
+            {
+                return match;
+            }
+
+            var nested = FindVisualChild<T>(child);
+            if (nested != null)
+            {
+                return nested;
+            }
+        }
+
+        return null;
+    }
+
+    private void UpdateDateTimePickerBounds()
+    {
+        var hasLogs = _minRawLogTimestamp.HasValue && _maxRawLogTimestamp.HasValue;
+        FilterStartPickerButton.IsEnabled = hasLogs;
+        FilterEndPickerButton.IsEnabled = hasLogs;
+
+        if (!hasLogs)
+        {
+            FilterStartCalendar.DisplayDateStart = null;
+            FilterStartCalendar.DisplayDateEnd = null;
+            FilterEndCalendar.DisplayDateStart = null;
+            FilterEndCalendar.DisplayDateEnd = null;
+            return;
+        }
+
+        var minDate = _minRawLogTimestamp!.Value.Date;
+        var maxDate = _maxRawLogTimestamp!.Value.Date;
+        FilterStartCalendar.DisplayDateStart = minDate;
+        FilterStartCalendar.DisplayDateEnd = maxDate;
+        FilterEndCalendar.DisplayDateStart = minDate;
+        FilterEndCalendar.DisplayDateEnd = maxDate;
+    }
+
+    private void ApplyCurrentFilter()
+    {
+        if (!_filterActive)
+        {
+            RawLogTextBox.Text = string.Join(Environment.NewLine, _rawLogLines);
+            if (_rawLogLines.Count > 0)
+            {
+                RawLogTextBox.Text += Environment.NewLine;
+            }
+
+            _filteredRawCount = _rawLogLines.Count;
+            FilterCountText.Text = $"Count: {_filteredRawCount}";
+            ExecuteRawFind();
+
+            SetProcessedOutput(_processedLogLines, showPlaceholderIfEmpty: true);
+            return;
+        }
+
+        var filteredRaw = _rawLogLines.Where(line => LineMatchesFilter(line, _filterIncludeTerms, _filterExcludeTerms, _filterStart, _filterEnd)).ToList();
+        RawLogTextBox.Text = string.Join(Environment.NewLine, filteredRaw);
+        if (filteredRaw.Count > 0)
+        {
+            RawLogTextBox.Text += Environment.NewLine;
+        }
+
+        _filteredRawCount = filteredRaw.Count;
+        FilterCountText.Text = $"Count: {_filteredRawCount}";
+        ExecuteRawFind();
+
+        var filteredProcessed = _processedLogLines.Where(line => LineMatchesFilter(line, _filterIncludeTerms, _filterExcludeTerms, _filterStart, _filterEnd)).ToList();
+        SetProcessedOutput(filteredProcessed, showPlaceholderIfEmpty: true);
+    }
+
+    private void QueueProcessedLayoutUpdate()
+    {
+        if (_pendingProcessedLayoutUpdate)
+        {
+            return;
+        }
+
+        _pendingProcessedLayoutUpdate = true;
+        Dispatcher.BeginInvoke(() =>
+        {
+            _pendingProcessedLayoutUpdate = false;
+            AdjustProcessedDocumentWidth();
+        }, System.Windows.Threading.DispatcherPriority.Loaded);
+    }
+
+    private void AdjustProcessedDocumentWidth()
+    {
+        var viewportWidth = ProcessedLogTextBox.ViewportWidth;
+        if (viewportWidth <= 0)
+        {
+            viewportWidth = ProcessedLogTextBox.ActualWidth;
+        }
+
+        if (viewportWidth <= 0)
+        {
+            return;
+        }
+
+        if (_processedVisibleLineCount <= 0)
+        {
+            SetProcessedDocumentWidth(viewportWidth);
+            return;
+        }
+
+        var maxWidth = MeasureProcessedTextWidth();
+        if (maxWidth <= 0)
+        {
+            SetProcessedDocumentWidth(viewportWidth);
+            return;
+        }
+
+        var desiredWidth = Math.Max(viewportWidth, maxWidth + ProcessedWidthPadding);
+        SetProcessedDocumentWidth(desiredWidth);
+    }
+
+    private void SetProcessedDocumentWidth(double width)
+    {
+        ProcessedLogTextBox.Document.PageWidth = width;
+        ProcessedLogTextBox.Document.ColumnWidth = width;
+    }
+
+    private double MeasureProcessedTextWidth()
+    {
+        var range = new TextRange(ProcessedLogTextBox.Document.ContentStart, ProcessedLogTextBox.Document.ContentEnd);
+        var text = range.Text?.TrimEnd('\r', '\n') ?? "";
+        if (text.Length == 0)
+        {
+            return 0;
+        }
+
+        var dpi = VisualTreeHelper.GetDpi(ProcessedLogTextBox);
+        var formatted = new FormattedText(
+            text,
+            CultureInfo.CurrentCulture,
+            FlowDirection.LeftToRight,
+            new Typeface(
+                ProcessedLogTextBox.FontFamily,
+                ProcessedLogTextBox.FontStyle,
+                ProcessedLogTextBox.FontWeight,
+                ProcessedLogTextBox.FontStretch),
+            ProcessedLogTextBox.FontSize,
+            Brushes.Black,
+            dpi.PixelsPerDip);
+
+        return formatted.WidthIncludingTrailingWhitespace;
+    }
+
+    private static bool TryParseKeywordFilter(string input, out List<string> includeTerms, out List<string> excludeTerms, out string? error)
+    {
+        includeTerms = new List<string>();
+        excludeTerms = new List<string>();
+        error = null;
+
+        if (string.IsNullOrWhiteSpace(input))
+        {
+            return true;
+        }
+
+        var terms = input.Split(',');
+        foreach (var raw in terms)
+        {
+            var term = raw.Trim();
+            if (term.Length == 0)
+            {
+                error = FilterInvalidKeywordMessage;
+                return false;
+            }
+
+            var sign = term[0];
+            if (sign == '+' || sign == '-')
+            {
+                term = term.Substring(1).Trim();
+                if (term.Length == 0)
+                {
+                    error = FilterInvalidKeywordMessage;
+                    return false;
+                }
+
+                if (sign == '-')
+                {
+                    excludeTerms.Add(term);
+                }
+                else
+                {
+                    includeTerms.Add(term);
+                }
+
+                continue;
+            }
+
+            includeTerms.Add(term);
+        }
+
+        return true;
+    }
+
+    private static bool TryParseDateRange(string startText, string endText, out DateTime? start, out DateTime? end, out string? error)
+    {
+        start = null;
+        end = null;
+        error = null;
+
+        if (!string.IsNullOrWhiteSpace(startText))
+        {
+            if (!DateTime.TryParseExact(startText, DateTimeFormats, CultureInfo.InvariantCulture, DateTimeStyles.AssumeLocal, out var startValue))
+            {
+                error = FilterInvalidDateMessage;
+                return false;
+            }
+
+            start = startValue;
+        }
+
+        if (!string.IsNullOrWhiteSpace(endText))
+        {
+            if (!DateTime.TryParseExact(endText, DateTimeFormats, CultureInfo.InvariantCulture, DateTimeStyles.AssumeLocal, out var endValue))
+            {
+                error = FilterInvalidDateMessage;
+                return false;
+            }
+
+            end = endValue;
+        }
+
+        if (start.HasValue && end.HasValue && start.Value > end.Value)
+        {
+            error = FilterInvalidRangeMessage;
+            return false;
+        }
+
+        return true;
+    }
+
+    private void SyncPickerFromText(string text, System.Windows.Controls.Calendar calendar, ComboBox hourCombo, ComboBox minuteCombo, bool isStart)
+    {
+        if (TryParseDateTime(text, out var value))
+        {
+            value = ClampToLogRange(value);
+            SetPickerValues(calendar, hourCombo, minuteCombo, value, isStart);
+            return;
+        }
+
+        var fallbackDate = calendar.SelectedDate ?? DateTime.Today;
+        var fallback = new DateTime(fallbackDate.Year, fallbackDate.Month, fallbackDate.Day, 0, 0, 0);
+        SetPickerValues(calendar, hourCombo, minuteCombo, fallback, isStart);
+    }
+
+    private void SetPickerValues(System.Windows.Controls.Calendar calendar, ComboBox hourCombo, ComboBox minuteCombo, DateTime value, bool isStart)
+    {
+        if (isStart)
+        {
+            _isUpdatingStartPicker = true;
+        }
+        else
+        {
+            _isUpdatingEndPicker = true;
+        }
+
+        calendar.SelectedDate = value.Date;
+        hourCombo.SelectedItem = value.Hour.ToString("00", CultureInfo.InvariantCulture);
+        minuteCombo.SelectedItem = value.Minute.ToString("00", CultureInfo.InvariantCulture);
+
+        if (isStart)
+        {
+            _isUpdatingStartPicker = false;
+        }
+        else
+        {
+            _isUpdatingEndPicker = false;
+        }
+    }
+
+    private void UpdateDateTimeTextFromPicker(TextBox target, System.Windows.Controls.Calendar calendar, ComboBox hourCombo, ComboBox minuteCombo, bool isStart)
+    {
+        if (isStart)
+        {
+            _isUpdatingStartPicker = true;
+        }
+        else
+        {
+            _isUpdatingEndPicker = true;
+        }
+
+        var date = calendar.SelectedDate ?? DateTime.Today;
+        var hour = ParseComboValue(hourCombo, 0);
+        var minute = ParseComboValue(minuteCombo, 0);
+        var value = new DateTime(date.Year, date.Month, date.Day, hour, minute, 0);
+        value = ClampToLogRange(value);
+        target.Text = value.ToString("yyyy-MM-dd HH:mm", CultureInfo.InvariantCulture);
+
+        if (isStart)
+        {
+            _isUpdatingStartPicker = false;
+        }
+        else
+        {
+            _isUpdatingEndPicker = false;
+        }
+    }
+
+    private static int ParseComboValue(ComboBox combo, int fallback)
+    {
+        if (combo.SelectedItem is string text && int.TryParse(text, NumberStyles.Integer, CultureInfo.InvariantCulture, out var value))
+        {
+            return value;
+        }
+
+        return fallback;
+    }
+
+    private static bool TryParseDateTime(string text, out DateTime value)
+    {
+        return DateTime.TryParseExact(text, DateTimeFormats, CultureInfo.InvariantCulture, DateTimeStyles.AssumeLocal, out value);
+    }
+
+    private DateTime ClampToLogRange(DateTime value)
+    {
+        if (_minRawLogTimestamp.HasValue && value < _minRawLogTimestamp.Value)
+        {
+            return _minRawLogTimestamp.Value;
+        }
+
+        if (_maxRawLogTimestamp.HasValue && value > _maxRawLogTimestamp.Value)
+        {
+            return _maxRawLogTimestamp.Value;
+        }
+
+        return value;
+    }
+
+    private static bool LineMatchesFilter(string line, IReadOnlyList<string> includeTerms, IReadOnlyList<string> excludeTerms, DateTime? start, DateTime? end)
+    {
+        if (!LineMatchesKeywordFilter(line, includeTerms, excludeTerms))
+        {
+            return false;
+        }
+
+        if (!start.HasValue && !end.HasValue)
+        {
+            return true;
+        }
+
+        if (!TryExtractTimestamp(line, out var timestamp))
+        {
+            return false;
+        }
+
+        if (start.HasValue && timestamp < start.Value)
+        {
+            return false;
+        }
+
+        if (end.HasValue && timestamp > end.Value)
+        {
+            return false;
+        }
+
+        return true;
+    }
+
+    private static bool LineMatchesKeywordFilter(string line, IReadOnlyList<string> includeTerms, IReadOnlyList<string> excludeTerms)
+    {
+        foreach (var term in includeTerms)
+        {
+            if (line.IndexOf(term, StringComparison.OrdinalIgnoreCase) < 0)
+            {
+                return false;
+            }
+        }
+
+        foreach (var term in excludeTerms)
+        {
+            if (line.IndexOf(term, StringComparison.OrdinalIgnoreCase) >= 0)
+            {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    private static bool TryExtractTimestamp(string line, out DateTime timestamp)
+    {
+        timestamp = default;
+        if (string.IsNullOrWhiteSpace(line))
+        {
+            return false;
+        }
+
+        var openIndex = line.IndexOf('[');
+        if (openIndex < 0)
+        {
+            return false;
+        }
+
+        var closeIndex = line.IndexOf(']', openIndex + 1);
+        if (closeIndex < 0)
+        {
+            return false;
+        }
+
+        var rawTimestamp = line.Substring(openIndex + 1, closeIndex - openIndex - 1);
+        return DateTime.TryParse(rawTimestamp, CultureInfo.InvariantCulture, DateTimeStyles.AssumeLocal, out timestamp);
     }
 
     private void Transport_RawMessageReceived(object? sender, string raw)
@@ -132,7 +1130,10 @@ public partial class MainWindow : Window
             DiscoveredCombo.ItemsSource = results.OrderBy(ip => ip).ToList();
             if (results.Count == 1)
             {
-                IpComboBox.Text = results[0];
+                if (_apexUploaded)
+                {
+                    IpTextBox.Text = results[0];
+                }
             }
             StatusText.Text = results.Count == 0 ? "No devices found" : $"Found {results.Count}";
         }
@@ -155,7 +1156,7 @@ public partial class MainWindow : Window
             return;
         }
 
-        var ip = IpComboBox.Text.Trim();
+        var ip = IpTextBox.Text.Trim();
         if (string.IsNullOrWhiteSpace(ip))
         {
             StatusText.Text = "Enter an IP";
@@ -195,6 +1196,12 @@ public partial class MainWindow : Window
             }
             StatusText.Text = "Connected";
             DisconnectButton.IsEnabled = true;
+            if (!string.IsNullOrWhiteSpace(_projectFilePath))
+            {
+                _settingsStore.RecordSuccessfulConnection(_settings, _projectFilePath, ip);
+                _settingsStore.Save(_settings);
+                UpdateRecentProjectList(_projectFilePath);
+            }
         }
         catch (Exception ex)
         {
@@ -225,7 +1232,10 @@ public partial class MainWindow : Window
     {
         if (DiscoveredCombo.SelectedItem is string selected)
         {
-            IpComboBox.Text = selected;
+            if (_apexUploaded)
+            {
+                IpTextBox.Text = selected;
+            }
         }
     }
 
@@ -254,16 +1264,75 @@ public partial class MainWindow : Window
         {
             return;
         }
+        LoadProjectFromPath(dialog.FileName, openPreview: true);
+    }
 
-        var preview = new ProjectDataPreviewWindow(dialog.FileName)
+    private void RecentProjectComboBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (_isUpdatingRecentProjects)
+        {
+            return;
+        }
+
+        if (RecentProjectComboBox.SelectedItem is not RecentProjectEntry entry)
+        {
+            return;
+        }
+
+        LoadProjectFromPath(entry.FilePath, openPreview: true);
+    }
+
+    private void ProjectPreviewButton_Click(object sender, RoutedEventArgs e)
+    {
+        if (string.IsNullOrWhiteSpace(_projectFilePath) || !File.Exists(_projectFilePath))
+        {
+            return;
+        }
+
+        var preview = new ProjectDataPreviewWindow(_projectFilePath)
         {
             Owner = this
         };
         preview.ShowDialog();
+    }
+
+    private void LoadProjectFromPath(string filePath, bool openPreview)
+    {
+        if (string.IsNullOrWhiteSpace(filePath) || !File.Exists(filePath))
+        {
+            return;
+        }
+
         _apexUploaded = true;
-        var fileName = Path.GetFileName(dialog.FileName);
-        ProjectDataHeaderText.Text = $"Project Data: {fileName}";
-        ProjectFileNameText.Text = fileName;
+        _projectFilePath = filePath;
+        ProjectDataHeaderText.Text = "Project Data";
+
+        _settingsStore.RecordProjectSelection(_settings, filePath);
+        _settingsStore.Save(_settings);
+        UpdateRecentProjectList(filePath);
+
+        var selected = _settings.RecentProjects.FirstOrDefault(entry =>
+            string.Equals(entry.FilePath, filePath, StringComparison.OrdinalIgnoreCase));
+        if (selected != null && !string.IsNullOrWhiteSpace(selected.LastSuccessfulIp))
+        {
+            IpTextBox.Text = selected.LastSuccessfulIp;
+        }
+        else
+        {
+            IpTextBox.Text = "";
+        }
+
+        ProjectPreviewButton.IsEnabled = true;
+
+        if (openPreview)
+        {
+            var preview = new ProjectDataPreviewWindow(filePath)
+            {
+                Owner = this
+            };
+            preview.ShowDialog();
+        }
+
         if (!_isConnecting)
         {
             ConnectButton.IsEnabled = true;
@@ -274,8 +1343,19 @@ public partial class MainWindow : Window
     {
         RawLogTextBox.Clear();
         ClearProcessedOutput();
+        _rawLogLines.Clear();
+        _processedLogLines.Clear();
+        _filteredRawCount = 0;
+        FilterCountText.Text = "Count: 0";
+        _minRawLogTimestamp = null;
+        _maxRawLogTimestamp = null;
+        UpdateDateTimePickerBounds();
         _rawLineNumber = 1;
         _messageFormatter.Reset(DateOnly.FromDateTime(DateTime.Today));
+        ResetFindState(_rawFindState, RawFindCountText, RawFindPrevButton, RawFindNextButton);
+        ResetFindState(_processedFindState, ProcessedFindCountText, ProcessedFindPrevButton, ProcessedFindNextButton);
+        RawFindTextBox.Text = "";
+        ProcessedFindTextBox.Text = "";
     }
 
     private string FormatMessage(string raw, out bool isLogLine)
@@ -391,21 +1471,51 @@ public partial class MainWindow : Window
                 return;
             }
 
-            var newText = RawLogTextBox.Text + line + Environment.NewLine;
-            if (newText.Length > MaxLogChars)
-            {
-                newText = newText.Substring(newText.Length - MaxLogChars);
-            }
+            UpdateRawLogTimestampBounds(line);
+            _rawLogLines.Add(line);
 
-            RawLogTextBox.Text = newText;
-            RawLogTextBox.CaretIndex = RawLogTextBox.Text.Length;
-            RawLogTextBox.ScrollToEnd();
+            if (!_filterActive || LineMatchesFilter(line, _filterIncludeTerms, _filterExcludeTerms, _filterStart, _filterEnd))
+            {
+                var newText = RawLogTextBox.Text + line + Environment.NewLine;
+                if (newText.Length > MaxLogChars)
+                {
+                    newText = newText.Substring(newText.Length - MaxLogChars);
+                }
+
+                RawLogTextBox.Text = newText;
+                RawLogTextBox.CaretIndex = RawLogTextBox.Text.Length;
+                RawLogTextBox.ScrollToEnd();
+
+                _filteredRawCount = _filterActive ? _filteredRawCount + 1 : _rawLogLines.Count;
+                FilterCountText.Text = $"Count: {_filteredRawCount}";
+                ExecuteRawFind();
+            }
 
             if (_processingEngine != null)
             {
                 AppendProcessedLineIfNumbered(line);
             }
         });
+    }
+
+    private void UpdateRawLogTimestampBounds(string line)
+    {
+        if (!TryExtractTimestamp(line, out var timestamp))
+        {
+            return;
+        }
+
+        if (!_minRawLogTimestamp.HasValue || timestamp < _minRawLogTimestamp.Value)
+        {
+            _minRawLogTimestamp = timestamp;
+        }
+
+        if (!_maxRawLogTimestamp.HasValue || timestamp > _maxRawLogTimestamp.Value)
+        {
+            _maxRawLogTimestamp = timestamp;
+        }
+
+        UpdateDateTimePickerBounds();
     }
 
     private async Task LoadDriversAsync(string ip)
@@ -455,11 +1565,18 @@ public partial class MainWindow : Window
         var context = new ProcessingContext(_deviceNameToId, result.ApexDiscoveryPreload.PageIndexMap);
         _processingEngine = new ProcessingEngine.ProcessingEngine(context);
 
-        var processed = ProcessingEngineRunner.ProcessNumberedLines(
-            RawLogTextBox.Text.Split(new[] { Environment.NewLine }, StringSplitOptions.RemoveEmptyEntries),
-            _processingEngine);
+        var processed = ProcessingEngineRunner.ProcessNumberedLines(_rawLogLines, _processingEngine);
 
-        SetProcessedOutput(processed, showPlaceholderIfEmpty: true);
+        _processedLogLines.Clear();
+        _processedLogLines.AddRange(processed);
+        if (_filterActive)
+        {
+            ApplyCurrentFilter();
+        }
+        else
+        {
+            SetProcessedOutput(_processedLogLines, showPlaceholderIfEmpty: true);
+        }
     }
 
     private void AppendProcessedLineIfNumbered(string line)
@@ -481,6 +1598,8 @@ public partial class MainWindow : Window
     private void ClearProcessedOutput()
     {
         ProcessedLogTextBox.Document.Blocks.Clear();
+        _processedVisibleLineCount = 0;
+        QueueProcessedLayoutUpdate();
     }
 
     private void SetProcessedOutput(IEnumerable<string> lines, bool showPlaceholderIfEmpty)
@@ -489,6 +1608,7 @@ public partial class MainWindow : Window
 
         var paragraph = new Paragraph();
         var hasLines = false;
+        var lineCount = 0;
         foreach (var line in lines)
         {
             if (string.IsNullOrWhiteSpace(line))
@@ -508,6 +1628,7 @@ public partial class MainWindow : Window
             };
             paragraph.Inlines.Add(run);
             hasLines = true;
+            lineCount++;
         }
 
         if (!hasLines && showPlaceholderIfEmpty)
@@ -517,12 +1638,17 @@ public partial class MainWindow : Window
                 Foreground = ProcessedLineClassifier.GetBrush(ProcessedLineCategory.Default)
             });
             hasLines = true;
+            lineCount = 1;
         }
 
         if (hasLines)
         {
             ProcessedLogTextBox.Document.Blocks.Add(paragraph);
         }
+
+        _processedVisibleLineCount = lineCount;
+        QueueProcessedLayoutUpdate();
+        ExecuteProcessedFind();
     }
 
     private bool IsProcessedPlaceholderVisible()
@@ -555,6 +1681,14 @@ public partial class MainWindow : Window
         if (IsProcessedPlaceholderVisible())
         {
             ProcessedLogTextBox.Document.Blocks.Clear();
+            _processedVisibleLineCount = 0;
+        }
+
+        _processedLogLines.Add(line);
+
+        if (_filterActive && !LineMatchesFilter(line, _filterIncludeTerms, _filterExcludeTerms, _filterStart, _filterEnd))
+        {
+            return;
         }
 
         var paragraph = ProcessedLogTextBox.Document.Blocks.FirstBlock as Paragraph;
@@ -575,7 +1709,32 @@ public partial class MainWindow : Window
             Foreground = ProcessedLineClassifier.GetBrush(category)
         };
         paragraph.Inlines.Add(run);
+        _processedVisibleLineCount++;
+        QueueProcessedLayoutUpdate();
         ProcessedLogTextBox.ScrollToEnd();
+        ExecuteProcessedFind();
+    }
+
+    private sealed class FindState
+    {
+        public List<int> Matches { get; } = new();
+        public List<ProcessedMatch> ProcessedMatches { get; } = new();
+        public int CurrentIndex { get; set; } = -1;
+        public string Query { get; set; } = "";
+    }
+
+    private sealed class ProcessedMatch
+    {
+        public ProcessedMatch(TextPointer start, int lineIndex, TextPointer lineStart)
+        {
+            Start = start;
+            LineIndex = lineIndex;
+            LineStart = lineStart;
+        }
+
+        public TextPointer Start { get; }
+        public int LineIndex { get; }
+        public TextPointer LineStart { get; }
     }
 
     private static bool IsAnchorName(string dName)

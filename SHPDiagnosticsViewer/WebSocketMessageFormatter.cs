@@ -113,7 +113,11 @@ public sealed class WebSocketMessageFormatter
         {
             if (_lastMessageLogTime.HasValue && timeOfDay < _lastMessageLogTime.Value)
             {
-                _currentDate = _currentDate.AddDays(1);
+                var delta = _lastMessageLogTime.Value - timeOfDay;
+                if (delta > TimeSpan.FromHours(12))
+                {
+                    _currentDate = _currentDate.AddDays(1);
+                }
             }
 
             _lastMessageLogTime = timeOfDay;

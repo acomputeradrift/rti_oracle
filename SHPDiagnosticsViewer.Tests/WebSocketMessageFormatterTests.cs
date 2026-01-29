@@ -36,6 +36,23 @@ public sealed class WebSocketMessageFormatterTests
     }
 
     [Fact]
+    public void MessageLogDateDoesNotAdvanceForOutOfOrderTimes()
+    {
+        // Requirement: mission.md - Core Capabilities #4; invariants.md - Determinism Invariant.
+        var formatter = new WebSocketMessageFormatter(new DateOnly(2018, 12, 1));
+        var first = "{\"messageType\":\"MessageLog\",\"time\":\"14:16:20.000\",\"text\":\"First\"}";
+        var outOfOrder = "{\"messageType\":\"MessageLog\",\"time\":\"13:10:00.000\",\"text\":\"Second\"}";
+
+        var formattedFirst = formatter.Format(first, out var isLogLineFirst);
+        var formattedSecond = formatter.Format(outOfOrder, out var isLogLineSecond);
+
+        Assert.True(isLogLineFirst);
+        Assert.True(isLogLineSecond);
+        Assert.Equal("[2018-12-01 14:16:20.000] First", formattedFirst);
+        Assert.Equal("[2018-12-01 13:10:00.000] Second", formattedSecond);
+    }
+
+    [Fact]
     public void SysvarLinesAreNotMarkedForNumbering()
     {
         // Requirement: mission.md - Core Capabilities #4; invariants.md - Output Honesty Invariant.

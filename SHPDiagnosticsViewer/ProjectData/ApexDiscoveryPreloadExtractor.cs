@@ -34,7 +34,7 @@ public static class ApexDiscoveryPreloadExtractor
         }
 
         var result = new ApexDiscoveryPreloadResult();
-        using var connection = new SqliteConnection($"Data Source={apexPath};Mode=ReadOnly");
+        using var connection = new SqliteConnection($"Data Source={apexPath};Mode=ReadOnly;Pooling=False");
         connection.Open();
 
         LoadPageIndexMap(connection, result.PageIndexMap);

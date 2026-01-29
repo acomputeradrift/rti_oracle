@@ -64,52 +64,57 @@ public sealed class ProjectDataExtractor : IProjectDataExtractor
             throw new FileNotFoundException("APEX file not found.", apexPath);
         }
 
-        var result = new ProjectDataExtractionResult();
-        Report(progress, "Opening project database", 5);
+        var tempPath = Path.Combine(Path.GetTempPath(), $"oracle_{Guid.NewGuid():N}.apex");
+        File.Copy(apexPath, tempPath, true);
 
-        using var connection = new SqliteConnection($"Data Source={apexPath};Mode=ReadOnly");
-        connection.Open();
-
-        var devices = LoadDevices(connection);
-        var rooms = LoadRooms(connection);
-        var ports = LoadPortLabels(connection);
-        var pageNames = LoadPageNames(connection);
-        var rtiDeviceData = LoadRtiDeviceData(connection);
-        var rtiDevicePages = LoadRtiDevicePages(connection);
-        var sourceLabels = LoadSourceLabels(connection);
-        var layers = LoadLayers(connection);
-        var buttons = LoadDeviceButtons(connection);
-
-        Report(progress, "Building diagnostics mapping", 40);
-        var deviceById = devices.ToDictionary(entry => entry.DeviceId);
-        var pageNameById = pageNames.ToDictionary(entry => entry.PageNameId, entry => entry.PageName);
-        var rtiAddressByDeviceId = rtiDeviceData.ToDictionary(entry => entry.DeviceId, entry => entry.RtiAddress);
-
-        foreach (var page in rtiDevicePages)
+        try
         {
-            foreach (var device in devices)
+            var result = new ProjectDataExtractionResult();
+            Report(progress, "Opening project database", 5);
+
+            using var connection = new SqliteConnection($"Data Source={tempPath};Mode=ReadOnly;Pooling=False");
+            connection.Open();
+
+            var devices = LoadDevices(connection);
+            var rooms = LoadRooms(connection);
+            var ports = LoadPortLabels(connection);
+            var pageNames = LoadPageNames(connection);
+            var rtiDeviceData = LoadRtiDeviceData(connection);
+            var rtiDevicePages = LoadRtiDevicePages(connection);
+            var sourceLabels = LoadSourceLabels(connection);
+            var layers = LoadLayers(connection);
+            var buttons = LoadDeviceButtons(connection);
+
+            Report(progress, "Building diagnostics mapping", 40);
+            var deviceById = devices.ToDictionary(entry => entry.DeviceId);
+            var pageNameById = pageNames.ToDictionary(entry => entry.PageNameId, entry => entry.PageName);
+            var rtiAddressByDeviceId = rtiDeviceData.ToDictionary(entry => entry.DeviceId, entry => entry.RtiAddress);
+
+            foreach (var page in rtiDevicePages)
             {
-                if (!rtiAddressByDeviceId.TryGetValue(device.DeviceId, out var rtiAddress))
+                foreach (var device in devices)
                 {
-                    continue;
-                }
+                    if (!rtiAddressByDeviceId.TryGetValue(device.DeviceId, out var rtiAddress))
+                    {
+                        continue;
+                    }
 
-                if (rtiAddress != page.RtiAddress)
-                {
-                    continue;
-                }
+                    if (rtiAddress != page.RtiAddress)
+                    {
+                        continue;
+                    }
 
-                pageNameById.TryGetValue(page.PageNameId, out var pageName);
-                result.DiagnosticsMapping.Add(new DiagnosticsMappingEntry(
-                    device.DeviceId,
-                    device.Name,
-                    rtiAddress,
-                    page.PageIndex,
-                    page.PageId,
-                    page.PageNameId,
-                    pageName ?? ""));
+                    pageNameById.TryGetValue(page.PageNameId, out var pageName);
+                    result.DiagnosticsMapping.Add(new DiagnosticsMappingEntry(
+                        device.DeviceId,
+                        device.Name,
+                        rtiAddress,
+                        page.PageIndex,
+                        page.PageId,
+                        page.PageNameId,
+                        pageName ?? ""));
+                }
             }
-        }
 
         result.DiagnosticsMapping.Sort((left, right) =>
         {
@@ -256,26 +261,35 @@ public sealed class ProjectDataExtractor : IProjectDataExtractor
             }
         }
 
-        result.ProjectTest.Sort((left, right) =>
+            result.ProjectTest.Sort((left, right) =>
+            {
+                var deviceCompare = left.DeviceId.CompareTo(right.DeviceId);
+                if (deviceCompare != 0)
+                {
+                    return deviceCompare;
+                }
+
+                var pageCompare = left.PageId.CompareTo(right.PageId);
+                if (pageCompare != 0)
+                {
+                    return pageCompare;
+                }
+
+                return left.ButtonId.CompareTo(right.ButtonId);
+            });
+
+            Report(progress, "Complete", 100);
+            result.ApexDiscoveryPreload = ApexDiscoveryPreloadExtractor.Extract(tempPath);
+            return result;
+        }
+        finally
         {
-            var deviceCompare = left.DeviceId.CompareTo(right.DeviceId);
-            if (deviceCompare != 0)
+            SqliteConnection.ClearAllPools();
+            if (File.Exists(tempPath))
             {
-                return deviceCompare;
+                File.Delete(tempPath);
             }
-
-            var pageCompare = left.PageId.CompareTo(right.PageId);
-            if (pageCompare != 0)
-            {
-                return pageCompare;
-            }
-
-            return left.ButtonId.CompareTo(right.ButtonId);
-        });
-
-        Report(progress, "Complete", 100);
-        result.ApexDiscoveryPreload = ApexDiscoveryPreloadExtractor.Extract(apexPath);
-        return result;
+        }
     }
 
     private static void Report(IProgress<ProjectDataExtractionProgress>? progress, string stage, int percent)

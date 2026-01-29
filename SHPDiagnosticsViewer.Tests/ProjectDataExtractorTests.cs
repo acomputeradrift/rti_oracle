@@ -88,6 +88,31 @@ public sealed class ProjectDataExtractorTests
         Assert.Throws<FileNotFoundException>(() => extractor.Extract(path));
     }
 
+    [Fact]
+    public void ExtractDoesNotLockSourceFile()
+    {
+        var fixture = GetFixturePath();
+        var temp = Path.Combine(Path.GetTempPath(), $"fixture_{Guid.NewGuid():N}.apex");
+        File.Copy(fixture, temp, true);
+        File.SetAttributes(temp, FileAttributes.Normal);
+
+        try
+        {
+            var extractor = CreateExtractor();
+            extractor.Extract(temp);
+
+            using var stream = File.Open(temp, FileMode.Open, FileAccess.ReadWrite, FileShare.None);
+            Assert.True(stream.CanRead);
+        }
+        finally
+        {
+            if (File.Exists(temp))
+            {
+                File.Delete(temp);
+            }
+        }
+    }
+
     private static string GetFixturePath()
     {
         var path = Path.Combine(AppContext.BaseDirectory, "Fixtures", "TEST - System Manager v10.apex");
