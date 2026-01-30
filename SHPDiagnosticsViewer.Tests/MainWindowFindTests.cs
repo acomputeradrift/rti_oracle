@@ -25,14 +25,14 @@ public sealed class MainWindowFindTests
             window.Show();
             window.UpdateLayout();
 
-            var rawLog = (TextBox)window.FindName("RawLogTextBox")!;
+            var rawLog = (RichTextBox)window.FindName("RawLogTextBox")!;
             var rawFind = (TextBox)window.FindName("RawFindTextBox")!;
             var countText = (TextBlock)window.FindName("RawFindCountText")!;
             var prevButton = (Button)window.FindName("RawFindPrevButton")!;
             var nextButton = (Button)window.FindName("RawFindNextButton")!;
 
             var lines = BuildLines(40, 20, 30);
-            rawLog.Text = string.Join(Environment.NewLine, lines);
+            InvokeSetRawOutput(window, lines);
             rawFind.Text = "match";
             InvokeRawFind(window);
             FlushLayout(window);
@@ -40,7 +40,7 @@ public sealed class MainWindowFindTests
             Assert.Equal("Match: 1/2", countText.Text);
             Assert.True(prevButton.IsEnabled);
             Assert.True(nextButton.IsEnabled);
-            Assert.Equal("match", rawLog.SelectedText);
+            Assert.Equal("match", GetSelectionText(rawLog));
 
             var firstMatchLine = GetFirstMatchLineIndex(lines);
             AssertLineIsVisible(rawLog, firstMatchLine);
@@ -49,14 +49,14 @@ public sealed class MainWindowFindTests
             FlushLayout(window);
 
             var secondMatchLine = GetSecondMatchLineIndex(lines);
-            Assert.Equal("match", rawLog.SelectedText);
+            Assert.Equal("match", GetSelectionText(rawLog));
             AssertLineIsVisible(rawLog, secondMatchLine);
             Assert.Equal("Match: 2/2", countText.Text);
 
             prevButton.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
             FlushLayout(window);
 
-            Assert.Equal("match", rawLog.SelectedText);
+            Assert.Equal("match", GetSelectionText(rawLog));
             AssertLineIsVisible(rawLog, firstMatchLine);
             Assert.Equal("Match: 1/2", countText.Text);
 
@@ -165,17 +165,17 @@ public sealed class MainWindowFindTests
         return -1;
     }
 
-    private static void AssertLineIsVisible(TextBox textBox, int expectedLineIndex)
+    private static void AssertLineIsVisible(RichTextBox richTextBox, int expectedLineIndex)
     {
-        var selectionLine = textBox.GetLineIndexFromCharacterIndex(textBox.SelectionStart);
+        var selectionLine = GetProcessedLineIndex(richTextBox, richTextBox.Selection.Start);
         Assert.Equal(expectedLineIndex, selectionLine);
 
-        var firstVisible = textBox.GetFirstVisibleLineIndex();
-        var lastVisible = textBox.GetLastVisibleLineIndex();
-        Assert.True(firstVisible >= 0);
-        Assert.True(lastVisible >= firstVisible);
+        var scrollViewer = FindVisualChild<ScrollViewer>(richTextBox);
+        Assert.NotNull(scrollViewer);
 
-        Assert.InRange(selectionLine, firstVisible, lastVisible);
+        var rect = richTextBox.Selection.Start.GetCharacterRect(LogicalDirection.Forward);
+        var yInViewport = rect.Top - scrollViewer!.VerticalOffset + (rect.Height / 2);
+        Assert.InRange(yInViewport, 0, scrollViewer.ViewportHeight);
     }
 
     private static void AssertProcessedLineIsCentered(RichTextBox richTextBox, int expectedLineIndex)
@@ -204,13 +204,13 @@ public sealed class MainWindowFindTests
             window.Show();
             window.UpdateLayout();
 
-            var rawLog = (TextBox)window.FindName("RawLogTextBox")!;
+            var rawLog = (RichTextBox)window.FindName("RawLogTextBox")!;
             var rawFind = (TextBox)window.FindName("RawFindTextBox")!;
             var countText = (TextBlock)window.FindName("RawFindCountText")!;
             var prevButton = (Button)window.FindName("RawFindPrevButton")!;
             var nextButton = (Button)window.FindName("RawFindNextButton")!;
 
-            rawLog.Text = "No entries here";
+            InvokeSetRawOutput(window, new[] { "No entries here" });
             rawFind.Text = "absent";
             InvokeRawFind(window);
             FlushLayout(window);
@@ -218,6 +218,87 @@ public sealed class MainWindowFindTests
             Assert.Equal("Match: None", countText.Text);
             Assert.False(prevButton.IsEnabled);
             Assert.False(nextButton.IsEnabled);
+
+            window.Hide();
+        });
+    }
+
+    [Fact]
+    public void FindHighlightsAllMatchesInBothLogs()
+    {
+        RunOnSta(() =>
+        {
+            var window = new MainWindow
+            {
+                Width = 900,
+                Height = 700
+            };
+            window.Show();
+            window.UpdateLayout();
+
+            var rawLog = (RichTextBox)window.FindName("RawLogTextBox")!;
+            var rawFind = (TextBox)window.FindName("RawFindTextBox")!;
+            var processedLog = (RichTextBox)window.FindName("ProcessedLogTextBox")!;
+            var processedFind = (TextBox)window.FindName("ProcessedFindTextBox")!;
+
+            var lines = BuildLines(20, 4, 10);
+            InvokeSetRawOutput(window, lines);
+            InvokeSetProcessedOutput(window, lines);
+
+            rawFind.Text = "match";
+            processedFind.Text = "match";
+            InvokeRawFind(window);
+            InvokeProcessedFind(window);
+            FlushLayout(window);
+
+            Assert.True(CountHighlightedRuns(rawLog) >= 2);
+            Assert.True(CountHighlightedRuns(processedLog) >= 2);
+
+            window.Hide();
+        });
+    }
+
+    [Fact]
+    public void FindUsesFocusedHighlightForCurrentMatch()
+    {
+        RunOnSta(() =>
+        {
+            var window = new MainWindow
+            {
+                Width = 900,
+                Height = 700
+            };
+            window.Show();
+            window.UpdateLayout();
+
+            var rawLog = (RichTextBox)window.FindName("RawLogTextBox")!;
+            var rawFind = (TextBox)window.FindName("RawFindTextBox")!;
+            var rawNext = (Button)window.FindName("RawFindNextButton")!;
+            var processedLog = (RichTextBox)window.FindName("ProcessedLogTextBox")!;
+            var processedFind = (TextBox)window.FindName("ProcessedFindTextBox")!;
+            var processedNext = (Button)window.FindName("ProcessedFindNextButton")!;
+
+            var lines = BuildLines(12, 2, 6);
+            InvokeSetRawOutput(window, lines);
+            InvokeSetProcessedOutput(window, lines);
+
+            rawFind.Text = "match";
+            processedFind.Text = "match";
+            InvokeRawFind(window);
+            InvokeProcessedFind(window);
+            FlushLayout(window);
+
+            Assert.Equal(1, CountRunsWithBackground(rawLog, FocusHighlightColor));
+            Assert.True(CountRunsWithBackground(rawLog, MatchHighlightColor) >= 1);
+            Assert.Equal(1, CountRunsWithBackground(processedLog, FocusHighlightColor));
+            Assert.True(CountRunsWithBackground(processedLog, MatchHighlightColor) >= 1);
+
+            rawNext.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+            processedNext.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+            FlushLayout(window);
+
+            Assert.Equal(1, CountRunsWithBackground(rawLog, FocusHighlightColor));
+            Assert.Equal(1, CountRunsWithBackground(processedLog, FocusHighlightColor));
 
             window.Hide();
         });
@@ -256,11 +337,65 @@ public sealed class MainWindowFindTests
         return range.Text.Trim();
     }
 
+    private static int CountHighlightedRuns(RichTextBox richTextBox)
+    {
+        var count = 0;
+        foreach (var block in richTextBox.Document.Blocks)
+        {
+            if (block is not Paragraph paragraph)
+            {
+                continue;
+            }
+
+            foreach (var inline in paragraph.Inlines)
+            {
+                if (inline is Run run && run.Background != null)
+                {
+                    count++;
+                }
+            }
+        }
+
+        return count;
+    }
+
+    private static readonly Color MatchHighlightColor = Color.FromRgb(255, 236, 153);
+    private static readonly Color FocusHighlightColor = Color.FromRgb(255, 165, 0);
+
+    private static int CountRunsWithBackground(RichTextBox richTextBox, Color color)
+    {
+        var count = 0;
+        foreach (var block in richTextBox.Document.Blocks)
+        {
+            if (block is not Paragraph paragraph)
+            {
+                continue;
+            }
+
+            foreach (var inline in paragraph.Inlines)
+            {
+                if (inline is Run run && run.Background is SolidColorBrush brush && brush.Color == color)
+                {
+                    count++;
+                }
+            }
+        }
+
+        return count;
+    }
+
     private static void InvokeSetProcessedOutput(MainWindow window, IEnumerable<string> lines)
     {
         var method = typeof(MainWindow).GetMethod("SetProcessedOutput", BindingFlags.Instance | BindingFlags.NonPublic);
         Assert.NotNull(method);
         method!.Invoke(window, new object[] { lines, true });
+    }
+
+    private static void InvokeSetRawOutput(MainWindow window, IEnumerable<string> lines)
+    {
+        var method = typeof(MainWindow).GetMethod("SetRawOutput", BindingFlags.Instance | BindingFlags.NonPublic);
+        Assert.NotNull(method);
+        method!.Invoke(window, new object[] { lines });
     }
 
     private static void InvokeRawFind(MainWindow window)

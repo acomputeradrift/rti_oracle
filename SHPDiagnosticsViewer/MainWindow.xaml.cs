@@ -32,6 +32,7 @@ public partial class MainWindow : Window
     private const string FilterInvalidDateMessage = "Invalid date/time filter. Use yyyy-MM-dd HH:mm.";
     private const string FilterInvalidRangeMessage = "Invalid date/time range. Start must be before End.";
     private const double ProcessedWidthPadding = 12;
+    private const double RawWidthPadding = 12;
     private static readonly TimeSpan FindDebounceInterval = TimeSpan.FromMilliseconds(200);
     private static readonly string[] DateTimeFormats =
     {
@@ -46,6 +47,8 @@ public partial class MainWindow : Window
     private bool _isUpdatingRecentProjects;
     private int _processedVisibleLineCount;
     private bool _pendingProcessedLayoutUpdate;
+    private int _rawVisibleLineCount;
+    private bool _pendingRawLayoutUpdate;
     private bool _filterActive;
     private int _filteredRawCount;
     private DateTime? _filterStart;
@@ -56,6 +59,10 @@ public partial class MainWindow : Window
     private DateTime? _maxRawLogTimestamp;
     private readonly FindState _rawFindState = new();
     private readonly FindState _processedFindState = new();
+    private static readonly Color RawMatchColor = Color.FromRgb(255, 236, 153);
+    private static readonly Color RawFocusMatchColor = Color.FromRgb(255, 165, 0);
+    private static readonly Color ProcessedMatchColor = Color.FromRgb(255, 236, 153);
+    private static readonly Color ProcessedFocusMatchColor = Color.FromRgb(255, 165, 0);
     private readonly DispatcherTimer _rawFindTimer = new();
     private readonly DispatcherTimer _processedFindTimer = new();
     private readonly OracleSettingsStore _settingsStore = new();
@@ -101,10 +108,12 @@ public partial class MainWindow : Window
 
     private void ConfigureLogOutputBoxes()
     {
-        RawLogTextBox.TextWrapping = TextWrapping.NoWrap;
         RawLogTextBox.HorizontalScrollBarVisibility = ScrollBarVisibility.Auto;
         RawLogTextBox.VerticalScrollBarVisibility = ScrollBarVisibility.Auto;
         RawLogTextBox.Padding = new Thickness(0);
+        RawLogTextBox.Document.PagePadding = new Thickness(0);
+        RawLogTextBox.Loaded += (_, _) => QueueRawLayoutUpdate();
+        RawLogTextBox.SizeChanged += (_, _) => QueueRawLayoutUpdate();
 
         ProcessedLogTextBox.HorizontalScrollBarVisibility = ScrollBarVisibility.Auto;
         ProcessedLogTextBox.VerticalScrollBarVisibility = ScrollBarVisibility.Auto;
@@ -297,31 +306,35 @@ public partial class MainWindow : Window
     {
         MoveFindSelection(_rawFindState, RawLogTextBox, moveNext: false, isProcessed: false);
         UpdateMatchLabel(_rawFindState, RawFindCountText, isProcessed: false);
+        ApplyRawFocusHighlight();
     }
 
     private void RawFindNextButton_Click(object sender, RoutedEventArgs e)
     {
         MoveFindSelection(_rawFindState, RawLogTextBox, moveNext: true, isProcessed: false);
         UpdateMatchLabel(_rawFindState, RawFindCountText, isProcessed: false);
+        ApplyRawFocusHighlight();
     }
 
     private void RawFindClearButton_Click(object sender, RoutedEventArgs e)
     {
         RawFindTextBox.Text = "";
         ResetFindState(_rawFindState, RawFindCountText, RawFindPrevButton, RawFindNextButton);
-        RawLogTextBox.Select(0, 0);
+        RawLogTextBox.Selection.Select(RawLogTextBox.Document.ContentStart, RawLogTextBox.Document.ContentStart);
     }
 
     private void ProcessedFindPrevButton_Click(object sender, RoutedEventArgs e)
     {
         MoveFindSelection(_processedFindState, ProcessedLogTextBox, moveNext: false, isProcessed: true);
         UpdateMatchLabel(_processedFindState, ProcessedFindCountText, isProcessed: true);
+        ApplyProcessedFocusHighlight();
     }
 
     private void ProcessedFindNextButton_Click(object sender, RoutedEventArgs e)
     {
         MoveFindSelection(_processedFindState, ProcessedLogTextBox, moveNext: true, isProcessed: true);
         UpdateMatchLabel(_processedFindState, ProcessedFindCountText, isProcessed: true);
+        ApplyProcessedFocusHighlight();
     }
 
     private void ProcessedFindClearButton_Click(object sender, RoutedEventArgs e)
@@ -508,14 +521,81 @@ public partial class MainWindow : Window
 
     private void ExecuteRawFind()
     {
-        UpdateFindState(_rawFindState, RawFindTextBox.Text, RawLogTextBox.Text, RawFindCountText, RawFindPrevButton, RawFindNextButton, resetIndex: true);
+        _rawFindState.Query = RawFindTextBox.Text ?? "";
+        var lines = _filterActive
+            ? _rawLogLines.Where(line => LineMatchesFilter(line, _filterIncludeTerms, _filterExcludeTerms, _filterStart, _filterEnd)).ToList()
+            : _rawLogLines.ToList();
+        if (lines.Count == 0)
+        {
+            lines = SplitLines(GetRawText());
+        }
+        SetRawOutput(lines);
+        UpdateFindState(_rawFindState, _rawFindState.Query, GetRawText(), RawFindCountText, RawFindPrevButton, RawFindNextButton, resetIndex: true);
         SelectFindMatch(_rawFindState, RawLogTextBox, isProcessed: false);
+        ApplyRawFocusHighlight();
     }
 
     private void ExecuteProcessedFind()
     {
-        UpdateProcessedFindState(_processedFindState, ProcessedFindTextBox.Text, ProcessedFindCountText, ProcessedFindPrevButton, ProcessedFindNextButton, resetIndex: true);
+        _processedFindState.Query = ProcessedFindTextBox.Text ?? "";
+        var lines = _filterActive
+            ? _processedLogLines.Where(line => LineMatchesFilter(line, _filterIncludeTerms, _filterExcludeTerms, _filterStart, _filterEnd)).ToList()
+            : _processedLogLines.ToList();
+        if (lines.Count == 0)
+        {
+            lines = SplitLines(GetProcessedText());
+        }
+        if (lines.Count > 0)
+        {
+            SetProcessedOutput(lines, showPlaceholderIfEmpty: true);
+        }
+        UpdateProcessedFindState(_processedFindState, _processedFindState.Query, ProcessedFindCountText, ProcessedFindPrevButton, ProcessedFindNextButton, resetIndex: true);
         SelectFindMatch(_processedFindState, ProcessedLogTextBox, isProcessed: true);
+        ApplyProcessedFocusHighlight();
+    }
+
+    private void ApplyRawFocusHighlight()
+    {
+        ApplyFocusHighlight(RawLogTextBox, _rawFindState.Query, RawMatchColor, RawFocusMatchColor, _rawFindState.CurrentIndex);
+    }
+
+    private void ApplyProcessedFocusHighlight()
+    {
+        ApplyFocusHighlight(ProcessedLogTextBox, _processedFindState.Query, ProcessedMatchColor, ProcessedFocusMatchColor, _processedFindState.CurrentIndex);
+    }
+
+    private static void ApplyFocusHighlight(RichTextBox logTextBox, string query, Color matchColor, Color focusColor, int focusIndex)
+    {
+        if (string.IsNullOrWhiteSpace(query))
+        {
+            return;
+        }
+
+        var paragraph = logTextBox.Document.Blocks.FirstBlock as Paragraph;
+        if (paragraph == null)
+        {
+            return;
+        }
+
+        var matchRunIndex = 0;
+        foreach (var inline in paragraph.Inlines)
+        {
+            if (inline is not Run run)
+            {
+                continue;
+            }
+
+            if (run.Background is not SolidColorBrush brush)
+            {
+                continue;
+            }
+
+            if (brush.Color == matchColor || brush.Color == focusColor)
+            {
+                run.Background = new SolidColorBrush(matchRunIndex == focusIndex ? focusColor : matchColor);
+                matchRunIndex++;
+            }
+        }
     }
 
     private void SelectFindMatch(FindState state, Control logControl, bool isProcessed)
@@ -536,7 +616,7 @@ public partial class MainWindow : Window
             return;
         }
 
-        SelectRawMatch(state, (TextBox)logControl);
+        SelectRawMatch(state, (RichTextBox)logControl);
     }
 
     private void MoveFindSelection(FindState state, Control logControl, bool moveNext, bool isProcessed)
@@ -559,10 +639,17 @@ public partial class MainWindow : Window
         SelectFindMatch(state, logControl, isProcessed);
     }
 
-    private void SelectRawMatch(FindState state, TextBox logTextBox)
+    private void SelectRawMatch(FindState state, RichTextBox logTextBox)
     {
         var start = state.Matches[state.CurrentIndex];
-        logTextBox.Select(start, state.Query.Length);
+        var startPointer = GetTextPointerAtOffset(logTextBox.Document.ContentStart, start);
+        var endPointer = GetTextPointerAtOffset(logTextBox.Document.ContentStart, start + state.Query.Length);
+        if (startPointer == null || endPointer == null)
+        {
+            return;
+        }
+
+        logTextBox.Selection.Select(startPointer, endPointer);
 
         EnsureTextBoxSelectionVisible(logTextBox, start);
     }
@@ -571,7 +658,8 @@ public partial class MainWindow : Window
     {
         var match = state.ProcessedMatches[state.CurrentIndex];
         var startPointer = match.Start;
-        var endPointer = startPointer.GetPositionAtOffset(state.Query.Length, LogicalDirection.Forward);
+        var startOffset = new TextRange(logTextBox.Document.ContentStart, startPointer).Text.Length;
+        var endPointer = GetTextPointerAtOffset(logTextBox.Document.ContentStart, startOffset + state.Query.Length);
         if (startPointer == null || endPointer == null)
         {
             return;
@@ -581,7 +669,7 @@ public partial class MainWindow : Window
         EnsureRichTextSelectionVisible(logTextBox, startPointer);
     }
 
-    private void EnsureTextBoxSelectionVisible(TextBox logTextBox, int selectionStart)
+    private void EnsureTextBoxSelectionVisible(RichTextBox logTextBox, int selectionStart)
     {
         logTextBox.UpdateLayout();
         var scrollViewer = FindVisualChild<ScrollViewer>(logTextBox);
@@ -590,11 +678,15 @@ public partial class MainWindow : Window
             return;
         }
 
-        var rect = logTextBox.GetRectFromCharacterIndex(selectionStart);
+        var pointer = GetTextPointerAtOffset(logTextBox.Document.ContentStart, selectionStart);
+        if (pointer == null)
+        {
+            return;
+        }
+
+        var rect = pointer.GetCharacterRect(LogicalDirection.Forward);
         if (rect.IsEmpty || scrollViewer.ViewportHeight <= 0)
         {
-            var lineIndex = logTextBox.GetLineIndexFromCharacterIndex(selectionStart);
-            logTextBox.ScrollToLine(lineIndex);
             return;
         }
 
@@ -647,6 +739,68 @@ public partial class MainWindow : Window
         }
     }
 
+    private static TextPointer? GetTextPointerAtOffset(TextPointer start, int offset)
+    {
+        var remaining = offset;
+        var pointer = start;
+        while (pointer != null)
+        {
+            if (pointer.GetPointerContext(LogicalDirection.Forward) == TextPointerContext.Text)
+            {
+                var text = pointer.GetTextInRun(LogicalDirection.Forward);
+                if (text.Length >= remaining)
+                {
+                    return pointer.GetPositionAtOffset(remaining, LogicalDirection.Forward);
+                }
+
+                remaining -= text.Length;
+                pointer = pointer.GetPositionAtOffset(text.Length, LogicalDirection.Forward);
+            }
+            else if (pointer.GetPointerContext(LogicalDirection.Forward) == TextPointerContext.ElementStart
+                     && pointer.GetAdjacentElement(LogicalDirection.Forward) is LineBreak)
+            {
+                if (remaining <= 2)
+                {
+                    return pointer.GetNextContextPosition(LogicalDirection.Forward);
+                }
+
+                remaining -= 2;
+                pointer = pointer.GetNextContextPosition(LogicalDirection.Forward);
+            }
+            else
+            {
+                pointer = pointer.GetNextContextPosition(LogicalDirection.Forward);
+            }
+        }
+
+        return null;
+    }
+
+    private string GetRawText()
+    {
+        var range = new TextRange(RawLogTextBox.Document.ContentStart, RawLogTextBox.Document.ContentEnd);
+        return range.Text ?? "";
+    }
+
+    private string GetProcessedText()
+    {
+        var range = new TextRange(ProcessedLogTextBox.Document.ContentStart, ProcessedLogTextBox.Document.ContentEnd);
+        return range.Text ?? "";
+    }
+
+    private static List<string> SplitLines(string text)
+    {
+        if (string.IsNullOrWhiteSpace(text))
+        {
+            return new List<string>();
+        }
+
+        return text
+            .Split(new[] { "\r\n" }, StringSplitOptions.RemoveEmptyEntries)
+            .Where(line => !string.IsNullOrWhiteSpace(line))
+            .ToList();
+    }
+
     private static T? FindVisualChild<T>(DependencyObject root) where T : DependencyObject
     {
         var count = VisualTreeHelper.GetChildrenCount(root);
@@ -695,33 +849,33 @@ public partial class MainWindow : Window
     {
         if (!_filterActive)
         {
-            RawLogTextBox.Text = string.Join(Environment.NewLine, _rawLogLines);
-            if (_rawLogLines.Count > 0)
-            {
-                RawLogTextBox.Text += Environment.NewLine;
-            }
-
             _filteredRawCount = _rawLogLines.Count;
             FilterCountText.Text = $"Count: {_filteredRawCount}";
-            ExecuteRawFind();
+            _rawFindState.Query = RawFindTextBox.Text ?? "";
+            SetRawOutput(_rawLogLines);
+            UpdateFindState(_rawFindState, _rawFindState.Query, GetRawText(), RawFindCountText, RawFindPrevButton, RawFindNextButton, resetIndex: true);
+            SelectFindMatch(_rawFindState, RawLogTextBox, isProcessed: false);
 
             SetProcessedOutput(_processedLogLines, showPlaceholderIfEmpty: true);
+            _processedFindState.Query = ProcessedFindTextBox.Text ?? "";
+            UpdateProcessedFindState(_processedFindState, _processedFindState.Query, ProcessedFindCountText, ProcessedFindPrevButton, ProcessedFindNextButton, resetIndex: true);
+            SelectFindMatch(_processedFindState, ProcessedLogTextBox, isProcessed: true);
             return;
         }
 
         var filteredRaw = _rawLogLines.Where(line => LineMatchesFilter(line, _filterIncludeTerms, _filterExcludeTerms, _filterStart, _filterEnd)).ToList();
-        RawLogTextBox.Text = string.Join(Environment.NewLine, filteredRaw);
-        if (filteredRaw.Count > 0)
-        {
-            RawLogTextBox.Text += Environment.NewLine;
-        }
-
         _filteredRawCount = filteredRaw.Count;
         FilterCountText.Text = $"Count: {_filteredRawCount}";
-        ExecuteRawFind();
+        _rawFindState.Query = RawFindTextBox.Text ?? "";
+        SetRawOutput(filteredRaw);
+        UpdateFindState(_rawFindState, _rawFindState.Query, GetRawText(), RawFindCountText, RawFindPrevButton, RawFindNextButton, resetIndex: true);
+        SelectFindMatch(_rawFindState, RawLogTextBox, isProcessed: false);
 
         var filteredProcessed = _processedLogLines.Where(line => LineMatchesFilter(line, _filterIncludeTerms, _filterExcludeTerms, _filterStart, _filterEnd)).ToList();
         SetProcessedOutput(filteredProcessed, showPlaceholderIfEmpty: true);
+        _processedFindState.Query = ProcessedFindTextBox.Text ?? "";
+        UpdateProcessedFindState(_processedFindState, _processedFindState.Query, ProcessedFindCountText, ProcessedFindPrevButton, ProcessedFindNextButton, resetIndex: true);
+        SelectFindMatch(_processedFindState, ProcessedLogTextBox, isProcessed: true);
     }
 
     private void QueueProcessedLayoutUpdate()
@@ -736,6 +890,21 @@ public partial class MainWindow : Window
         {
             _pendingProcessedLayoutUpdate = false;
             AdjustProcessedDocumentWidth();
+        }, System.Windows.Threading.DispatcherPriority.Loaded);
+    }
+
+    private void QueueRawLayoutUpdate()
+    {
+        if (_pendingRawLayoutUpdate)
+        {
+            return;
+        }
+
+        _pendingRawLayoutUpdate = true;
+        Dispatcher.BeginInvoke(() =>
+        {
+            _pendingRawLayoutUpdate = false;
+            AdjustRawDocumentWidth();
         }, System.Windows.Threading.DispatcherPriority.Loaded);
     }
 
@@ -769,10 +938,46 @@ public partial class MainWindow : Window
         SetProcessedDocumentWidth(desiredWidth);
     }
 
+    private void AdjustRawDocumentWidth()
+    {
+        var viewportWidth = RawLogTextBox.ViewportWidth;
+        if (viewportWidth <= 0)
+        {
+            viewportWidth = RawLogTextBox.ActualWidth;
+        }
+
+        if (viewportWidth <= 0)
+        {
+            return;
+        }
+
+        if (_rawVisibleLineCount <= 0)
+        {
+            SetRawDocumentWidth(viewportWidth);
+            return;
+        }
+
+        var maxWidth = MeasureRawTextWidth();
+        if (maxWidth <= 0)
+        {
+            SetRawDocumentWidth(viewportWidth);
+            return;
+        }
+
+        var desiredWidth = Math.Max(viewportWidth, maxWidth + RawWidthPadding);
+        SetRawDocumentWidth(desiredWidth);
+    }
+
     private void SetProcessedDocumentWidth(double width)
     {
         ProcessedLogTextBox.Document.PageWidth = width;
         ProcessedLogTextBox.Document.ColumnWidth = width;
+    }
+
+    private void SetRawDocumentWidth(double width)
+    {
+        RawLogTextBox.Document.PageWidth = width;
+        RawLogTextBox.Document.ColumnWidth = width;
     }
 
     private double MeasureProcessedTextWidth()
@@ -795,6 +1000,32 @@ public partial class MainWindow : Window
                 ProcessedLogTextBox.FontWeight,
                 ProcessedLogTextBox.FontStretch),
             ProcessedLogTextBox.FontSize,
+            Brushes.Black,
+            dpi.PixelsPerDip);
+
+        return formatted.WidthIncludingTrailingWhitespace;
+    }
+
+    private double MeasureRawTextWidth()
+    {
+        var range = new TextRange(RawLogTextBox.Document.ContentStart, RawLogTextBox.Document.ContentEnd);
+        var text = range.Text?.TrimEnd('\r', '\n') ?? "";
+        if (text.Length == 0)
+        {
+            return 0;
+        }
+
+        var dpi = VisualTreeHelper.GetDpi(RawLogTextBox);
+        var formatted = new FormattedText(
+            text,
+            CultureInfo.CurrentCulture,
+            FlowDirection.LeftToRight,
+            new Typeface(
+                RawLogTextBox.FontFamily,
+                RawLogTextBox.FontStyle,
+                RawLogTextBox.FontWeight,
+                RawLogTextBox.FontStretch),
+            RawLogTextBox.FontSize,
             Brushes.Black,
             dpi.PixelsPerDip);
 
@@ -1341,7 +1572,7 @@ public partial class MainWindow : Window
 
     private void ClearDiagnostics_Click(object sender, RoutedEventArgs e)
     {
-        RawLogTextBox.Clear();
+        ClearRawOutput();
         ClearProcessedOutput();
         _rawLogLines.Clear();
         _processedLogLines.Clear();
@@ -1476,19 +1707,9 @@ public partial class MainWindow : Window
 
             if (!_filterActive || LineMatchesFilter(line, _filterIncludeTerms, _filterExcludeTerms, _filterStart, _filterEnd))
             {
-                var newText = RawLogTextBox.Text + line + Environment.NewLine;
-                if (newText.Length > MaxLogChars)
-                {
-                    newText = newText.Substring(newText.Length - MaxLogChars);
-                }
-
-                RawLogTextBox.Text = newText;
-                RawLogTextBox.CaretIndex = RawLogTextBox.Text.Length;
-                RawLogTextBox.ScrollToEnd();
-
                 _filteredRawCount = _filterActive ? _filteredRawCount + 1 : _rawLogLines.Count;
                 FilterCountText.Text = $"Count: {_filteredRawCount}";
-                ExecuteRawFind();
+                AppendRawLine(line);
             }
 
             if (_processingEngine != null)
@@ -1602,6 +1823,70 @@ public partial class MainWindow : Window
         QueueProcessedLayoutUpdate();
     }
 
+    private void ClearRawOutput()
+    {
+        RawLogTextBox.Document.Blocks.Clear();
+        _rawVisibleLineCount = 0;
+        QueueRawLayoutUpdate();
+    }
+
+    private void SetRawOutput(IEnumerable<string> lines)
+    {
+        RawLogTextBox.Document.Blocks.Clear();
+
+        var paragraph = new Paragraph();
+        var hasLines = false;
+        var lineCount = 0;
+        var applyHighlights = !string.IsNullOrWhiteSpace(_rawFindState.Query);
+        foreach (var line in lines)
+        {
+            if (string.IsNullOrWhiteSpace(line))
+            {
+                continue;
+            }
+
+            if (hasLines)
+            {
+                paragraph.Inlines.Add(new LineBreak());
+            }
+
+            AppendRunsWithHighlights(paragraph, line, _rawFindState.Query, RawMatchColor, applyHighlights, Brushes.Black);
+            hasLines = true;
+            lineCount++;
+        }
+
+        if (hasLines)
+        {
+            RawLogTextBox.Document.Blocks.Add(paragraph);
+        }
+
+        _rawVisibleLineCount = lineCount;
+        QueueRawLayoutUpdate();
+    }
+
+    private void AppendRawLine(string line)
+    {
+        var paragraph = RawLogTextBox.Document.Blocks.FirstBlock as Paragraph;
+        if (paragraph == null)
+        {
+            paragraph = new Paragraph();
+            RawLogTextBox.Document.Blocks.Add(paragraph);
+        }
+
+        if (paragraph.Inlines.Count > 0)
+        {
+            paragraph.Inlines.Add(new LineBreak());
+        }
+
+        AppendRunsWithHighlights(paragraph, line, _rawFindState.Query, RawMatchColor, applyHighlights: !string.IsNullOrWhiteSpace(_rawFindState.Query), Brushes.Black);
+        _rawVisibleLineCount++;
+        QueueRawLayoutUpdate();
+        if (!string.IsNullOrWhiteSpace(_rawFindState.Query))
+        {
+            UpdateFindState(_rawFindState, _rawFindState.Query, GetRawText(), RawFindCountText, RawFindPrevButton, RawFindNextButton, resetIndex: false);
+        }
+    }
+
     private void SetProcessedOutput(IEnumerable<string> lines, bool showPlaceholderIfEmpty)
     {
         ProcessedLogTextBox.Document.Blocks.Clear();
@@ -1621,12 +1906,7 @@ public partial class MainWindow : Window
                 paragraph.Inlines.Add(new LineBreak());
             }
 
-            var category = ProcessedLineClassifier.DetermineCategory(line);
-            var run = new Run(line)
-            {
-                Foreground = ProcessedLineClassifier.GetBrush(category)
-            };
-            paragraph.Inlines.Add(run);
+            AppendProcessedRunsWithHighlights(paragraph, line);
             hasLines = true;
             lineCount++;
         }
@@ -1648,7 +1928,6 @@ public partial class MainWindow : Window
 
         _processedVisibleLineCount = lineCount;
         QueueProcessedLayoutUpdate();
-        ExecuteProcessedFind();
     }
 
     private bool IsProcessedPlaceholderVisible()
@@ -1703,16 +1982,59 @@ public partial class MainWindow : Window
             paragraph.Inlines.Add(new LineBreak());
         }
 
-        var category = ProcessedLineClassifier.DetermineCategory(line);
-        var run = new Run(line)
-        {
-            Foreground = ProcessedLineClassifier.GetBrush(category)
-        };
-        paragraph.Inlines.Add(run);
+        AppendProcessedRunsWithHighlights(paragraph, line);
         _processedVisibleLineCount++;
         QueueProcessedLayoutUpdate();
         ProcessedLogTextBox.ScrollToEnd();
-        ExecuteProcessedFind();
+        if (!string.IsNullOrWhiteSpace(_processedFindState.Query))
+        {
+            UpdateProcessedFindState(_processedFindState, _processedFindState.Query, ProcessedFindCountText, ProcessedFindPrevButton, ProcessedFindNextButton, resetIndex: false);
+        }
+    }
+
+    private void AppendProcessedRunsWithHighlights(Paragraph paragraph, string line)
+    {
+        var category = ProcessedLineClassifier.DetermineCategory(line);
+        var foreground = ProcessedLineClassifier.GetBrush(category);
+        AppendRunsWithHighlights(paragraph, line, _processedFindState.Query, ProcessedMatchColor, applyHighlights: true, foreground);
+    }
+
+    private static void AppendRunsWithHighlights(Paragraph paragraph, string line, string query, Color highlightColor, bool applyHighlights, Brush? foreground = null)
+    {
+        if (!applyHighlights || string.IsNullOrWhiteSpace(query))
+        {
+            paragraph.Inlines.Add(new Run(line) { Foreground = foreground });
+            return;
+        }
+
+        var index = 0;
+        while (index < line.Length)
+        {
+            var matchIndex = line.IndexOf(query, index, StringComparison.OrdinalIgnoreCase);
+            if (matchIndex < 0)
+            {
+                var tail = line.Substring(index);
+                if (tail.Length > 0)
+                {
+                    paragraph.Inlines.Add(new Run(tail) { Foreground = foreground });
+                }
+                break;
+            }
+
+            if (matchIndex > index)
+            {
+                var segment = line.Substring(index, matchIndex - index);
+                paragraph.Inlines.Add(new Run(segment) { Foreground = foreground });
+            }
+
+            var matchText = line.Substring(matchIndex, query.Length);
+            paragraph.Inlines.Add(new Run(matchText)
+            {
+                Foreground = foreground,
+                Background = new SolidColorBrush(highlightColor)
+            });
+            index = matchIndex + query.Length;
+        }
     }
 
     private sealed class FindState

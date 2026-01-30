@@ -383,16 +383,21 @@
                   <TextBlock x:Name="RawFindCountText" Text="Match: None" VerticalAlignment="Center" />
                 </StackPanel>
               </Grid>
-              <TextBox x:Name="RawLogTextBox"
+              <RichTextBox x:Name="RawLogTextBox"
                        Grid.Row="1"
                        FontFamily="Consolas"
                        FontSize="12"
                        IsReadOnly="True"
-                       TextWrapping="NoWrap"
+                       Background="White"
+                       Foreground="Black"
                        Padding="0"
                        VerticalScrollBarVisibility="Auto"
                        HorizontalScrollBarVisibility="Auto"
-                       AcceptsReturn="True" />
+                       AcceptsReturn="True">
+                <FlowDocument>
+                  <Paragraph />
+                </FlowDocument>
+              </RichTextBox>
             </Grid>
           </Border>
 

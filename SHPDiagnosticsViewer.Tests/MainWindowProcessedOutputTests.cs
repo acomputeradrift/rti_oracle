@@ -51,12 +51,12 @@ public sealed class MainWindowProcessedOutputTests
         RunOnSta(() =>
         {
             var window = new MainWindow();
-            GetTextBox(window, "RawLogTextBox").Text = "raw";
+            SetRichText(window, "RawLogTextBox", "raw");
             SetRichText(window, "ProcessedLogTextBox", "processed");
 
             InvokeClearDiagnostics(window);
 
-            Assert.Equal(string.Empty, GetTextBox(window, "RawLogTextBox").Text);
+            Assert.Equal(string.Empty, GetRichText(window, "RawLogTextBox"));
             Assert.Equal(string.Empty, GetRichText(window, "ProcessedLogTextBox"));
         });
     }
@@ -163,13 +163,6 @@ public sealed class MainWindowProcessedOutputTests
             "Room Select"));
         result.ApexDiscoveryPreload.PageIndexMap["81|0"] = "Room Select";
         return result;
-    }
-
-    private static TextBox GetTextBox(MainWindow window, string fieldName)
-    {
-        var field = typeof(MainWindow).GetField(fieldName, BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public);
-        Assert.NotNull(field);
-        return (TextBox)field!.GetValue(window)!;
     }
 
     private static string GetRichText(MainWindow window, string fieldName)

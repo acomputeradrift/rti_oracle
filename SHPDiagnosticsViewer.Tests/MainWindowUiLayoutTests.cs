@@ -59,10 +59,9 @@ public sealed class MainWindowUiLayoutTests
         {
             var window = new MainWindow();
 
-            var rawLog = (TextBox)window.FindName("RawLogTextBox")!;
+            var rawLog = (RichTextBox)window.FindName("RawLogTextBox")!;
             var processedLog = (RichTextBox)window.FindName("ProcessedLogTextBox")!;
 
-            Assert.Equal(TextWrapping.NoWrap, rawLog.TextWrapping);
             Assert.Equal(ScrollBarVisibility.Auto, rawLog.HorizontalScrollBarVisibility);
             Assert.Equal(ScrollBarVisibility.Auto, processedLog.HorizontalScrollBarVisibility);
         });
