@@ -4,6 +4,8 @@
 - UI structure and layout only.
 - No code changes or behavioral logic in this plan.
 - Follow existing patterns and styles from the current UI.
+~~- No code changes or behavioral logic in this plan.~~
+- No code changes; UI behavior notes are included only to document agreed requirements.
 
 ## Reference Documents
 - `ui_plan.md` (approved layout + drawing)
@@ -25,6 +27,10 @@
   - “TCP Capture (RAW)” checkbox.
   - “Send probe on connect (diagnostic)” checkbox.
 - Keep the rest of the row as-is (SHP IP label, Connect/Disconnect, Status).
+~~- Replace the IP `TextBox` with an editable IP `ComboBox` to allow a dropdown (UI element only).~~
+- Keep the IP as a plain editable field (no dropdown).
+- Add a `Connect` title aligned with the `Project Data` title.
+- Align the SHP IP row with the Upload Project row; align the Discover row with the Upload Additional Info row.
 
 ### Discovery Row
 - Preserve the existing “Discover” button + “Discovered:” label + dropdown row.
@@ -32,10 +38,12 @@
 ### Top Right: Project Data Box
 - Keep the box at the same vertical height and style.
 - Reformat the contents into two single-line rows (no wrapping):
-  - Row 1: “Upload Project (.apex)” button + current project file name.
+  - ~~Row 1: “Upload Project (.apex)” button + current project file name.~~
+  - Row 1: “Upload Project (.apex)” button + recent project dropdown + `Show` button.
   - Row 2: “Upload Additional Info (.xlsx)” button + current additional info file name.
 - Ensure the box stays aligned horizontally with the connection row (same top band).
 - Box height is content-driven with minimal padding; no extra vertical space.
+- `Show` button should match other button sizes and open the same diagnostics preview used on upload.
 
 ### Driver Log Levels Panel
 - Add a collapse/expand arrow next to “Driver Log Levels”.
@@ -53,11 +61,32 @@
 - Move Find controls into each log pane header (Raw and Processed):
   - `Find: [text] [Prev] [Next] [Clear] Count: N`
 - Keep the visible divider between Raw and Processed panes.
+- Filter keyword parsing:
+  - Comma-separated terms.
+  - `-term` excludes; plain terms include.
+  - Invalid input disables Filter and shows a tooltip explaining the error.
+- Date/time pickers:
+  - Calendar + hour/minute only (no seconds/milliseconds).
+  - Format matches log timestamps (`yyyy-MM-dd HH:mm`).
+  - Min/Max from raw logs; disable calendar buttons if no raw logs.
+- Find behavior:
+  - Debounced live search.
+  - Highlight all matches; focused match uses a distinct highlight color.
+  - Count label uses `Match: 1/10` or `Match: None`.
+  - Raw and Processed find behavior must be identical but independent.
+- Log panes:
+  - No line wrapping.
+  - Horizontal scrollbars only when needed (hidden otherwise).
+  - Raw and Processed panes must behave identically for long lines.
+- `Clear Logs` label uses full wording (not `Clear`).
 
 ## Visual Constraints
 - Do not increase the vertical height of the top control band.
 - Keep button sizing and spacing consistent with existing UI.
 - Preserve current colors and typography.
+- Ensure filter inputs are fully visible (no clipped right edges).
 
 ## Implementation Notes (Context Only)
 - Behavior for Filter/Find, IP history, and panel expand/collapse is out of scope for this plan and should be handled by the implementation agent using existing patterns.
+~~- Behavior for Filter/Find, IP history, and panel expand/collapse is out of scope for this plan and should be handled by the implementation agent using existing patterns.~~
+- Behavior notes included for accurate UI specification only; implementation remains out of scope here.
