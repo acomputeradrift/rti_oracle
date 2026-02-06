@@ -68,6 +68,153 @@
           </StackPanel>
         </ScrollViewer>
       </TabItem>
+      <TabItem Header="Apex Discovery">
+        <ScrollViewer VerticalScrollBarVisibility="Auto">
+          <StackPanel>
+            <TextBlock Text="Pages" Margin="0,0,0,6" FontWeight="SemiBold" />
+            <DataGrid ItemsSource="{Binding PageMappings}"
+                      AutoGenerateColumns="False"
+                      IsReadOnly="True"
+                      HeadersVisibility="Column"
+                      CanUserAddRows="False"
+                      Height="180">
+              <DataGrid.Columns>
+                <DataGridTextColumn Header="DeviceId" Binding="{Binding DeviceId}" Width="80" />
+                <DataGridTextColumn Header="DeviceName" Binding="{Binding DeviceName}" Width="*" />
+                <DataGridTextColumn Header="RoomId" Binding="{Binding RoomId}" Width="80" />
+                <DataGridTextColumn Header="RoomName" Binding="{Binding RoomName}" Width="*" />
+                <DataGridTextColumn Header="SourceId" Binding="{Binding SourceId}" Width="80" />
+                <DataGridTextColumn Header="SourceName" Binding="{Binding SourceName}" Width="*" />
+                <DataGridTextColumn Header="PageNumber" Binding="{Binding PageNumber}" Width="90" />
+                <DataGridTextColumn Header="PageName" Binding="{Binding PageName}" Width="*" />
+              </DataGrid.Columns>
+            </DataGrid>
+
+            <TextBlock Text="Rooms" Margin="0,12,0,6" FontWeight="SemiBold" />
+            <DataGrid ItemsSource="{Binding RoomMappings}"
+                      AutoGenerateColumns="False"
+                      IsReadOnly="True"
+                      HeadersVisibility="Column"
+                      CanUserAddRows="False"
+                      Height="180">
+              <DataGrid.Columns>
+                <DataGridTextColumn Header="RoomId" Binding="{Binding RoomId}" Width="70" />
+                <DataGridTextColumn Header="RoomName" Binding="{Binding RoomName}" Width="*" />
+                <DataGridTextColumn Header="SourceId" Binding="{Binding SourceId}" Width="80" />
+                <DataGridTextColumn Header="SourceName" Binding="{Binding SourceName}" Width="*" />
+                <DataGridTextColumn Header="ControllerId" Binding="{Binding ControllerDeviceId}" Width="95" />
+                <DataGridTextColumn Header="ControllerName" Binding="{Binding ControllerDeviceName}" Width="*" />
+                <DataGridTextColumn Header="PageId" Binding="{Binding PageId}" Width="80" />
+                <DataGridTextColumn Header="PageName" Binding="{Binding PageName}" Width="*" />
+              </DataGrid.Columns>
+            </DataGrid>
+
+            <TextBlock Text="Relay Ports" Margin="0,12,0,6" FontWeight="SemiBold" />
+            <DataGrid ItemsSource="{Binding RelayPorts}"
+                      AutoGenerateColumns="False"
+                      IsReadOnly="True"
+                      HeadersVisibility="Column"
+                      CanUserAddRows="False"
+                      Height="180">
+              <DataGrid.Columns>
+                <DataGridTextColumn Header="Controller" Binding="{Binding ControllerDeviceName}" Width="*" />
+                <DataGridTextColumn Header="ExpanderType" Binding="{Binding ExpanderDeviceType}" Width="110" />
+                <DataGridTextColumn Header="ExpanderName" Binding="{Binding ExpanderName}" Width="*" />
+                <DataGridTextColumn Header="RelayName" Binding="{Binding RelayName}" Width="*" />
+                <DataGridTextColumn Header="RelayType" Binding="{Binding RelayType}" Width="120" />
+                <DataGridTextColumn Header="RelayMode" Binding="{Binding RelayMode}" Width="120" />
+              </DataGrid.Columns>
+            </DataGrid>
+
+            <TextBlock Text="MPIO/IR Ports" Margin="0,12,0,6" FontWeight="SemiBold" />
+            <DataGrid ItemsSource="{Binding MpioIrPorts}"
+                      AutoGenerateColumns="False"
+                      IsReadOnly="True"
+                      HeadersVisibility="Column"
+                      CanUserAddRows="False"
+                      Height="180">
+              <DataGrid.Columns>
+                <DataGridTextColumn Header="Controller" Binding="{Binding ControllerDeviceName}" Width="*" />
+                <DataGridTextColumn Header="ExpanderType" Binding="{Binding ExpanderDeviceType}" Width="110" />
+                <DataGridTextColumn Header="ExpanderName" Binding="{Binding ExpanderName}" Width="*" />
+                <DataGridTextColumn Header="PortNumber" Binding="{Binding PortNumber}" Width="90" />
+                <DataGridTextColumn Header="PortName" Binding="{Binding PortName}" Width="*" />
+              </DataGrid.Columns>
+            </DataGrid>
+
+            <TextBlock Text="Sense Ports" Margin="0,12,0,6" FontWeight="SemiBold" />
+            <DataGrid ItemsSource="{Binding SensePorts}"
+                      AutoGenerateColumns="False"
+                      IsReadOnly="True"
+                      HeadersVisibility="Column"
+                      CanUserAddRows="False"
+                      Height="180">
+              <DataGrid.Columns>
+                <DataGridTextColumn Header="Controller" Binding="{Binding ControllerDeviceName}" Width="*" />
+                <DataGridTextColumn Header="ExpanderType" Binding="{Binding ExpanderDeviceType}" Width="110" />
+                <DataGridTextColumn Header="ExpanderName" Binding="{Binding ExpanderName}" Width="*" />
+                <DataGridTextColumn Header="PortNumber" Binding="{Binding PortNumber}" Width="90" />
+                <DataGridTextColumn Header="PortName" Binding="{Binding PortName}" Width="*" />
+                <DataGridTextColumn Header="SenseMode" Binding="{Binding SenseModeState}" Width="120" />
+              </DataGrid.Columns>
+            </DataGrid>
+
+            <TextBlock Text="Trigger Ports" Margin="0,12,0,6" FontWeight="SemiBold" />
+            <DataGrid ItemsSource="{Binding TriggerPorts}"
+                      AutoGenerateColumns="False"
+                      IsReadOnly="True"
+                      HeadersVisibility="Column"
+                      CanUserAddRows="False"
+                      Height="150">
+              <DataGrid.Columns>
+                <DataGridTextColumn Header="Controller" Binding="{Binding ControllerDeviceName}" Width="*" />
+                <DataGridTextColumn Header="ExpanderType" Binding="{Binding ExpanderDeviceType}" Width="110" />
+                <DataGridTextColumn Header="ExpanderName" Binding="{Binding ExpanderName}" Width="*" />
+                <DataGridTextColumn Header="TriggerNumber" Binding="{Binding TriggerNumber}" Width="110" />
+                <DataGridTextColumn Header="TriggerName" Binding="{Binding TriggerName}" Width="*" />
+              </DataGrid.Columns>
+            </DataGrid>
+
+            <TextBlock Text="RS-232 Ports" Margin="0,12,0,6" FontWeight="SemiBold" />
+            <DataGrid ItemsSource="{Binding Rs232Ports}"
+                      AutoGenerateColumns="False"
+                      IsReadOnly="True"
+                      HeadersVisibility="Column"
+                      CanUserAddRows="False"
+                      Height="180">
+              <DataGrid.Columns>
+                <DataGridTextColumn Header="Controller" Binding="{Binding ControllerDeviceName}" Width="*" />
+                <DataGridTextColumn Header="ExpanderType" Binding="{Binding ExpanderDeviceType}" Width="110" />
+                <DataGridTextColumn Header="ExpanderName" Binding="{Binding ExpanderName}" Width="*" />
+                <DataGridTextColumn Header="PortNumber" Binding="{Binding PortNumber}" Width="90" />
+                <DataGridTextColumn Header="PortName" Binding="{Binding PortName}" Width="*" />
+              </DataGrid.Columns>
+            </DataGrid>
+
+            <TextBlock Text="Driver Template Variables" Margin="0,12,0,6" FontWeight="SemiBold" />
+            <DataGrid ItemsSource="{Binding DriverTemplateVariables}"
+                      AutoGenerateColumns="False"
+                      IsReadOnly="True"
+                      HeadersVisibility="Column"
+                      CanUserAddRows="False"
+                      Height="220">
+              <DataGrid.Columns>
+                <DataGridTextColumn Header="DriverDeviceId" Binding="{Binding DriverDeviceId}" Width="110" />
+                <DataGridTextColumn Header="DriverName" Binding="{Binding DriverDeviceName}" Width="*" />
+                <DataGridTextColumn Header="DisplayName" Binding="{Binding DriverDisplayName}" Width="*" />
+                <DataGridTextColumn Header="SysVarRef" Binding="{Binding SysVarRef}" Width="*" />
+                <DataGridTextColumn Header="SysVarToken" Binding="{Binding SysVarToken}" Width="140" />
+                <DataGridTextColumn Header="SourceDriverId" Binding="{Binding SourceDriverId}" Width="160" />
+                <DataGridTextColumn Header="SourceDriverName" Binding="{Binding SourceDriverName}" Width="*" />
+                <DataGridTextColumn Header="Category" Binding="{Binding VariableCategory}" Width="*" />
+                <DataGridTextColumn Header="VariableName" Binding="{Binding VariableName}" Width="*" />
+                <DataGridTextColumn Header="Type" Binding="{Binding VariableType}" Width="110" />
+                <DataGridTextColumn Header="Format" Binding="{Binding Format}" Width="160" />
+              </DataGrid.Columns>
+            </DataGrid>
+          </StackPanel>
+        </ScrollViewer>
+      </TabItem>
     </TabControl>
 
     <StackPanel Grid.Row="2" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,8,0,0">

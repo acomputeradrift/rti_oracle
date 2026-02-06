@@ -2,7 +2,9 @@ using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
+using System.Linq;
 using System.Text.RegularExpressions;
+using System.Xml.Linq;
 using Microsoft.Data.Sqlite;
 
 namespace SHPDiagnosticsViewer.ProjectData;
@@ -12,10 +14,80 @@ public sealed class ApexDiscoveryPreloadResult
     public Dictionary<string, string> PageIndexMap { get; } = new(StringComparer.Ordinal);
     public Dictionary<string, SysVarRefEntry> SysVarRefMap { get; } = new(StringComparer.Ordinal);
     public Dictionary<int, DriverConfigEntry> DriverConfigMap { get; } = new();
+    public List<PageMappingEntry> PageMappings { get; } = new();
+    public List<RelayPortEntry> RelayPorts { get; } = new();
+    public List<MpioIrPortEntry> MpioIrPorts { get; } = new();
+    public List<SensePortEntry> SensePorts { get; } = new();
+    public List<TriggerPortEntry> TriggerPorts { get; } = new();
+    public List<Rs232PortEntry> Rs232Ports { get; } = new();
+    public List<RoomMappingEntry> RoomMappings { get; } = new();
+    public List<DriverTemplateVariableEntry> DriverTemplateVariables { get; } = new();
 }
 
 public sealed record SysVarRefEntry(int? DriverDeviceId, string? DriverName, string? VariableName, int? DeviceId);
 public sealed record DriverConfigEntry(string DeviceName, string DeviceDisplayName, Dictionary<string, string> Config);
+public sealed record PageMappingEntry(
+    int DeviceId,
+    string DeviceName,
+    int? RoomId,
+    string RoomName,
+    int? SourceId,
+    string SourceName,
+    int PageNumber,
+    string PageName);
+public sealed record RelayPortEntry(
+    string ControllerDeviceName,
+    string ExpanderDeviceType,
+    string ExpanderName,
+    string RelayName,
+    string RelayType,
+    string RelayMode);
+public sealed record MpioIrPortEntry(
+    string ControllerDeviceName,
+    string ExpanderDeviceType,
+    string ExpanderName,
+    int PortNumber,
+    string PortName);
+public sealed record SensePortEntry(
+    string ControllerDeviceName,
+    string ExpanderDeviceType,
+    string ExpanderName,
+    int PortNumber,
+    string PortName,
+    string SenseModeState);
+public sealed record TriggerPortEntry(
+    string ControllerDeviceName,
+    string ExpanderDeviceType,
+    string ExpanderName,
+    int TriggerNumber,
+    string TriggerName);
+public sealed record Rs232PortEntry(
+    string ControllerDeviceName,
+    string ExpanderDeviceType,
+    string ExpanderName,
+    int PortNumber,
+    string PortName);
+public sealed record RoomMappingEntry(
+    int RoomId,
+    string RoomName,
+    int? SourceId,
+    string SourceName,
+    int? ControllerDeviceId,
+    string ControllerDeviceName,
+    int? PageId,
+    string PageName);
+public sealed record DriverTemplateVariableEntry(
+    int DriverDeviceId,
+    string DriverDeviceName,
+    string DriverDisplayName,
+    string SysVarRef,
+    string SysVarToken,
+    string SourceDriverId,
+    string SourceDriverName,
+    string VariableCategory,
+    string VariableName,
+    string VariableType,
+    string Format);
 
 public static class ApexDiscoveryPreloadExtractor
 {
@@ -40,6 +112,14 @@ public static class ApexDiscoveryPreloadExtractor
         LoadPageIndexMap(connection, result.PageIndexMap);
         LoadDriverConfigMap(connection, result.DriverConfigMap);
         LoadSysVarRefMap(connection, result.SysVarRefMap);
+        LoadPageMappings(connection, result.PageMappings);
+        LoadRelayPorts(connection, result.RelayPorts);
+        LoadMpioIrPorts(connection, result.MpioIrPorts);
+        LoadSensePorts(connection, result.SensePorts);
+        LoadTriggerPorts(connection, result.TriggerPorts);
+        LoadRs232Ports(connection, result.Rs232Ports);
+        LoadRoomMappings(connection, result.RoomMappings);
+        LoadDriverTemplateVariables(connection, result.DriverTemplateVariables);
 
         return result;
     }
@@ -313,6 +393,567 @@ ORDER BY d.DeviceId, p.PageOrder;
             }
         }
     }
+
+    private static void LoadPageMappings(SqliteConnection connection, List<PageMappingEntry> entries)
+    {
+        using var command = connection.CreateCommand();
+        command.CommandText = """
+SELECT
+  d.DeviceId AS device_id,
+  d.Name AS device_name,
+  sd.RoomId AS room_id,
+  r.Name AS room_name,
+  p.SourceDeviceId AS source_id,
+  sd.Name AS source_name,
+  (p.PageOrder + 1) AS page_number,
+  n.PageName AS page_name
+FROM RTIDeviceData rd
+JOIN Devices d ON rd.DeviceId = d.DeviceId
+JOIN RTIDevicePageData p ON p.RTIAddress = rd.RTIAddress
+LEFT JOIN Devices sd ON p.SourceDeviceId = sd.DeviceId
+LEFT JOIN Rooms r ON sd.RoomId = r.RoomId
+LEFT JOIN PageNames n ON p.PageNameId = n.PageNameId
+ORDER BY d.DeviceId, p.PageOrder;
+""";
+
+        using var reader = command.ExecuteReader();
+        while (reader.Read())
+        {
+            if (reader.IsDBNull(0))
+            {
+                continue;
+            }
+
+            entries.Add(new PageMappingEntry(
+                reader.GetInt32(0),
+                reader.IsDBNull(1) ? "" : reader.GetString(1),
+                reader.IsDBNull(2) ? (int?)null : reader.GetInt32(2),
+                reader.IsDBNull(3) ? "" : reader.GetString(3),
+                reader.IsDBNull(4) ? (int?)null : reader.GetInt32(4),
+                reader.IsDBNull(5) ? "" : reader.GetString(5),
+                reader.IsDBNull(6) ? 0 : reader.GetInt32(6),
+                reader.IsDBNull(7) ? "" : reader.GetString(7)));
+        }
+    }
+
+    private static void LoadRelayPorts(SqliteConnection connection, List<RelayPortEntry> entries)
+    {
+        using var command = connection.CreateCommand();
+        command.CommandText = """
+WITH relay_labels AS (
+  SELECT
+    (LabelKey >> 16) AS expander_id,
+    LabelName AS relay_name
+  FROM PortLabels
+  WHERE RTIAddress = 0
+    AND (
+      LabelKey BETWEEN -64768 AND -64761
+      OR LabelName LIKE 'Relay %'
+    )
+),
+controller AS (
+  SELECT d.Name AS controller_device_name
+  FROM RTIDeviceData rd
+  JOIN Devices d ON rd.DeviceId = d.DeviceId
+  WHERE rd.RTIAddress = 0
+)
+SELECT
+  c.controller_device_name,
+  CASE
+    WHEN r.expander_id = -1 THEN 'Internal'
+    WHEN e.DeviceType = 5 THEN 'RCM-4'
+    WHEN e.DeviceType = 3 THEN 'ESC-2'
+    WHEN e.DeviceType = 6 THEN 'XP-6'
+    ELSE CAST(e.DeviceType AS TEXT)
+  END AS expander_device_type,
+  CASE
+    WHEN r.expander_id = -1 THEN 'Internal'
+    ELSE e.Name
+  END AS expander_name,
+  r.relay_name,
+  CASE
+    WHEN r.expander_id = -1 THEN 'Contact Closure'
+    WHEN r.expander_id = 1 THEN 'Unknown'
+    ELSE 'N/A'
+  END AS relay_type,
+  CASE
+    WHEN r.expander_id = -1 THEN 'Normally Open'
+    WHEN r.expander_id = 1 THEN 'Unknown'
+    ELSE 'N/A'
+  END AS relay_mode
+FROM relay_labels r
+CROSS JOIN controller c
+LEFT JOIN ExpansionDevices e
+  ON e.RTIAddress = 0 AND e.ExpanderId = r.expander_id
+ORDER BY expander_device_type, expander_name, r.relay_name;
+""";
+
+        using var reader = command.ExecuteReader();
+        while (reader.Read())
+        {
+            entries.Add(new RelayPortEntry(
+                reader.IsDBNull(0) ? "" : reader.GetString(0),
+                reader.IsDBNull(1) ? "" : reader.GetString(1),
+                reader.IsDBNull(2) ? "" : reader.GetString(2),
+                reader.IsDBNull(3) ? "" : reader.GetString(3),
+                reader.IsDBNull(4) ? "" : reader.GetString(4),
+                reader.IsDBNull(5) ? "" : reader.GetString(5)));
+        }
+    }
+
+    private static void LoadMpioIrPorts(SqliteConnection connection, List<MpioIrPortEntry> entries)
+    {
+        using var command = connection.CreateCommand();
+        command.CommandText = """
+WITH mpio_labels AS (
+  SELECT
+    (LabelKey >> 16) AS expander_id,
+    (LabelKey & 65535) AS port_key,
+    LabelName AS port_name
+  FROM PortLabels
+  WHERE RTIAddress = 0
+    AND (
+      LabelKey BETWEEN -65536 AND -65529
+      OR LabelKey BETWEEN 65536 AND 65543
+    )
+),
+controller AS (
+  SELECT d.Name AS controller_device_name
+  FROM RTIDeviceData rd
+  JOIN Devices d ON rd.DeviceId = d.DeviceId
+  WHERE rd.RTIAddress = 0
+)
+SELECT
+  c.controller_device_name,
+  CASE
+    WHEN m.expander_id = -1 THEN 'Internal'
+    WHEN e.DeviceType = 6 THEN 'XP-6'
+    ELSE CAST(e.DeviceType AS TEXT)
+  END AS expander_device_type,
+  CASE
+    WHEN m.expander_id = -1 THEN 'Internal'
+    ELSE e.Name
+  END AS expander_name,
+  (m.port_key % 256) + 1 AS port_number,
+  m.port_name
+FROM mpio_labels m
+CROSS JOIN controller c
+LEFT JOIN ExpansionDevices e
+  ON e.RTIAddress = 0 AND e.ExpanderId = m.expander_id
+ORDER BY expander_device_type, expander_name, port_number;
+""";
+
+        using var reader = command.ExecuteReader();
+        while (reader.Read())
+        {
+            entries.Add(new MpioIrPortEntry(
+                reader.IsDBNull(0) ? "" : reader.GetString(0),
+                reader.IsDBNull(1) ? "" : reader.GetString(1),
+                reader.IsDBNull(2) ? "" : reader.GetString(2),
+                reader.IsDBNull(3) ? 0 : reader.GetInt32(3),
+                reader.IsDBNull(4) ? "" : reader.GetString(4)));
+        }
+    }
+
+    private static void LoadSensePorts(SqliteConnection connection, List<SensePortEntry> entries)
+    {
+        using var command = connection.CreateCommand();
+        command.CommandText = """
+WITH sense_labels AS (
+  SELECT
+    (LabelKey >> 16) AS expander_id,
+    (LabelKey & 65535) AS port_key,
+    LabelName AS port_name
+  FROM PortLabels
+  WHERE RTIAddress = 0
+    AND (
+      LabelKey BETWEEN -65024 AND -65017
+      OR LabelKey BETWEEN 66048 AND 66055
+    )
+),
+controller AS (
+  SELECT d.Name AS controller_device_name
+  FROM RTIDeviceData rd
+  JOIN Devices d ON rd.DeviceId = d.DeviceId
+  WHERE rd.RTIAddress = 0
+),
+sense_mask AS (
+  SELECT Mask AS sense_mode_mask
+  FROM SenseModeMap
+  WHERE RTIAddress = 0 AND ExpanderId = -1
+)
+SELECT
+  c.controller_device_name,
+  CASE
+    WHEN s.expander_id = -1 THEN 'Internal'
+    WHEN e.DeviceType = 6 THEN 'XP-6'
+    ELSE CAST(e.DeviceType AS TEXT)
+  END AS expander_device_type,
+  CASE
+    WHEN s.expander_id = -1 THEN 'Internal'
+    ELSE e.Name
+  END AS expander_name,
+  (s.port_key - 512) + 1 AS port_number,
+  s.port_name,
+  CASE
+    WHEN s.expander_id = -1 THEN
+      CASE
+        WHEN ((sm.sense_mode_mask >> ((s.port_key - 512))) & 1) = 1 THEN 'Sense Closure'
+        ELSE 'Sense Voltage'
+      END
+    ELSE 'N/A'
+  END AS sense_mode_state
+FROM sense_labels s
+CROSS JOIN controller c
+LEFT JOIN ExpansionDevices e
+  ON e.RTIAddress = 0 AND e.ExpanderId = s.expander_id
+LEFT JOIN sense_mask sm
+  ON 1 = 1
+ORDER BY expander_device_type, expander_name, port_number;
+""";
+
+        using var reader = command.ExecuteReader();
+        while (reader.Read())
+        {
+            entries.Add(new SensePortEntry(
+                reader.IsDBNull(0) ? "" : reader.GetString(0),
+                reader.IsDBNull(1) ? "" : reader.GetString(1),
+                reader.IsDBNull(2) ? "" : reader.GetString(2),
+                reader.IsDBNull(3) ? 0 : reader.GetInt32(3),
+                reader.IsDBNull(4) ? "" : reader.GetString(4),
+                reader.IsDBNull(5) ? "" : reader.GetString(5)));
+        }
+    }
+
+    private static void LoadTriggerPorts(SqliteConnection connection, List<TriggerPortEntry> entries)
+    {
+        using var command = connection.CreateCommand();
+        command.CommandText = """
+WITH trig_labels AS (
+  SELECT
+    (LabelKey >> 16) AS expander_id,
+    (LabelKey & 65535) AS port_key,
+    LabelName AS trigger_name
+  FROM PortLabels
+  WHERE RTIAddress = 0
+    AND LabelKey BETWEEN 66307 AND 66309
+),
+controller AS (
+  SELECT d.Name AS controller_device_name
+  FROM RTIDeviceData rd
+  JOIN Devices d ON rd.DeviceId = d.DeviceId
+  WHERE rd.RTIAddress = 0
+)
+SELECT
+  c.controller_device_name,
+  CASE
+    WHEN e.DeviceType = 6 THEN 'XP-6'
+    ELSE CAST(e.DeviceType AS TEXT)
+  END AS expander_device_type,
+  e.Name AS expander_name,
+  (t.port_key - 770) AS trigger_number,
+  t.trigger_name
+FROM trig_labels t
+CROSS JOIN controller c
+LEFT JOIN ExpansionDevices e
+  ON e.RTIAddress = 0 AND e.ExpanderId = t.expander_id
+ORDER BY expander_device_type, expander_name, trigger_number;
+""";
+
+        using var reader = command.ExecuteReader();
+        while (reader.Read())
+        {
+            entries.Add(new TriggerPortEntry(
+                reader.IsDBNull(0) ? "" : reader.GetString(0),
+                reader.IsDBNull(1) ? "" : reader.GetString(1),
+                reader.IsDBNull(2) ? "" : reader.GetString(2),
+                reader.IsDBNull(3) ? 0 : reader.GetInt32(3),
+                reader.IsDBNull(4) ? "" : reader.GetString(4)));
+        }
+    }
+
+    private static void LoadRs232Ports(SqliteConnection connection, List<Rs232PortEntry> entries)
+    {
+        using var command = connection.CreateCommand();
+        command.CommandText = """
+WITH rs_labels AS (
+  SELECT
+    (LabelKey >> 16) AS expander_id,
+    (LabelKey & 65535) AS port_key,
+    LabelName AS port_name
+  FROM PortLabels
+  WHERE RTIAddress = 0
+    AND (
+      LabelKey BETWEEN -65280 AND -65273
+      OR LabelKey BETWEEN 65792 AND 65799
+    )
+),
+controller AS (
+  SELECT d.Name AS controller_device_name
+  FROM RTIDeviceData rd
+  JOIN Devices d ON rd.DeviceId = d.DeviceId
+  WHERE rd.RTIAddress = 0
+)
+SELECT
+  c.controller_device_name,
+  CASE
+    WHEN r.expander_id = -1 THEN 'Internal'
+    WHEN e.DeviceType = 6 THEN 'XP-6'
+    ELSE CAST(e.DeviceType AS TEXT)
+  END AS expander_device_type,
+  CASE
+    WHEN r.expander_id = -1 THEN 'Internal'
+    ELSE e.Name
+  END AS expander_name,
+  (r.port_key - 256) + 1 AS port_number,
+  r.port_name
+FROM rs_labels r
+CROSS JOIN controller c
+LEFT JOIN ExpansionDevices e
+  ON e.RTIAddress = 0 AND e.ExpanderId = r.expander_id
+ORDER BY expander_device_type, expander_name, port_number;
+""";
+
+        using var reader = command.ExecuteReader();
+        while (reader.Read())
+        {
+            entries.Add(new Rs232PortEntry(
+                reader.IsDBNull(0) ? "" : reader.GetString(0),
+                reader.IsDBNull(1) ? "" : reader.GetString(1),
+                reader.IsDBNull(2) ? "" : reader.GetString(2),
+                reader.IsDBNull(3) ? 0 : reader.GetInt32(3),
+                reader.IsDBNull(4) ? "" : reader.GetString(4)));
+        }
+    }
+
+    private static void LoadRoomMappings(SqliteConnection connection, List<RoomMappingEntry> entries)
+    {
+        using var command = connection.CreateCommand();
+        command.CommandText = """
+SELECT
+  r.RoomId AS room_id,
+  r.Name AS room_name,
+  s.DeviceId AS source_id,
+  s.Name AS source_name,
+  dv.DeviceId AS controller_device_id,
+  dv.Name AS controller_device_name,
+  p.PageId AS page_id,
+  n.PageName AS page_name
+FROM Rooms r
+LEFT JOIN Devices s
+  ON s.RoomId = r.RoomId
+LEFT JOIN RTIDevicePageData p
+  ON p.SourceDeviceId = s.DeviceId
+LEFT JOIN RTIDeviceData rd
+  ON p.RTIAddress = rd.RTIAddress
+LEFT JOIN Devices dv
+  ON rd.DeviceId = dv.DeviceId
+LEFT JOIN PageNames n
+  ON p.PageNameId = n.PageNameId
+ORDER BY r.RoomId, s.DeviceId, dv.DeviceId, p.PageId;
+""";
+
+        using var reader = command.ExecuteReader();
+        while (reader.Read())
+        {
+            if (reader.IsDBNull(0))
+            {
+                continue;
+            }
+
+            entries.Add(new RoomMappingEntry(
+                reader.GetInt32(0),
+                reader.IsDBNull(1) ? "" : reader.GetString(1),
+                reader.IsDBNull(2) ? (int?)null : reader.GetInt32(2),
+                reader.IsDBNull(3) ? "" : reader.GetString(3),
+                reader.IsDBNull(4) ? (int?)null : reader.GetInt32(4),
+                reader.IsDBNull(5) ? "" : reader.GetString(5),
+                reader.IsDBNull(6) ? (int?)null : reader.GetInt32(6),
+                reader.IsDBNull(7) ? "" : reader.GetString(7)));
+        }
+    }
+
+    private static void LoadDriverTemplateVariables(SqliteConnection connection, List<DriverTemplateVariableEntry> entries)
+    {
+        var deviceNames = new Dictionary<int, string>();
+        using (var command = connection.CreateCommand())
+        {
+            command.CommandText = "SELECT DeviceId, Name FROM Devices ORDER BY DeviceId";
+            using var reader = command.ExecuteReader();
+            while (reader.Read())
+            {
+                if (reader.IsDBNull(0))
+                {
+                    continue;
+                }
+
+                deviceNames[reader.GetInt32(0)] = reader.IsDBNull(1) ? "" : reader.GetString(1);
+            }
+        }
+
+        var driverLookup = new Dictionary<string, DriverVariableCatalog>(StringComparer.OrdinalIgnoreCase);
+        using (var command = connection.CreateCommand())
+        {
+            command.CommandText = "SELECT DriverDeviceId, DeviceId, DriverId, SystemVariables FROM DriverData ORDER BY DriverDeviceId";
+            using var reader = command.ExecuteReader();
+            while (reader.Read())
+            {
+                if (reader.IsDBNull(0) || reader.IsDBNull(1))
+                {
+                    continue;
+                }
+
+                var driverDeviceId = reader.GetInt32(0);
+                var deviceId = reader.GetInt32(1);
+                var driverId = reader.IsDBNull(2) ? "" : reader.GetString(2);
+                if (string.IsNullOrWhiteSpace(driverId))
+                {
+                    continue;
+                }
+
+                var xml = reader.IsDBNull(3) ? "" : reader.GetString(3);
+                var variables = ParseDriverVariables(xml);
+                deviceNames.TryGetValue(deviceId, out var driverName);
+                driverLookup[driverId] = new DriverVariableCatalog(driverDeviceId, deviceId, driverName ?? "", variables);
+            }
+        }
+
+        using (var command = connection.CreateCommand())
+        {
+            command.CommandText = """
+SELECT
+  d.DeviceId,
+  d.Name,
+  d.DisplayName,
+  dd.DriverId,
+  dd.DriverDeviceId,
+  sv.SysVarRef
+FROM Devices d
+JOIN DriverData dd ON dd.DeviceId = d.DeviceId
+JOIN SystemVariableIds sv ON sv.SysVarRef LIKE '%' || dd.DriverId || '%'
+ORDER BY d.DeviceId, sv.SysVarID;
+""";
+            using var reader = command.ExecuteReader();
+            while (reader.Read())
+            {
+                if (reader.IsDBNull(0) || reader.IsDBNull(3) || reader.IsDBNull(4) || reader.IsDBNull(5))
+                {
+                    continue;
+                }
+
+                var deviceId = reader.GetInt32(0);
+                var deviceName = reader.IsDBNull(1) ? "" : reader.GetString(1);
+                var displayName = reader.IsDBNull(2) ? "" : reader.GetString(2);
+                if (string.IsNullOrWhiteSpace(displayName))
+                {
+                    displayName = deviceName;
+                }
+
+                var driverId = reader.GetString(3);
+                var driverDeviceId = reader.GetInt32(4);
+                var sysVarRef = reader.GetString(5);
+                if (string.IsNullOrWhiteSpace(sysVarRef))
+                {
+                    continue;
+                }
+
+                var sysVarToken = "";
+                var atIndex = sysVarRef.IndexOf('@');
+                if (atIndex >= 0 && atIndex + 1 < sysVarRef.Length)
+                {
+                    sysVarToken = sysVarRef[(atIndex + 1)..];
+                }
+
+                var sourceDriverId = "";
+                var sourceDriverName = "";
+                var driverIdMatch = SysVarGuidPattern.Match(sysVarRef);
+                if (driverIdMatch.Success)
+                {
+                    sourceDriverId = driverIdMatch.Value;
+                    if (driverLookup.TryGetValue(sourceDriverId, out var catalog))
+                    {
+                        sourceDriverName = catalog.DriverName;
+                    }
+                }
+
+                var variableCategory = "";
+                var variableName = "";
+                var variableType = "";
+                var format = "";
+                if (!string.IsNullOrWhiteSpace(sysVarToken)
+                    && driverLookup.TryGetValue(driverId, out var driverCatalog)
+                    && driverCatalog.Variables.TryGetValue(sysVarToken, out var details))
+                {
+                    variableCategory = details.Category;
+                    variableName = details.Name;
+                    variableType = details.Type;
+                    format = details.Format;
+                }
+
+                entries.Add(new DriverTemplateVariableEntry(
+                    driverDeviceId,
+                    deviceName,
+                    displayName,
+                    sysVarRef,
+                    sysVarToken,
+                    sourceDriverId,
+                    sourceDriverName,
+                    variableCategory,
+                    variableName,
+                    variableType,
+                    format));
+            }
+        }
+    }
+
+    private static Dictionary<string, DriverVariableDetails> ParseDriverVariables(string xml)
+    {
+        var variables = new Dictionary<string, DriverVariableDetails>(StringComparer.OrdinalIgnoreCase);
+        if (string.IsNullOrWhiteSpace(xml))
+        {
+            return variables;
+        }
+
+        XDocument? document = null;
+        try
+        {
+            document = XDocument.Parse(xml);
+        }
+        catch
+        {
+            return variables;
+        }
+
+        foreach (var variable in document.Descendants("variable"))
+        {
+            var sysvar = variable.Attribute("sysvar")?.Value ?? "";
+            if (string.IsNullOrWhiteSpace(sysvar))
+            {
+                continue;
+            }
+
+            if (variables.ContainsKey(sysvar))
+            {
+                continue;
+            }
+
+            var name = variable.Attribute("name")?.Value ?? "";
+            var type = variable.Attribute("type")?.Value ?? variable.Attribute("datatype")?.Value ?? "";
+            var format = variable.Attribute("format")?.Value ?? "";
+            var category = variable.Ancestors("category").FirstOrDefault()?.Attribute("name")?.Value ?? "";
+            variables[sysvar] = new DriverVariableDetails(category, name, type, format);
+        }
+
+        return variables;
+    }
+
+    private sealed record DriverVariableCatalog(
+        int DriverDeviceId,
+        int DeviceId,
+        string DriverName,
+        Dictionary<string, DriverVariableDetails> Variables);
+
+    private sealed record DriverVariableDetails(string Category, string Name, string Type, string Format);
 
     private static ConfigLimits ExtractLimits(List<(string Name, string Value)> configs)
     {

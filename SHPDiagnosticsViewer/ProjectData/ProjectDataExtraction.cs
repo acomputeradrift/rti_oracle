@@ -64,6 +64,11 @@ public sealed class ProjectDataExtractor : IProjectDataExtractor
             throw new FileNotFoundException("APEX file not found.", apexPath);
         }
 
+        if (ProjectDataCacheStore.TryLoad(apexPath, out var cached))
+        {
+            return cached;
+        }
+
         var tempPath = Path.Combine(Path.GetTempPath(), $"oracle_{Guid.NewGuid():N}.apex");
         File.Copy(apexPath, tempPath, true);
 
@@ -280,6 +285,7 @@ public sealed class ProjectDataExtractor : IProjectDataExtractor
 
             Report(progress, "Complete", 100);
             result.ApexDiscoveryPreload = ApexDiscoveryPreloadExtractor.Extract(tempPath);
+            ProjectDataCacheStore.Save(apexPath, result);
             return result;
         }
         finally

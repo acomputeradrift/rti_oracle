@@ -113,6 +113,43 @@ public sealed class ProjectDataExtractorTests
         }
     }
 
+    [Fact]
+    public void ExtractWritesCacheAndCacheCanReload()
+    {
+        var fixture = GetFixturePath();
+        var temp = Path.Combine(Path.GetTempPath(), $"fixture_{Guid.NewGuid():N}.apex");
+        File.Copy(fixture, temp, true);
+        File.SetAttributes(temp, FileAttributes.Normal);
+
+        var cachePath = ProjectDataCacheStore.GetCachePath(temp);
+        if (File.Exists(cachePath))
+        {
+            File.Delete(cachePath);
+        }
+
+        try
+        {
+            var extractor = CreateExtractor();
+            var result = extractor.Extract(temp);
+
+            Assert.True(File.Exists(cachePath));
+            Assert.True(ProjectDataCacheStore.TryLoad(temp, out var cached));
+            Assert.Equal(result.DiagnosticsMapping.Count, cached.DiagnosticsMapping.Count);
+        }
+        finally
+        {
+            if (File.Exists(temp))
+            {
+                File.Delete(temp);
+            }
+
+            if (File.Exists(cachePath))
+            {
+                File.Delete(cachePath);
+            }
+        }
+    }
+
     private static string GetFixturePath()
     {
         var path = Path.Combine(AppContext.BaseDirectory, "Fixtures", "TEST - System Manager v10.apex");

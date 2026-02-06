@@ -17,6 +17,14 @@ public partial class ProjectDataPreviewWindow : Window
     public ObservableCollection<DiagnosticsMappingEntry> DiagnosticsMapping { get; } = new();
     public ObservableCollection<DriverConfigMapEntry> DriverConfigEntries { get; } = new();
     public ObservableCollection<SysVarRefMapEntry> SysVarRefMapEntries { get; } = new();
+    public ObservableCollection<PageMappingEntry> PageMappings { get; } = new();
+    public ObservableCollection<RelayPortEntry> RelayPorts { get; } = new();
+    public ObservableCollection<MpioIrPortEntry> MpioIrPorts { get; } = new();
+    public ObservableCollection<SensePortEntry> SensePorts { get; } = new();
+    public ObservableCollection<TriggerPortEntry> TriggerPorts { get; } = new();
+    public ObservableCollection<Rs232PortEntry> Rs232Ports { get; } = new();
+    public ObservableCollection<RoomMappingEntry> RoomMappings { get; } = new();
+    public ObservableCollection<DriverTemplateVariableEntry> DriverTemplateVariables { get; } = new();
 
     public ProjectDataPreviewWindow(string apexPath)
     {
@@ -70,6 +78,54 @@ public partial class ProjectDataPreviewWindow : Window
                     entry.Value.DriverName ?? "",
                     entry.Value.DeviceId,
                     entry.Value.VariableName ?? ""));
+            }
+
+            PageMappings.Clear();
+            foreach (var entry in result.ApexDiscoveryPreload.PageMappings)
+            {
+                PageMappings.Add(entry);
+            }
+
+            RelayPorts.Clear();
+            foreach (var entry in result.ApexDiscoveryPreload.RelayPorts)
+            {
+                RelayPorts.Add(entry);
+            }
+
+            MpioIrPorts.Clear();
+            foreach (var entry in result.ApexDiscoveryPreload.MpioIrPorts)
+            {
+                MpioIrPorts.Add(entry);
+            }
+
+            SensePorts.Clear();
+            foreach (var entry in result.ApexDiscoveryPreload.SensePorts)
+            {
+                SensePorts.Add(entry);
+            }
+
+            TriggerPorts.Clear();
+            foreach (var entry in result.ApexDiscoveryPreload.TriggerPorts)
+            {
+                TriggerPorts.Add(entry);
+            }
+
+            Rs232Ports.Clear();
+            foreach (var entry in result.ApexDiscoveryPreload.Rs232Ports)
+            {
+                Rs232Ports.Add(entry);
+            }
+
+            RoomMappings.Clear();
+            foreach (var entry in result.ApexDiscoveryPreload.RoomMappings)
+            {
+                RoomMappings.Add(entry);
+            }
+
+            DriverTemplateVariables.Clear();
+            foreach (var entry in result.ApexDiscoveryPreload.DriverTemplateVariables)
+            {
+                DriverTemplateVariables.Add(entry);
             }
 
             _preload = result.ApexDiscoveryPreload;
