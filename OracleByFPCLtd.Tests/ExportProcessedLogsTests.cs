@@ -72,6 +72,32 @@ public sealed class ExportProcessedLogsTests
         Assert.Equal(renderer.LastBytes, writer.LastBytes);
     }
 
+    [Fact]
+    public void PdfWrapRespectsWordBoundariesAndIndentation()
+    {
+        var indent = "  ";
+        var line = indent + "This is a long line that should wrap on word boundaries.";
+
+        var wrapped = PdfLineWrapper.Wrap(line, s => s.Length, maxWidth: 20);
+
+        Assert.Equal(4, wrapped.Count);
+        Assert.Equal(indent + "This is a long", wrapped[0]);
+        Assert.Equal(indent + "line that should", wrapped[1]);
+        Assert.Equal(indent + "wrap on word", wrapped[2]);
+        Assert.Equal(indent + "boundaries.", wrapped[3]);
+    }
+
+    [Fact]
+    public void PdfWrapAllowsShortLinesUnchanged()
+    {
+        var line = "Short line";
+
+        var wrapped = PdfLineWrapper.Wrap(line, s => s.Length, maxWidth: 40);
+
+        Assert.Single(wrapped);
+        Assert.Equal("Short line", wrapped[0]);
+    }
+
     private sealed class FakePdfRenderer : IPdfRenderer
     {
         public ExportRequest? LastRequest { get; private set; }

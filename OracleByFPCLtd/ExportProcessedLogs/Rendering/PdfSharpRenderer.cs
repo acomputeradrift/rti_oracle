@@ -60,6 +60,7 @@ public sealed class PdfSharpRenderer : IPdfRenderer
         var pageWidth = page.Width;
         var pageHeight = page.Height;
         var lineHeight = GetLineHeight(gfx, font);
+        var usableWidth = pageWidth - (Margin * 2) - (LogPadding * 2);
         var logAreaTop = startY;
         var logAreaBottom = pageHeight - Margin;
 
@@ -68,23 +69,31 @@ public sealed class PdfSharpRenderer : IPdfRenderer
         var y = logAreaTop + LogPadding;
         foreach (var line in lines)
         {
-            if (y + lineHeight > logAreaBottom - LogPadding)
-            {
-                gfx.Dispose();
-                page = document.AddPage();
-                gfx = XGraphics.FromPdfPage(page);
-                pageWidth = page.Width;
-                pageHeight = page.Height;
-                logAreaTop = Margin;
-                logAreaBottom = pageHeight - Margin;
-                DrawLogBackground(gfx, pageWidth, logAreaTop, logAreaBottom);
-                y = logAreaTop + LogPadding;
-            }
-
+            var segments = usableWidth > 0
+                ? PdfLineWrapper.Wrap(line, text => gfx.MeasureString(text, font).Width, usableWidth)
+                : new[] { line };
             var category = ProcessedLineClassifier.DetermineCategory(line);
             var color = PdfExportStyles.GetCategoryColor(category);
-            DrawText(gfx, line, font, new XSolidBrush(color), Margin + LogPadding, y);
-            y += lineHeight + LineSpacing;
+
+            foreach (var segment in segments)
+            {
+                if (y + lineHeight > logAreaBottom - LogPadding)
+                {
+                    gfx.Dispose();
+                    page = document.AddPage();
+                    gfx = XGraphics.FromPdfPage(page);
+                    pageWidth = page.Width;
+                    pageHeight = page.Height;
+                    logAreaTop = Margin;
+                    logAreaBottom = pageHeight - Margin;
+                    DrawLogBackground(gfx, pageWidth, logAreaTop, logAreaBottom);
+                    y = logAreaTop + LogPadding;
+                    usableWidth = pageWidth - (Margin * 2) - (LogPadding * 2);
+                }
+
+                DrawText(gfx, segment, font, new XSolidBrush(color), Margin + LogPadding, y);
+                y += lineHeight + LineSpacing;
+            }
         }
 
         return gfx;
