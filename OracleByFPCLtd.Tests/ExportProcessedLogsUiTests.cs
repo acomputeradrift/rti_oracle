@@ -18,8 +18,8 @@ public sealed class ExportProcessedLogsUiTests
             var window = new MainWindow();
 
             var processedLines = GetProcessedLines(window);
-            processedLines.Add("1 Line one");
-            processedLines.Add("2 Line two");
+            processedLines.Add("1 [2026-01-24 10:15] Driver - Command: Line one");
+            processedLines.Add("2 [2026-01-24 10:45] Driver event: Line two");
 
             SetProjectFilePath(window, @"C:\Projects\Project.apex");
             var projectPanel = (OracleByFPCLtd.UI.Panels.ProjectDataPanel)window.FindName("ProjectDataPanel")!;
@@ -38,6 +38,30 @@ public sealed class ExportProcessedLogsUiTests
             Assert.Equal("2026-01-24 10:00", request.FilterSummary.Start);
             Assert.Equal("2026-01-24 11:00", request.FilterSummary.End);
             Assert.Equal(2, request.Lines.Count);
+        });
+    }
+
+    [Fact]
+    public void BuildExportRequestHonorsFilters()
+    {
+        RunOnSta(() =>
+        {
+            var window = new MainWindow();
+
+            var processedLines = GetProcessedLines(window);
+            processedLines.Add("1 [2026-01-24 09:00] Driver - Command: Early");
+            processedLines.Add("2 [2026-01-24 10:30] Driver event: Match");
+            processedLines.Add("3 [2026-01-24 10:45] Macro - Start");
+
+            var diagnostics = (OracleByFPCLtd.UI.Panels.DiagnosticsPanel)window.FindName("DiagnosticsPanel")!;
+            diagnostics.FilterBar.FilterKeywordTextBox.Text = "Driver";
+            diagnostics.FilterBar.FilterStartTextBox.Text = "2026-01-24 10:00";
+            diagnostics.FilterBar.FilterEndTextBox.Text = "2026-01-24 11:00";
+
+            var request = InvokeBuildExportRequest(window);
+
+            Assert.Single(request.Lines);
+            Assert.Equal("2 [2026-01-24 10:30] Driver event: Match", request.Lines[0]);
         });
     }
 

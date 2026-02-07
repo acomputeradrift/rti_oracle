@@ -14,8 +14,8 @@ public sealed class HeaderBuilder
         };
 
         var additional = string.IsNullOrWhiteSpace(metadata.AdditionalDataName)
-            ? "Additional Data: None"
-            : $"Additional Data: {metadata.AdditionalDataName}";
+            ? "Additional Info File: None"
+            : $"Additional Info File: {metadata.AdditionalDataName}";
         lines.Add(additional);
 
         return lines;

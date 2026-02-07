@@ -24,11 +24,11 @@ public sealed class ExportProcessedLogsTests
 
         Assert.Contains("Date: 2026-01-24 10:30", lines);
         Assert.Contains("Apex File: Project.apex", lines);
-        Assert.Contains("Additional Data: Additional.xlsx", lines);
+        Assert.Contains("Additional Info File: Additional.xlsx", lines);
     }
 
     [Fact]
-    public void LogSectionBuilderIncludesFiltersAndLines()
+    public void LogSectionBuilderIncludesLines()
     {
         var filter = new FilterSummary("Driver", "2026-01-24 10:00", "2026-01-24 11:00");
         var request = new ExportRequest(
@@ -39,9 +39,19 @@ public sealed class ExportProcessedLogsTests
 
         var lines = builder.Build(request);
 
-        Assert.Contains("Filters: keywords=Driver start=2026-01-24 10:00 end=2026-01-24 11:00", lines);
         Assert.Contains("1 Line one", lines);
         Assert.Contains("2 Line two", lines);
+    }
+
+    [Fact]
+    public void FilterSummaryBuilderUsesNoneDefaults()
+    {
+        var summary = new FilterSummary("", "", "");
+        var builder = new FilterSummaryBuilder();
+
+        var line = builder.Build(summary);
+
+        Assert.Equal("Filter: Keywords = None, Start Date/Time = None, End Date/Time = None", line);
     }
 
     [Fact]

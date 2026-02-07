@@ -79,7 +79,7 @@ public partial class MainWindow : Window
     private readonly RecentIpService _recentIpService = new();
     private readonly AdditionalInfoService _additionalInfoService = new();
     private readonly ProcessedLogsExportService _exportService = new(
-        new QuestPdfRenderer(),
+        new PdfSharpRenderer(),
         new ExportFileWriter());
     private OracleSettings _settings = new();
     private List<string> _filterIncludeTerms = new();
@@ -1735,10 +1735,14 @@ public partial class MainWindow : Window
 
     private void DownloadLogsButton_Click(object sender, RoutedEventArgs e)
     {
+        var exportBaseName = string.IsNullOrWhiteSpace(_projectFilePath)
+            ? "Unknown"
+            : Path.GetFileNameWithoutExtension(_projectFilePath);
+        var exportDate = DateTime.Now.ToString("yyyy_MM_dd_HHmm");
         var dialog = new SaveFileDialog
         {
             Filter = "PDF (*.pdf)|*.pdf|All files (*.*)|*.*",
-            FileName = "processed-logs.pdf"
+            FileName = $"{exportDate}_{exportBaseName}_Oracle_Export.pdf"
         };
 
         if (dialog.ShowDialog(this) != true)
@@ -1766,7 +1770,10 @@ public partial class MainWindow : Window
             FilterKeywordTextBox.Text.Trim(),
             FilterStartTextBox.Text.Trim(),
             FilterEndTextBox.Text.Trim());
-        return new ExportRequest(_processedLogLines, metadata, filterSummary);
+        var exportLines = _filterActive
+            ? _processedLogLines.Where(line => LineMatchesFilter(line, _filterIncludeTerms, _filterExcludeTerms, _filterStart, _filterEnd)).ToList()
+            : new List<string>(_processedLogLines);
+        return new ExportRequest(exportLines, metadata, filterSummary);
     }
 
     private string FormatMessage(string raw, out bool isLogLine)
