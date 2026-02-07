@@ -119,6 +119,9 @@ public sealed class DriverData
 
 public sealed class AdditionalData
 {
+    public List<string> Errors { get; } = new();
+    public List<string> MatchedDriverNames { get; } = new();
+
     public static AdditionalData FromExtractionResult(ProjectDataExtractionResult result)
     {
         return new AdditionalData();

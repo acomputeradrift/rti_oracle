@@ -25,6 +25,8 @@ using OracleByFPCLtd.ExportProcessedLogs.Models;
 using OracleByFPCLtd.ExportProcessedLogs.Rendering;
 using OracleByFPCLtd.ExportProcessedLogs.Services;
 using OracleByFPCLtd.ProjectData;
+using OracleByFPCLtd.ProjectData.Extractors;
+using OracleByFPCLtd.ProjectData.Models;
 using OracleByFPCLtd.ProcessingEngine;
 using OracleByFPCLtd.Settings.Models;
 using OracleByFPCLtd.Settings.Services;
@@ -53,6 +55,7 @@ public partial class MainWindow : Window
     private int _rawLineNumber = 1;
     private bool _apexUploaded;
     private string? _projectFilePath;
+    private string? _additionalInfoPath;
     private bool _isUpdatingRecentProjects;
     private int _processedVisibleLineCount;
     private bool _pendingProcessedLayoutUpdate;
@@ -1671,7 +1674,7 @@ public partial class MainWindow : Window
         }
         catch (Exception ex)
         {
-            MessageBox.Show(this, ex.Message, "Project Data", MessageBoxButton.OK, MessageBoxImage.Error);
+            ShowMessageOnUiThread(ex.Message, "Project Data", MessageBoxImage.Error);
         }
     }
 
@@ -1691,7 +1694,12 @@ public partial class MainWindow : Window
 
         _additionalInfoService.RecordAdditionalInfo(_settings, dialog.FileName);
         _settingsStore.Save(_settings);
+        _additionalInfoPath = dialog.FileName;
         AdditionalInfoFileNameText.Text = Path.GetFileName(dialog.FileName);
+        if (!string.IsNullOrWhiteSpace(_projectFilePath))
+        {
+            _ = LoadProjectDataForProcessingAsync(_projectFilePath);
+        }
     }
 
     private void LoadProjectFromPath(string filePath, bool openPreview)
@@ -1985,6 +1993,12 @@ public partial class MainWindow : Window
 
     public void InitializeProcessing(ProjectDataExtractionResult result)
     {
+        var additionalData = LoadAdditionalData(result);
+        InitializeProcessing(result, additionalData);
+    }
+
+    private void InitializeProcessing(ProjectDataExtractionResult result, AdditionalData additionalData)
+    {
         _deviceNameToId.Clear();
         foreach (var entry in result.DiagnosticsMapping)
         {
@@ -1994,8 +2008,14 @@ public partial class MainWindow : Window
             }
         }
 
-        var context = new ProcessingContext(_deviceNameToId, result.ApexDiscoveryPreload.PageIndexMap);
-        _processingEngine = new ProcessingEngine.ProcessingEngine(context);
+        var baseBundle = ProjectDataBundle.FromExtractionResult(result);
+        var bundle = new ProjectDataBundle
+        {
+            System = baseBundle.System,
+            Drivers = baseBundle.Drivers,
+            Additional = additionalData
+        };
+        _processingEngine = new ProcessingEngine.ProcessingEngine(bundle);
 
         var processed = ProcessingEngineRunner.ProcessNumberedLines(_rawLogLines, _processingEngine);
 
@@ -2010,6 +2030,33 @@ public partial class MainWindow : Window
             SetProcessedOutput(_processedLogLines, showPlaceholderIfEmpty: true);
             UpdateDownloadLogsState();
         }
+    }
+
+    private AdditionalData LoadAdditionalData(ProjectDataExtractionResult result)
+    {
+        var driverNames = result.ApexDiscoveryPreload.DriverConfigMap.Values
+            .Select(entry => entry.DeviceName)
+            .Where(name => !string.IsNullOrWhiteSpace(name))
+            .Distinct(StringComparer.Ordinal);
+
+        var data = AdditionalDataExtractor.Extract(_additionalInfoPath, driverNames);
+        if (data.Errors.Count > 0)
+        {
+            ShowMessageOnUiThread(string.Join(Environment.NewLine, data.Errors), "Additional Info", MessageBoxImage.Warning);
+        }
+
+        return data;
+    }
+
+    private void ShowMessageOnUiThread(string message, string title, MessageBoxImage image)
+    {
+        if (Dispatcher.CheckAccess())
+        {
+            MessageBox.Show(this, message, title, MessageBoxButton.OK, image);
+            return;
+        }
+
+        Dispatcher.Invoke(() => MessageBox.Show(this, message, title, MessageBoxButton.OK, image));
     }
 
     private void AppendProcessedLineIfNumbered(string line)

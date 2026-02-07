@@ -38,16 +38,6 @@ public static class ProcessedLineClassifier
             return ProcessedLineCategory.Disconnect;
         }
 
-        if (content.Contains("Button", StringComparison.OrdinalIgnoreCase))
-        {
-            return ProcessedLineCategory.Button;
-        }
-
-        if (content.Contains("Page", StringComparison.OrdinalIgnoreCase))
-        {
-            return ProcessedLineCategory.Page;
-        }
-
         if (content.Contains("Command", StringComparison.OrdinalIgnoreCase))
         {
             return ProcessedLineCategory.DriverCommand;
@@ -62,6 +52,16 @@ public static class ProcessedLineClassifier
         if (content.Contains("Event", StringComparison.OrdinalIgnoreCase))
         {
             return ProcessedLineCategory.DriverEvent;
+        }
+
+        if (content.Contains("Button", StringComparison.OrdinalIgnoreCase))
+        {
+            return ProcessedLineCategory.Button;
+        }
+
+        if (content.Contains("Page", StringComparison.OrdinalIgnoreCase))
+        {
+            return ProcessedLineCategory.Page;
         }
 
         return ProcessedLineCategory.Default;
