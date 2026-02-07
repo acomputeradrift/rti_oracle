@@ -109,6 +109,23 @@ public sealed class MainWindowUiLayoutTests
     }
 
     [Fact]
+    public void HeaderLayoutOrdersLogoConnectionProjectData()
+    {
+        RunOnSta(() =>
+        {
+            var window = new MainWindow();
+
+            var logo = (FrameworkElement)window.FindName("AppLogoImage")!;
+            var connection = (FrameworkElement)window.FindName("ConnectBoxBorder")!;
+            var projectData = (FrameworkElement)window.FindName("ProjectDataBorder")!;
+
+            Assert.Equal(0, Grid.GetColumn(logo));
+            Assert.Equal(1, Grid.GetColumn(connection));
+            Assert.Equal(3, Grid.GetColumn(projectData));
+        });
+    }
+
+    [Fact]
     public void DateTimePickersDisableWithoutLogsAndClampToLogRange()
     {
         RunOnSta(() =>
