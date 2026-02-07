@@ -9,6 +9,8 @@ public enum ProcessedLineCategory
     Default,
     Connect,
     Disconnect,
+    Button,
+    Page,
     DriverCommand,
     Macro,
     DriverEvent
@@ -36,7 +38,17 @@ public static class ProcessedLineClassifier
             return ProcessedLineCategory.Disconnect;
         }
 
-        if (content.Contains("Driver - Command:", StringComparison.OrdinalIgnoreCase))
+        if (content.Contains("Button", StringComparison.OrdinalIgnoreCase))
+        {
+            return ProcessedLineCategory.Button;
+        }
+
+        if (content.Contains("Page", StringComparison.OrdinalIgnoreCase))
+        {
+            return ProcessedLineCategory.Page;
+        }
+
+        if (content.Contains("Command", StringComparison.OrdinalIgnoreCase))
         {
             return ProcessedLineCategory.DriverCommand;
         }
@@ -47,7 +59,7 @@ public static class ProcessedLineClassifier
             return ProcessedLineCategory.Macro;
         }
 
-        if (content.Contains("Driver event:", StringComparison.OrdinalIgnoreCase))
+        if (content.Contains("Event", StringComparison.OrdinalIgnoreCase))
         {
             return ProcessedLineCategory.DriverEvent;
         }
@@ -59,12 +71,21 @@ public static class ProcessedLineClassifier
     {
         return category switch
         {
-            ProcessedLineCategory.Connect => Brushes.LimeGreen,
-            ProcessedLineCategory.Disconnect => Brushes.Red,
-            ProcessedLineCategory.DriverCommand => Brushes.LightGray,
-            ProcessedLineCategory.Macro => Brushes.Orange,
-            ProcessedLineCategory.DriverEvent => Brushes.Yellow,
-            _ => Brushes.White
+            ProcessedLineCategory.Connect => CreateBrush(0x39, 0xB5, 0x4A),
+            ProcessedLineCategory.Disconnect => CreateBrush(0xFF, 0x00, 0x00),
+            ProcessedLineCategory.Button => CreateBrush(0xFF, 0xFF, 0x00),
+            ProcessedLineCategory.Page => CreateBrush(0x1E, 0x90, 0xFF),
+            ProcessedLineCategory.DriverEvent => CreateBrush(0xFC, 0xB0, 0x40),
+            ProcessedLineCategory.DriverCommand => CreateBrush(0xFF, 0xFF, 0xFF),
+            ProcessedLineCategory.Macro => CreateBrush(0xA7, 0xA9, 0xAC),
+            _ => CreateBrush(0x58, 0x58, 0x5A)
         };
+    }
+
+    private static Brush CreateBrush(byte red, byte green, byte blue)
+    {
+        var brush = new SolidColorBrush(Color.FromRgb(red, green, blue));
+        brush.Freeze();
+        return brush;
     }
 }

@@ -18,12 +18,14 @@ public sealed class PdfExportStylesTests
     }
 
     [Theory]
-    [InlineData(ProcessedLineCategory.Connect, 50, 205, 50)]
-    [InlineData(ProcessedLineCategory.Disconnect, 255, 0, 0)]
-    [InlineData(ProcessedLineCategory.DriverCommand, 211, 211, 211)]
-    [InlineData(ProcessedLineCategory.Macro, 255, 165, 0)]
-    [InlineData(ProcessedLineCategory.DriverEvent, 255, 255, 0)]
-    [InlineData(ProcessedLineCategory.Default, 255, 255, 255)]
+    [InlineData(ProcessedLineCategory.Connect, 0x39, 0xB5, 0x4A)]
+    [InlineData(ProcessedLineCategory.Disconnect, 0xFF, 0x00, 0x00)]
+    [InlineData(ProcessedLineCategory.DriverEvent, 0xFC, 0xB0, 0x40)]
+    [InlineData(ProcessedLineCategory.DriverCommand, 0xFF, 0xFF, 0xFF)]
+    [InlineData(ProcessedLineCategory.Button, 0xFF, 0xFF, 0x00)]
+    [InlineData(ProcessedLineCategory.Page, 0x1E, 0x90, 0xFF)]
+    [InlineData(ProcessedLineCategory.Macro, 0xA7, 0xA9, 0xAC)]
+    [InlineData(ProcessedLineCategory.Default, 0x58, 0x58, 0x5A)]
     public void CategoryColorsMatchProcessedOutputPalette(ProcessedLineCategory category, byte red, byte green, byte blue)
     {
         var color = PdfExportStyles.GetCategoryColor(category);

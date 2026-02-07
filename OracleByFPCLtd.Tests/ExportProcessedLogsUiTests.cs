@@ -29,6 +29,7 @@ public sealed class ExportProcessedLogsUiTests
             diagnostics.FilterBar.FilterKeywordTextBox.Text = "Driver";
             diagnostics.FilterBar.FilterStartTextBox.Text = "2026-01-24 10:00";
             diagnostics.FilterBar.FilterEndTextBox.Text = "2026-01-24 11:00";
+            InvokeFilterApply(window);
 
             var request = InvokeBuildExportRequest(window);
 
@@ -57,6 +58,7 @@ public sealed class ExportProcessedLogsUiTests
             diagnostics.FilterBar.FilterKeywordTextBox.Text = "Driver";
             diagnostics.FilterBar.FilterStartTextBox.Text = "2026-01-24 10:00";
             diagnostics.FilterBar.FilterEndTextBox.Text = "2026-01-24 11:00";
+            InvokeFilterApply(window);
 
             var request = InvokeBuildExportRequest(window);
 
@@ -84,6 +86,13 @@ public sealed class ExportProcessedLogsUiTests
         var method = typeof(MainWindow).GetMethod("BuildExportRequest", BindingFlags.Instance | BindingFlags.NonPublic);
         Assert.NotNull(method);
         return (ExportRequest)method!.Invoke(window, null)!;
+    }
+
+    private static void InvokeFilterApply(MainWindow window)
+    {
+        var method = typeof(MainWindow).GetMethod("FilterApplyButton_Click", BindingFlags.Instance | BindingFlags.NonPublic);
+        Assert.NotNull(method);
+        method!.Invoke(window, new object[] { window, new RoutedEventArgs() });
     }
 
     private static void RunOnSta(Action action)

@@ -154,6 +154,7 @@ public partial class MainWindow : Window
         WirePanelHandlers();
         ConfigureLogOutputBoxes();
         ConfigureFilterControls();
+        UpdateDownloadLogsState();
         ConfigureFindTimers();
         LoadSettings();
         DataContext = this;
@@ -984,6 +985,7 @@ public partial class MainWindow : Window
             _processedFindState.Query = ProcessedFindTextBox.Text ?? "";
             UpdateProcessedFindState(_processedFindState, _processedFindState.Query, ProcessedFindCountText, ProcessedFindPrevButton, ProcessedFindNextButton, resetIndex: true);
             SelectFindMatch(_processedFindState, ProcessedLogTextBox, isProcessed: true);
+            UpdateDownloadLogsState();
             return;
         }
 
@@ -1000,6 +1002,7 @@ public partial class MainWindow : Window
         _processedFindState.Query = ProcessedFindTextBox.Text ?? "";
         UpdateProcessedFindState(_processedFindState, _processedFindState.Query, ProcessedFindCountText, ProcessedFindPrevButton, ProcessedFindNextButton, resetIndex: true);
         SelectFindMatch(_processedFindState, ProcessedLogTextBox, isProcessed: true);
+        UpdateDownloadLogsState();
     }
 
     private void QueueProcessedLayoutUpdate()
@@ -1620,7 +1623,7 @@ public partial class MainWindow : Window
         {
             return;
         }
-        LoadProjectFromPath(dialog.FileName, openPreview: true);
+        HandleProjectSelected(dialog.FileName);
     }
 
     private void RecentProjectComboBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
@@ -1635,7 +1638,7 @@ public partial class MainWindow : Window
             return;
         }
 
-        LoadProjectFromPath(entry.FilePath, openPreview: true);
+        HandleProjectSelected(entry.FilePath);
     }
 
     private void ProjectPreviewButton_Click(object sender, RoutedEventArgs e)
@@ -1650,6 +1653,26 @@ public partial class MainWindow : Window
             Owner = this
         };
         preview.ShowDialog();
+    }
+
+    private void HandleProjectSelected(string filePath)
+    {
+        LoadProjectFromPath(filePath, openPreview: false);
+        _ = LoadProjectDataForProcessingAsync(filePath);
+    }
+
+    private async Task LoadProjectDataForProcessingAsync(string filePath)
+    {
+        try
+        {
+            var extractor = new ProjectDataExtractor();
+            var result = await Task.Run(() => extractor.Extract(filePath));
+            InitializeProcessing(result);
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show(this, ex.Message, "Project Data", MessageBoxButton.OK, MessageBoxImage.Error);
+        }
     }
 
     private void UploadAdditionalInfo_Click(object sender, RoutedEventArgs e)
@@ -1720,6 +1743,7 @@ public partial class MainWindow : Window
         ClearProcessedOutput();
         _rawLogLines.Clear();
         _processedLogLines.Clear();
+        UpdateDownloadLogsState();
         _filteredRawCount = 0;
         FilterCountText.Text = "Count: 0";
         _minRawLogTimestamp = null;
@@ -1984,6 +2008,7 @@ public partial class MainWindow : Window
         else
         {
             SetProcessedOutput(_processedLogLines, showPlaceholderIfEmpty: true);
+            UpdateDownloadLogsState();
         }
     }
 
@@ -2068,6 +2093,7 @@ public partial class MainWindow : Window
         AppendRunsWithHighlights(paragraph, line, _rawFindState.Query, RawMatchColor, applyHighlights: !string.IsNullOrWhiteSpace(_rawFindState.Query), Brushes.Black);
         _rawVisibleLineCount++;
         QueueRawLayoutUpdate();
+        RawLogTextBox.ScrollToEnd();
         if (!string.IsNullOrWhiteSpace(_rawFindState.Query))
         {
             UpdateFindState(_rawFindState, _rawFindState.Query, GetRawText(), RawFindCountText, RawFindPrevButton, RawFindNextButton, resetIndex: false);
@@ -2115,6 +2141,7 @@ public partial class MainWindow : Window
 
         _processedVisibleLineCount = lineCount;
         QueueProcessedLayoutUpdate();
+        UpdateDownloadLogsState();
     }
 
     private bool IsProcessedPlaceholderVisible()
@@ -2142,6 +2169,21 @@ public partial class MainWindow : Window
         return string.Equals(run.Text, ProcessedPlaceholderText, StringComparison.Ordinal);
     }
 
+    private void UpdateDownloadLogsState()
+    {
+        DownloadLogsButton.IsEnabled = GetFilteredProcessedCount() > 0;
+    }
+
+    private int GetFilteredProcessedCount()
+    {
+        if (!_filterActive)
+        {
+            return _processedLogLines.Count;
+        }
+
+        return _processedLogLines.Count(line => LineMatchesFilter(line, _filterIncludeTerms, _filterExcludeTerms, _filterStart, _filterEnd));
+    }
+
     private void AppendProcessedLine(string line)
     {
         if (IsProcessedPlaceholderVisible())
@@ -2151,6 +2193,7 @@ public partial class MainWindow : Window
         }
 
         _processedLogLines.Add(line);
+        UpdateDownloadLogsState();
 
         if (_filterActive && !LineMatchesFilter(line, _filterIncludeTerms, _filterExcludeTerms, _filterStart, _filterEnd))
         {

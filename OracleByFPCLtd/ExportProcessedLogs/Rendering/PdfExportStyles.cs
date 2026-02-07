@@ -11,12 +11,14 @@ public static class PdfExportStyles
     {
         return category switch
         {
-            ProcessedLineCategory.Connect => XColor.FromArgb(50, 205, 50),
-            ProcessedLineCategory.Disconnect => XColor.FromArgb(255, 0, 0),
-            ProcessedLineCategory.DriverCommand => XColor.FromArgb(211, 211, 211),
-            ProcessedLineCategory.Macro => XColor.FromArgb(255, 165, 0),
-            ProcessedLineCategory.DriverEvent => XColor.FromArgb(255, 255, 0),
-            _ => XColor.FromArgb(255, 255, 255)
+            ProcessedLineCategory.Connect => XColor.FromArgb(0x39, 0xB5, 0x4A),
+            ProcessedLineCategory.Disconnect => XColor.FromArgb(0xFF, 0x00, 0x00),
+            ProcessedLineCategory.Button => XColor.FromArgb(0xFF, 0xFF, 0x00),
+            ProcessedLineCategory.Page => XColor.FromArgb(0x1E, 0x90, 0xFF),
+            ProcessedLineCategory.DriverEvent => XColor.FromArgb(0xFC, 0xB0, 0x40),
+            ProcessedLineCategory.DriverCommand => XColor.FromArgb(0xFF, 0xFF, 0xFF),
+            ProcessedLineCategory.Macro => XColor.FromArgb(0xA7, 0xA9, 0xAC),
+            _ => XColor.FromArgb(0x58, 0x58, 0x5A)
         };
     }
 }

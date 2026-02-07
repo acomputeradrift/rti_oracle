@@ -5,6 +5,7 @@ using System.Threading;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Documents;
+using System.Windows.Media;
 using OracleByFPCLtd.ProjectData;
 using Xunit;
 
@@ -150,6 +151,86 @@ public sealed class MainWindowProcessedOutputTests
         });
     }
 
+    [Fact]
+    public void RawLogAutoScrollsToEndOnAppend()
+    {
+        RunOnSta(() =>
+        {
+            var window = new MainWindow
+            {
+                Width = 900,
+                Height = 700
+            };
+            window.Show();
+            window.UpdateLayout();
+
+            var raw = GetRichTextBox(window, "RawLogTextBox");
+            for (var i = 0; i < 60; i++)
+            {
+                InvokeAppendLog(window, $"[{i:00}] line {i}");
+            }
+
+            FlushLayout(raw);
+            var scrollViewer = GetScrollViewer(raw);
+            Assert.NotNull(scrollViewer);
+            Assert.True(scrollViewer!.ScrollableHeight > 0);
+            Assert.InRange(scrollViewer.VerticalOffset, scrollViewer.ScrollableHeight - 1, scrollViewer.ScrollableHeight + 1);
+            window.Hide();
+        });
+    }
+
+    [Fact]
+    public void DownloadLogsButtonDisabledWhenNoProcessedLines()
+    {
+        RunOnSta(() =>
+        {
+            var window = new MainWindow();
+
+            InvokeApplyCurrentFilter(window);
+
+            var downloadButton = GetDownloadLogsButton(window);
+            Assert.False(downloadButton.IsEnabled);
+        });
+    }
+
+    [Fact]
+    public void DownloadLogsButtonDisabledWhenFilterMatchesNothing()
+    {
+        RunOnSta(() =>
+        {
+            var window = new MainWindow();
+            var processedLines = GetProcessedLines(window);
+            processedLines.Add("[2026-01-24 09:00] Macro - Start");
+
+            var diagnostics = (OracleByFPCLtd.UI.Panels.DiagnosticsPanel)window.FindName("DiagnosticsPanel")!;
+            diagnostics.FilterBar.FilterKeywordTextBox.Text = "Driver";
+
+            InvokeFilterApply(window);
+
+            var downloadButton = GetDownloadLogsButton(window);
+            Assert.False(downloadButton.IsEnabled);
+        });
+    }
+
+    [Fact]
+    public void DownloadLogsButtonEnabledWhenFilteredProcessedHasMatches()
+    {
+        RunOnSta(() =>
+        {
+            var window = new MainWindow();
+            var processedLines = GetProcessedLines(window);
+            processedLines.Add("[2026-01-24 10:15] Driver event: Match");
+
+            var diagnostics = (OracleByFPCLtd.UI.Panels.DiagnosticsPanel)window.FindName("DiagnosticsPanel")!;
+            diagnostics.FilterBar.FilterKeywordTextBox.Text = "Driver";
+
+            InvokeFilterApply(window);
+
+            var downloadButton = GetDownloadLogsButton(window);
+            Assert.True(downloadButton.IsEnabled);
+        });
+    }
+
     private static ProjectDataExtractionResult BuildResult()
     {
         var result = new ProjectDataExtractionResult();
@@ -212,6 +293,26 @@ public sealed class MainWindowProcessedOutputTests
         element.UpdateLayout();
     }
 
+    private static ScrollViewer? GetScrollViewer(DependencyObject root)
+    {
+        if (root is ScrollViewer viewer)
+        {
+            return viewer;
+        }
+
+        for (var i = 0; i < VisualTreeHelper.GetChildrenCount(root); i++)
+        {
+            var child = VisualTreeHelper.GetChild(root, i);
+            var result = GetScrollViewer(child);
+            if (result != null)
+            {
+                return result;
+            }
+        }
+
+        return null;
+    }
+
     private static void InvokeSetProcessedOutput(MainWindow window, IEnumerable<string> lines)
     {
         var method = typeof(MainWindow).GetMethod("SetProcessedOutput", BindingFlags.Instance | BindingFlags.NonPublic);
@@ -231,6 +332,33 @@ public sealed class MainWindowProcessedOutputTests
         var method = typeof(MainWindow).GetMethod("ClearDiagnostics_Click", BindingFlags.Instance | BindingFlags.NonPublic);
         Assert.NotNull(method);
         method!.Invoke(window, new object[] { window, null! });
+    }
+
+    private static void InvokeApplyCurrentFilter(MainWindow window)
+    {
+        var method = typeof(MainWindow).GetMethod("ApplyCurrentFilter", BindingFlags.Instance | BindingFlags.NonPublic);
+        Assert.NotNull(method);
+        method!.Invoke(window, null);
+    }
+
+    private static void InvokeFilterApply(MainWindow window)
+    {
+        var method = typeof(MainWindow).GetMethod("FilterApplyButton_Click", BindingFlags.Instance | BindingFlags.NonPublic);
+        Assert.NotNull(method);
+        method!.Invoke(window, new object[] { window, new RoutedEventArgs() });
+    }
+
+    private static List<string> GetProcessedLines(MainWindow window)
+    {
+        var field = typeof(MainWindow).GetField("_processedLogLines", BindingFlags.Instance | BindingFlags.NonPublic);
+        Assert.NotNull(field);
+        return (List<string>)field!.GetValue(window)!;
+    }
+
+    private static Button GetDownloadLogsButton(MainWindow window)
+    {
+        var diagnostics = (OracleByFPCLtd.UI.Panels.DiagnosticsPanel)window.FindName("DiagnosticsPanel")!;
+        return diagnostics.FilterBar.DownloadLogsButton;
     }
 
     private static void RunOnSta(Action action)
