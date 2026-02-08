@@ -6,10 +6,18 @@ namespace OracleByFPCLtd.DriverProfiles.Models;
 
 public sealed record DriverProfileDiscoveryRule(string Description, string Sql);
 public sealed record DriverProfileAnalysisRule(string Description, string ExampleInput, string ExampleOutput);
-public sealed record AdditionalInfoSchema(IReadOnlyList<AdditionalInfoColumn> Columns);
+public sealed record AdditionalInfoSheetSchema(string SheetName, IReadOnlyList<AdditionalInfoColumn> Columns);
 public sealed record AdditionalInfoColumn(string Header, AdditionalInfoColumnRole Role);
 public enum AdditionalInfoColumnRole
 {
+    AppId,
+    GroupId,
+    ActionSelector,
+    SceneName,
+    GroupRoom,
+    GroupName,
+    ZoneId,
+    ZoneName,
     InputIndex,
     InputName,
     OutputIndex,
@@ -29,7 +37,7 @@ public sealed record DriverProfileDefinition(
     IReadOnlyList<DriverProfileDiscoveryRule> DiscoveryRules,
     IReadOnlyList<DriverProfileAnalysisRule> AnalysisRules,
     IReadOnlyList<string> Notes,
-    AdditionalInfoSchema? AdditionalInfoSchema = null,
+    IReadOnlyList<AdditionalInfoSheetSchema>? AdditionalInfoSchemas = null,
     IDriverProfileMapper? Mapper = null);
 
 public sealed record DriverProfileMatch(int DriverDeviceId, DriverConfigEntry DriverConfig, DriverProfileDefinition Profile);

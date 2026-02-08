@@ -42,36 +42,50 @@ public static class AdditionalDataExtractor
         }
 
         var sharedStrings = ReadSharedStrings(archive, data.Errors);
-        var matched = new HashSet<string>(StringComparer.Ordinal);
+        var profiles = DriverProfileCatalog.All()
+            .Where(profile => profile.AdditionalInfoSchemas is not null && profile.AdditionalInfoSchemas.Count > 0)
+            .ToList();
+        var profilesByDevice = profiles.ToDictionary(profile => profile.DeviceName, StringComparer.Ordinal);
+        var schemaBySheet = profiles
+            .SelectMany(profile => profile.AdditionalInfoSchemas!.Select(schema => (profile, schema)))
+            .ToDictionary(entry => entry.schema.SheetName, entry => entry, StringComparer.Ordinal);
+
+        var matchedSheets = new List<WorkbookSheet>();
         foreach (var sheet in workbookSheets)
         {
             if (driverNames.Contains(sheet.Name))
             {
-                if (matched.Add(sheet.Name))
+                data.MatchedDriverNames.Add(sheet.Name);
+                matchedSheets.Add(sheet);
+                continue;
+            }
+
+            if (schemaBySheet.TryGetValue(sheet.Name, out var entry)
+                && driverNames.Contains(entry.profile.DeviceName))
+            {
+                if (!data.MatchedDriverNames.Contains(entry.profile.DeviceName))
                 {
-                    data.MatchedDriverNames.Add(sheet.Name);
+                    data.MatchedDriverNames.Add(entry.profile.DeviceName);
                 }
+                matchedSheets.Add(sheet);
                 continue;
             }
 
             data.Errors.Add($"Unmatched sheet: {sheet.Name}");
         }
 
-        var profiles = DriverProfileCatalog.All()
-            .Where(profile => profile.AdditionalInfoSchema is not null)
-            .ToDictionary(profile => profile.DeviceName, StringComparer.Ordinal);
-
-        foreach (var driverName in matched)
+        foreach (var sheet in matchedSheets)
         {
-            if (!profiles.TryGetValue(driverName, out var profile) || profile.AdditionalInfoSchema is null)
+            if (!schemaBySheet.TryGetValue(sheet.Name, out var entry))
             {
-                data.Errors.Add($"No driver profile for driver '{driverName}'.");
-                continue;
-            }
-
-            var sheet = workbookSheets.FirstOrDefault(entry => string.Equals(entry.Name, driverName, StringComparison.Ordinal));
-            if (sheet == null)
-            {
+                if (profilesByDevice.TryGetValue(sheet.Name, out var profile))
+                {
+                    data.Errors.Add($"No Additional Info schema for driver '{profile.DeviceName}'.");
+                }
+                else
+                {
+                    data.Errors.Add($"No driver profile for driver '{sheet.Name}'.");
+                }
                 continue;
             }
 
@@ -81,7 +95,7 @@ public static class AdditionalDataExtractor
                 continue;
             }
 
-            ApplySchema(data, driverName, profile.AdditionalInfoSchema, headers, rows);
+            ApplySchema(data, entry.profile.DeviceName, entry.schema, headers, rows);
         }
 
         return data;
@@ -329,14 +343,14 @@ public static class AdditionalDataExtractor
     private static void ApplySchema(
         AdditionalData data,
         string driverName,
-        AdditionalInfoSchema schema,
+        AdditionalInfoSheetSchema schema,
         IReadOnlyList<string> headers,
         IReadOnlyList<Dictionary<string, string>> rows)
     {
         var requiredHeaders = schema.Columns.Select(column => column.Header).ToList();
         if (!requiredHeaders.All(header => headers.Contains(header)))
         {
-            data.Errors.Add($"Missing required headers for driver '{driverName}'.");
+            data.Errors.Add($"Missing required headers for driver '{driverName}' in sheet '{schema.SheetName}'.");
             return;
         }
 
@@ -346,6 +360,14 @@ public static class AdditionalDataExtractor
             data.Drivers[driverName] = driverData;
         }
 
+        var appIdHeader = schema.Columns.FirstOrDefault(c => c.Role == AdditionalInfoColumnRole.AppId)?.Header;
+        var groupIdHeader = schema.Columns.FirstOrDefault(c => c.Role == AdditionalInfoColumnRole.GroupId)?.Header;
+        var actionSelectorHeader = schema.Columns.FirstOrDefault(c => c.Role == AdditionalInfoColumnRole.ActionSelector)?.Header;
+        var sceneNameHeader = schema.Columns.FirstOrDefault(c => c.Role == AdditionalInfoColumnRole.SceneName)?.Header;
+        var groupRoomHeader = schema.Columns.FirstOrDefault(c => c.Role == AdditionalInfoColumnRole.GroupRoom)?.Header;
+        var groupNameHeader = schema.Columns.FirstOrDefault(c => c.Role == AdditionalInfoColumnRole.GroupName)?.Header;
+        var zoneIdHeader = schema.Columns.FirstOrDefault(c => c.Role == AdditionalInfoColumnRole.ZoneId)?.Header;
+        var zoneNameHeader = schema.Columns.FirstOrDefault(c => c.Role == AdditionalInfoColumnRole.ZoneName)?.Header;
         var inputIndexHeader = schema.Columns.FirstOrDefault(c => c.Role == AdditionalInfoColumnRole.InputIndex)?.Header;
         var inputNameHeader = schema.Columns.FirstOrDefault(c => c.Role == AdditionalInfoColumnRole.InputName)?.Header;
         var outputIndexHeader = schema.Columns.FirstOrDefault(c => c.Role == AdditionalInfoColumnRole.OutputIndex)?.Header;
@@ -353,6 +375,62 @@ public static class AdditionalDataExtractor
 
         foreach (var row in rows)
         {
+            if (appIdHeader != null && groupIdHeader != null && (groupRoomHeader != null || groupNameHeader != null))
+            {
+                var appIdText = row.TryGetValue(appIdHeader, out var appId) ? appId : "";
+                var groupIdText = row.TryGetValue(groupIdHeader, out var groupId) ? groupId : "";
+                var groupRoom = groupRoomHeader != null && row.TryGetValue(groupRoomHeader, out var room) ? room : "";
+                var groupName = groupNameHeader != null && row.TryGetValue(groupNameHeader, out var group) ? group : "";
+
+                if (string.IsNullOrWhiteSpace(groupRoom) && string.IsNullOrWhiteSpace(groupName))
+                {
+                    continue;
+                }
+
+                if (TryParseIndex(appIdText, out var appIdValue) && TryParseIndex(groupIdText, out var groupIdValue))
+                {
+                    AddCbusGroupMapping(driverData, appIdValue, groupIdValue, groupRoom, groupName, driverName, data.Errors);
+                }
+            }
+
+            if (appIdHeader != null && groupIdHeader != null && actionSelectorHeader != null && sceneNameHeader != null)
+            {
+                var appIdText = row.TryGetValue(appIdHeader, out var appId) ? appId : "";
+                var groupIdText = row.TryGetValue(groupIdHeader, out var groupId) ? groupId : "";
+                var actionSelectorText = row.TryGetValue(actionSelectorHeader, out var actionSelector) ? actionSelector : "";
+                var sceneName = row.TryGetValue(sceneNameHeader, out var scene) ? scene : "";
+
+                if (string.IsNullOrWhiteSpace(sceneName))
+                {
+                    continue;
+                }
+
+                if (TryParseIndex(appIdText, out var appIdValue)
+                    && TryParseIndex(groupIdText, out var groupIdValue)
+                    && TryParseIndex(actionSelectorText, out var actionSelectorValue))
+                {
+                    AddCbusSceneMapping(driverData, appIdValue, groupIdValue, actionSelectorValue, sceneName, driverName, data.Errors);
+                }
+            }
+
+            if (groupIdHeader != null && zoneIdHeader != null && (groupNameHeader != null || zoneNameHeader != null))
+            {
+                var groupIdText = row.TryGetValue(groupIdHeader, out var groupId) ? groupId : "";
+                var zoneIdText = row.TryGetValue(zoneIdHeader, out var zoneId) ? zoneId : "";
+                var groupName = groupNameHeader != null && row.TryGetValue(groupNameHeader, out var group) ? group : "";
+                var zoneName = zoneNameHeader != null && row.TryGetValue(zoneNameHeader, out var zone) ? zone : "";
+
+                if (string.IsNullOrWhiteSpace(groupName) && string.IsNullOrWhiteSpace(zoneName))
+                {
+                    continue;
+                }
+
+                if (TryParseIndex(groupIdText, out var groupIdValue) && TryParseIndex(zoneIdText, out var zoneIdValue))
+                {
+                    AddCbusHvacMapping(driverData, groupIdValue, zoneIdValue, groupName, zoneName, driverName, data.Errors);
+                }
+            }
+
             if (inputIndexHeader != null && inputNameHeader != null)
             {
                 var inputIndexText = row.TryGetValue(inputIndexHeader, out var inputIndex) ? inputIndex : "";
@@ -373,6 +451,77 @@ public static class AdditionalDataExtractor
                 }
             }
         }
+    }
+
+    private static void AddCbusSceneMapping(
+        AdditionalDriverData data,
+        int appId,
+        int groupId,
+        int actionSelector,
+        string sceneName,
+        string driverName,
+        List<string> errors)
+    {
+        var key = (appId, groupId, actionSelector);
+        var entry = new CbusSceneEntry(sceneName);
+        if (data.CbusScenes.TryGetValue(key, out var existing))
+        {
+            if (!string.Equals(existing.SceneName, entry.SceneName, StringComparison.Ordinal))
+            {
+                errors.Add($"Conflicting C-Bus scene mapping for App {appId}, Group {groupId}, Action {actionSelector} in driver '{driverName}'.");
+            }
+            return;
+        }
+
+        data.CbusScenes[key] = entry;
+    }
+
+    private static void AddCbusGroupMapping(
+        AdditionalDriverData data,
+        int appId,
+        int groupId,
+        string groupRoom,
+        string groupName,
+        string driverName,
+        List<string> errors)
+    {
+        var key = (appId, groupId);
+        var entry = new CbusGroupEntry(groupRoom, groupName);
+        if (data.CbusGroups.TryGetValue(key, out var existing))
+        {
+            if (!string.Equals(existing.GroupRoom, entry.GroupRoom, StringComparison.Ordinal)
+                || !string.Equals(existing.GroupName, entry.GroupName, StringComparison.Ordinal))
+            {
+                errors.Add($"Conflicting C-Bus group mapping for App {appId}, Group {groupId} in driver '{driverName}'.");
+            }
+            return;
+        }
+
+        data.CbusGroups[key] = entry;
+    }
+
+    private static void AddCbusHvacMapping(
+        AdditionalDriverData data,
+        int groupId,
+        int zoneId,
+        string groupName,
+        string zoneName,
+        string driverName,
+        List<string> errors)
+    {
+        var key = (groupId, zoneId);
+        var entry = new CbusHvacEntry(groupName, zoneName);
+        if (data.CbusHvacZones.TryGetValue(key, out var existing))
+        {
+            if (!string.Equals(existing.GroupName, entry.GroupName, StringComparison.Ordinal)
+                || !string.Equals(existing.ZoneName, entry.ZoneName, StringComparison.Ordinal))
+            {
+                errors.Add($"Conflicting C-Bus HVAC mapping for Group {groupId}, Zone {zoneId} in driver '{driverName}'.");
+            }
+            return;
+        }
+
+        data.CbusHvacZones[key] = entry;
     }
 
     private static bool TryParseIndex(string value, out int index)

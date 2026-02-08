@@ -24,13 +24,16 @@ public static class VauxLattisMatrixProfile
         new List<DriverProfileDiscoveryRule>(),
         new List<DriverProfileAnalysisRule>(),
         new List<string>(),
-        new AdditionalInfoSchema(new List<AdditionalInfoColumn>
+        new List<AdditionalInfoSheetSchema>
         {
-            new("Audio Zone Input Index", AdditionalInfoColumnRole.InputIndex),
-            new("Audio Zone Input Name", AdditionalInfoColumnRole.InputName),
-            new("Audio Zone Output Index", AdditionalInfoColumnRole.OutputIndex),
-            new("Audio Zone Output Name", AdditionalInfoColumnRole.OutputName)
-        }),
+            new("Vaux Lattis Matrix", new List<AdditionalInfoColumn>
+            {
+                new("Audio Zone Input Index", AdditionalInfoColumnRole.InputIndex),
+                new("Audio Zone Input Name", AdditionalInfoColumnRole.InputName),
+                new("Audio Zone Output Index", AdditionalInfoColumnRole.OutputIndex),
+                new("Audio Zone Output Name", AdditionalInfoColumnRole.OutputName)
+            })
+        },
         Mapper);
 
     private sealed class VauxLattisMatrixMapper : IDriverProfileMapper

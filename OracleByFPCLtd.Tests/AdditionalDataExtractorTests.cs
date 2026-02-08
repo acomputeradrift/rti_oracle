@@ -77,6 +77,52 @@ public sealed class AdditionalDataExtractorTests
         }
     }
 
+    [Fact]
+    public void ExtractParsesClipsalCbusSheets()
+    {
+        var cbusHeaders = new[] { "AppID", "GroupID", "GroupRoom", "GroupName" };
+        var cbusRows = new List<object[]>
+        {
+            new object[] { 56.0, 25.0, "Living Room", "Pendant" }
+        };
+        var sceneHeaders = new[] { "AppID", "GroupID", "ActionSelector", "SceneName" };
+        var sceneRows = new List<object[]>
+        {
+            new object[] { 202.0, 33.0, 0.0, "Lower Floor On" }
+        };
+        var hvacHeaders = new[] { "Groupld", "GroupName", "ZoneID", "ZoneName" };
+        var hvacRows = new List<object[]>
+        {
+            new object[] { 1.0, "HVAC Group", 0.0, "Zone A" }
+        };
+
+        var path = CreateWorkbookWithSheets(new List<(string Name, IReadOnlyList<string> Headers, IReadOnlyList<object[]> Rows)>
+        {
+            ("Clipsal C-Bus", cbusHeaders, cbusRows),
+            ("Clipsal C-Bus Scenes", sceneHeaders, sceneRows),
+            ("Clipsal C-Bus HVAC", hvacHeaders, hvacRows)
+        });
+        try
+        {
+            var data = AdditionalDataExtractor.Extract(path, new[] { "Clipsal C-Bus" });
+
+            Assert.Contains(data.Drivers, entry => entry.Key == "Clipsal C-Bus");
+            var driverData = data.Drivers["Clipsal C-Bus"];
+            Assert.Equal("Living Room", driverData.CbusGroups[(56, 25)].GroupRoom);
+            Assert.Equal("Pendant", driverData.CbusGroups[(56, 25)].GroupName);
+            Assert.Equal("Lower Floor On", driverData.CbusScenes[(202, 33, 0)].SceneName);
+            Assert.Equal("HVAC Group", driverData.CbusHvacZones[(1, 0)].GroupName);
+            Assert.Equal("Zone A", driverData.CbusHvacZones[(1, 0)].ZoneName);
+        }
+        finally
+        {
+            if (File.Exists(path))
+            {
+                File.Delete(path);
+            }
+        }
+    }
+
     private static string CreateWorkbook(params string[] sheetNames)
     {
         var path = Path.Combine(Path.GetTempPath(), $"additional_{Guid.NewGuid():N}.xlsx");
@@ -109,6 +155,26 @@ public sealed class AdditionalDataExtractorTests
         AddEntry(archive, "xl/workbook.xml", BuildWorkbook(new[] { sheetName }));
         AddEntry(archive, "xl/_rels/workbook.xml.rels", BuildWorkbookRelationships(new[] { sheetName }));
         AddEntry(archive, "xl/worksheets/sheet1.xml", BuildWorksheet(headers, rows));
+
+        return path;
+    }
+
+    private static string CreateWorkbookWithSheets(
+        IReadOnlyList<(string Name, IReadOnlyList<string> Headers, IReadOnlyList<object[]> Rows)> sheets)
+    {
+        var path = Path.Combine(Path.GetTempPath(), $"additional_{Guid.NewGuid():N}.xlsx");
+        using var archive = ZipFile.Open(path, ZipArchiveMode.Create);
+
+        AddEntry(archive, "[Content_Types].xml", BuildContentTypes(sheets.Select(sheet => sheet.Name)));
+        AddEntry(archive, "_rels/.rels", BuildRootRelationships());
+        AddEntry(archive, "xl/workbook.xml", BuildWorkbook(sheets.Select(sheet => sheet.Name)));
+        AddEntry(archive, "xl/_rels/workbook.xml.rels", BuildWorkbookRelationships(sheets.Select(sheet => sheet.Name)));
+
+        for (var i = 0; i < sheets.Count; i++)
+        {
+            var sheet = sheets[i];
+            AddEntry(archive, $"xl/worksheets/sheet{i + 1}.xml", BuildWorksheet(sheet.Headers, sheet.Rows));
+        }
 
         return path;
     }

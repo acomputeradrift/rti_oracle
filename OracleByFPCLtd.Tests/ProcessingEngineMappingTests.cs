@@ -100,6 +100,74 @@ public sealed class ProcessingEngineMappingTests
         Assert.False(line.IsUnresolved);
     }
 
+    [Fact]
+    public void DriverMappingServiceMapsCbusImmediateSwitchUnknownState()
+    {
+        var bundle = BuildBundleWithCbus();
+        var service = new DriverMappingService();
+        var evt = new DiagnosticEvent(4, "Driver - Command:'Clipsal C-Bus\\General\\Immediate Switch(121, 78, 56)' Sustain:NO");
+
+        var line = service.Map(evt, bundle);
+
+        Assert.Equal("4 Driver - Command:'Clipsal C-Bus\\General\\Immediate Switch(121 [Unknown State!], Living Room Pendant, 56)' Sustain:NO", line.Text);
+        Assert.False(line.IsUnresolved);
+    }
+
+    [Fact]
+    public void DriverMappingServiceMarksCbusMissingMap()
+    {
+        var bundle = BuildBundleWithCbus();
+        var service = new DriverMappingService();
+        var evt = new DiagnosticEvent(2, "Driver event 'When 'App 56, Group 25 On' happens on 'Clipsal C-Bus\\App 56 Group On''");
+
+        bundle.Additional.Drivers["Clipsal C-Bus"].CbusGroups.Clear();
+        var line = service.Map(evt, bundle);
+
+        Assert.Equal("2 Driver event 'When 'App 56, Group 25 [No Map!] On' happens on 'Clipsal C-Bus\\App 56 Group On''", line.Text);
+        Assert.True(line.IsUnresolved);
+    }
+
+    [Fact]
+    public void DriverMappingServiceMapsCbusHvacSetpointUpUnknownState()
+    {
+        var bundle = BuildBundleWithCbus();
+        bundle.Additional.Drivers["Clipsal C-Bus"].CbusHvacZones[(1, 0)] = new CbusHvacEntry("Garage", "Unswitched");
+        var service = new DriverMappingService();
+        var evt = new DiagnosticEvent(6, "Driver - Command:'Clipsal C-Bus\\HVAC\\HVAC Zone Setpoint Up(1, Unswitched (0))' Sustain:NO  Sent to 'WorkShop Slave'");
+
+        var line = service.Map(evt, bundle);
+
+        Assert.Equal("6 Driver - Command:'Clipsal C-Bus\\HVAC\\HVAC Zone Setpoint Up(Garage, Unswitched (0 [Unknown State!]))' Sustain:NO  Sent to 'WorkShop Slave'", line.Text);
+        Assert.True(line.IsUnresolved);
+    }
+
+    [Fact]
+    public void DriverMappingServiceMapsCbusRampToLevelScene()
+    {
+        var bundle = BuildBundleWithCbus();
+        bundle.Additional.Drivers["Clipsal C-Bus"].CbusScenes[(202, 33, 0)] = new CbusSceneEntry("Lower Floor On");
+        var service = new DriverMappingService();
+        var evt = new DiagnosticEvent(9, "Driver - Command:'Clipsal C-Bus\\General\\Ramp to level(10, 0, 33, 202)' Sustain:YES");
+
+        var line = service.Map(evt, bundle);
+
+        Assert.Equal("9 Driver - Command:'Clipsal C-Bus\\General\\Ramp to level(4 seconds, Lower Floor On)' Sustain:YES", line.Text);
+        Assert.False(line.IsUnresolved);
+    }
+
+    [Fact]
+    public void DriverMappingServiceMarksNoProfile()
+    {
+        var bundle = new ProjectDataBundle();
+        var service = new DriverMappingService();
+        var evt = new DiagnosticEvent(1, "Driver - Command:'Some Driver\\General\\Action(1)' Sustain:NO");
+
+        var line = service.Map(evt, bundle);
+
+        Assert.Equal("1 Driver - Command:'Some Driver\\General\\Action(1)' Sustain:NO [No Profile!]", line.Text);
+        Assert.True(line.IsUnresolved);
+    }
+
     private static ProjectDataBundle BuildBundle()
     {
         var bundle = new ProjectDataBundle();
@@ -122,6 +190,15 @@ public sealed class ProcessingEngineMappingTests
         driverData.InputNames[1] = "Shaw 1";
         driverData.OutputNames[13] = "Gym";
         bundle.Additional.Drivers["Vaux Lattis Matrix"] = driverData;
+        return bundle;
+    }
+
+    private static ProjectDataBundle BuildBundleWithCbus()
+    {
+        var bundle = new ProjectDataBundle();
+        var driverData = new AdditionalDriverData();
+        driverData.CbusGroups[(56, 78)] = new CbusGroupEntry("Living Room", "Pendant");
+        bundle.Additional.Drivers["Clipsal C-Bus"] = driverData;
         return bundle;
     }
 }

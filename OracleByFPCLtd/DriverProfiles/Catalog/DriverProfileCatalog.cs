@@ -12,7 +12,8 @@ public static class DriverProfileCatalog
             RtiAd64Profile.Definition,
             RtiInternalProfile.Definition,
             RtiSystemVariableEventsProfile.Definition,
-            VauxLattisMatrixProfile.Definition
+            VauxLattisMatrixProfile.Definition,
+            ClipsalCbusProfile.Definition
         };
     }
 
