@@ -71,6 +71,20 @@ public sealed class UiDecompositionTests
     }
 
     [Fact]
+    public void DriverLogLevelsPanelExposesPresetButtons()
+    {
+        RunOnSta(() =>
+        {
+            var window = new MainWindow();
+            var panel = (DriverLogLevelsPanel)window.FindName("DriverLogLevelsPanel")!;
+
+            Assert.NotNull(panel.AllLogLevelsButton);
+            Assert.NotNull(panel.SystemOnlyLogLevelsButton);
+            Assert.NotNull(panel.NoneLogLevelsButton);
+        });
+    }
+
+    [Fact]
     public void FilterBarExposesFilterControls()
     {
         RunOnSta(() =>

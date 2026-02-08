@@ -24,17 +24,47 @@
         </Trigger>
       </Style.Triggers>
     </Style>
+
+    <Style x:Key="PresetButtonStyle" TargetType="Button">
+      <Setter Property="Height" Value="20" />
+      <Setter Property="Padding" Value="8,1" />
+      <Setter Property="Background" Value="#F3F3F3" />
+      <Setter Property="BorderBrush" Value="#BDBDBD" />
+      <Setter Property="BorderThickness" Value="1" />
+    </Style>
+
   </UserControl.Resources>
   <Grid>
     <Grid.RowDefinitions>
       <RowDefinition Height="Auto" />
       <RowDefinition Height="*" />
     </Grid.RowDefinitions>
-    <ToggleButton x:Name="DriverLogLevelsToggleButtonControl"
-                  Content="Driver Log Levels ▾"
-                  FontWeight="SemiBold"
-                  IsChecked="False"
-                  Margin="0,0,0,6" />
+    <Grid Grid.Row="0" Margin="0,0,0,6">
+      <ToggleButton x:Name="DriverLogLevelsToggleButtonControl"
+                    Content="Driver Log Levels ▾"
+                    FontWeight="SemiBold"
+                    IsChecked="False"
+                    Style="{StaticResource DriverToggleStyle}" />
+      <StackPanel Orientation="Horizontal"
+                  HorizontalAlignment="Left"
+                  VerticalAlignment="Center"
+                  Margin="8,0,0,0">
+        <Button x:Name="AllLogLevelsButtonControl"
+                Content="All"
+                Style="{StaticResource PresetButtonStyle}"
+                Margin="0,0,6,0"
+                Click="AllLogLevelsButton_Click" />
+        <Button x:Name="SystemOnlyLogLevelsButtonControl"
+                Content="System Only"
+                Style="{StaticResource PresetButtonStyle}"
+                Margin="0,0,6,0"
+                Click="SystemOnlyLogLevelsButton_Click" />
+        <Button x:Name="NoneLogLevelsButtonControl"
+                Content="None"
+                Style="{StaticResource PresetButtonStyle}"
+                Click="NoneLogLevelsButton_Click" />
+      </StackPanel>
+    </Grid>
     <Grid Grid.Row="1"
           Visibility="{Binding IsChecked, ElementName=DriverLogLevelsToggleButtonControl, Converter={StaticResource BoolToVis}}">
       <ScrollViewer HorizontalScrollBarVisibility="Disabled"

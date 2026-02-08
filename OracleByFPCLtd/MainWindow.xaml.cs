@@ -170,6 +170,7 @@ public partial class MainWindow : Window
 
         _transport = CreateWebSocketTransport();
         RegisterTransportHandlers(_transport);
+        UpdateAllLogLevelsVisibility();
     }
 
     private void WirePanelHandlers()
@@ -188,6 +189,9 @@ public partial class MainWindow : Window
         DriverLogLevelsToggleButton.Unchecked += DriverLogLevelsToggleButton_Unchecked;
         DriverLogLevelsPanel.DriverToggleClick += DriverToggle_Click;
         DriverLogLevelsPanel.DriverLevelButtonClick += DriverLevelButton_Click;
+        DriverLogLevelsPanel.AllLogLevelsClick += DriverAllLogLevels_Click;
+        DriverLogLevelsPanel.SystemOnlyLogLevelsClick += DriverSystemOnlyLogLevels_Click;
+        DriverLogLevelsPanel.NoneLogLevelsClick += DriverNoneLogLevels_Click;
 
         FilterKeywordTextBox.TextChanged += FilterKeywordTextBox_TextChanged;
         FilterStartTextBox.TextChanged += FilterStartTextBox_TextChanged;
@@ -1559,6 +1563,7 @@ public partial class MainWindow : Window
             }
             StatusText.Text = "Connected";
             DisconnectButton.IsEnabled = true;
+            UpdateAllLogLevelsVisibility();
             if (!string.IsNullOrWhiteSpace(_projectFilePath))
             {
                 _recentProjectService.RecordSuccessfulConnection(_settings, _projectFilePath, ip);
@@ -1590,6 +1595,7 @@ public partial class MainWindow : Window
         ConnectButton.IsEnabled = true;
         DiscoverButton.IsEnabled = true;
         Drivers.Clear();
+        UpdateAllLogLevelsVisibility();
     }
 
     private void DiscoveredCombo_SelectionChanged(object sender, SelectionChangedEventArgs e)
@@ -2409,6 +2415,100 @@ public partial class MainWindow : Window
 
         await _transport.SendLogLevelAsync(driver.DName, level.ToString());
         AppendLog($"[local] Set {driver.DName} to {level}");
+    }
+
+    private async void DriverAllLogLevels_Click(object sender, RoutedEventArgs e)
+    {
+        foreach (var driver in Drivers)
+        {
+            driver.SelectedLevel = 3;
+            driver.IsEnabled = true;
+        }
+
+        if (!_transport.IsConnected)
+        {
+            return;
+        }
+
+        foreach (var driver in Drivers)
+        {
+            await _transport.SendLogLevelAsync(driver.DName, "3");
+        }
+
+        AppendLog("[local] Set all drivers to 3");
+    }
+
+    private async void DriverSystemOnlyLogLevels_Click(object sender, RoutedEventArgs e)
+    {
+        var targets = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+        {
+            "EVENTS_INPUT",
+            "EVENTS_SENSE",
+            "EVENTS_DRIVER",
+            "DEVICES_EXPANSION",
+            "EVENTS_SCHEDULED",
+            "DEVICES_RTIPANEL",
+            "EVENTS_PERIODIC",
+            "USER_GENERAL"
+        };
+
+        foreach (var driver in Drivers)
+        {
+            if (targets.Contains(driver.DName))
+            {
+                driver.SelectedLevel = 3;
+                driver.IsEnabled = true;
+            }
+            else
+            {
+                driver.IsEnabled = false;
+            }
+        }
+
+        if (!_transport.IsConnected)
+        {
+            return;
+        }
+
+        foreach (var driver in Drivers)
+        {
+            var level = targets.Contains(driver.DName) ? "3" : "0";
+            await _transport.SendLogLevelAsync(driver.DName, level);
+        }
+
+        AppendLog("[local] Set system drivers to 3");
+    }
+
+    private async void DriverNoneLogLevels_Click(object sender, RoutedEventArgs e)
+    {
+        foreach (var driver in Drivers)
+        {
+            driver.IsEnabled = false;
+        }
+
+        if (!_transport.IsConnected)
+        {
+            return;
+        }
+
+        foreach (var driver in Drivers)
+        {
+            await _transport.SendLogLevelAsync(driver.DName, "0");
+        }
+
+        AppendLog("[local] Set all drivers to 0");
+    }
+
+    private void UpdateAllLogLevelsVisibility()
+    {
+        var visibility = _transport.IsConnected ? Visibility.Visible : Visibility.Collapsed;
+        DriverLogLevelsPanel.AllLogLevelsButton.Visibility = visibility;
+        DriverLogLevelsPanel.SystemOnlyLogLevelsButton.Visibility = visibility;
+        DriverLogLevelsPanel.NoneLogLevelsButton.Visibility = visibility;
+        if (visibility == Visibility.Visible)
+        {
+            DriverLogLevelsPanel.UpdatePresetButtonSizing();
+        }
     }
 
     public class DriverEntry : INotifyPropertyChanged
