@@ -105,7 +105,6 @@ public sealed class UiDecompositionTests
             Assert.NotNull(bar.FilterApplyButton);
             Assert.NotNull(bar.FilterClearButton);
             Assert.NotNull(bar.FilterCountText);
-            Assert.NotNull(bar.DownloadLogsButton);
             Assert.NotNull(bar.ClearDiagnosticsButton);
         });
     }

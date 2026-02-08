@@ -180,7 +180,7 @@ public sealed class MainWindowProcessedOutputTests
     }
 
     [Fact]
-    public void DownloadLogsButtonDisabledWhenNoProcessedLines()
+    public void DownloadProcessedLogsMenuItemDisabledWhenNoProcessedLines()
     {
         RunOnSta(() =>
         {
@@ -188,13 +188,13 @@ public sealed class MainWindowProcessedOutputTests
 
             InvokeApplyCurrentFilter(window);
 
-            var downloadButton = GetDownloadLogsButton(window);
-            Assert.False(downloadButton.IsEnabled);
+            var downloadMenuItem = GetDownloadProcessedLogsMenuItem(window);
+            Assert.False(downloadMenuItem.IsEnabled);
         });
     }
 
     [Fact]
-    public void DownloadLogsButtonDisabledWhenFilterMatchesNothing()
+    public void DownloadProcessedLogsMenuItemDisabledWhenFilterMatchesNothing()
     {
         RunOnSta(() =>
         {
@@ -207,13 +207,13 @@ public sealed class MainWindowProcessedOutputTests
 
             InvokeFilterApply(window);
 
-            var downloadButton = GetDownloadLogsButton(window);
-            Assert.False(downloadButton.IsEnabled);
+            var downloadMenuItem = GetDownloadProcessedLogsMenuItem(window);
+            Assert.False(downloadMenuItem.IsEnabled);
         });
     }
 
     [Fact]
-    public void DownloadLogsButtonEnabledWhenFilteredProcessedHasMatches()
+    public void DownloadProcessedLogsMenuItemEnabledWhenFilteredProcessedHasMatches()
     {
         RunOnSta(() =>
         {
@@ -226,8 +226,8 @@ public sealed class MainWindowProcessedOutputTests
 
             InvokeFilterApply(window);
 
-            var downloadButton = GetDownloadLogsButton(window);
-            Assert.True(downloadButton.IsEnabled);
+            var downloadMenuItem = GetDownloadProcessedLogsMenuItem(window);
+            Assert.True(downloadMenuItem.IsEnabled);
         });
     }
 
@@ -355,10 +355,11 @@ public sealed class MainWindowProcessedOutputTests
         return (List<string>)field!.GetValue(window)!;
     }
 
-    private static Button GetDownloadLogsButton(MainWindow window)
+    private static MenuItem GetDownloadProcessedLogsMenuItem(MainWindow window)
     {
-        var diagnostics = (OracleByFPCLtd.UI.Panels.DiagnosticsPanel)window.FindName("DiagnosticsPanel")!;
-        return diagnostics.FilterBar.DownloadLogsButton;
+        var menuItem = window.FindName("DownloadProcessedLogsMenuItemControl");
+        Assert.NotNull(menuItem);
+        return (MenuItem)menuItem!;
     }
 
     private static void RunOnSta(Action action)

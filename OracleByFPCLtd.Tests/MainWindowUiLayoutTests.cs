@@ -16,6 +16,10 @@ public sealed class MainWindowUiLayoutTests
             var window = new MainWindow();
 
             Assert.NotNull(window.FindName("AppLogoImage"));
+            Assert.NotNull(window.FindName("DownloadProcessedLogsMenuItemControl"));
+            Assert.NotNull(window.FindName("DownloadAdditionalInfoTemplateMenuItemControl"));
+            Assert.NotNull(window.FindName("AutoscrollMenuItemControl"));
+            Assert.NotNull(window.FindName("AboutMenuItemControl"));
 
             var connection = (OracleByFPCLtd.UI.Panels.ConnectionPanel)window.FindName("ConnectionPanel")!;
             Assert.NotNull(connection.ConnectHeaderText);
@@ -50,7 +54,6 @@ public sealed class MainWindowUiLayoutTests
             Assert.NotNull(diagnostics.FilterBar.FilterApplyButton);
             Assert.NotNull(diagnostics.FilterBar.FilterClearButton);
             Assert.NotNull(diagnostics.FilterBar.FilterCountText);
-            Assert.NotNull(diagnostics.FilterBar.DownloadLogsButton);
             Assert.NotNull(diagnostics.FilterBar.ClearDiagnosticsButton);
 
             Assert.NotNull(diagnostics.RawOutputPanel.FindBar.FindTextBox);

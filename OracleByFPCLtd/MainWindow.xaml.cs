@@ -69,6 +69,7 @@ public partial class MainWindow : Window
     private bool _isUpdatingEndPicker;
     private DateTime? _minRawLogTimestamp;
     private DateTime? _maxRawLogTimestamp;
+    private bool _autoScrollEnabled = true;
     private readonly FindState _rawFindState = new();
     private readonly FindState _processedFindState = new();
     private static readonly Color RawMatchColor = Color.FromRgb(255, 236, 153);
@@ -138,7 +139,6 @@ public partial class MainWindow : Window
     private Popup FilterEndDatePopup => DiagnosticsPanel.FilterBar.FilterEndDatePopup;
     private System.Windows.Controls.Calendar FilterStartCalendar => DiagnosticsPanel.FilterBar.FilterStartCalendar;
     private System.Windows.Controls.Calendar FilterEndCalendar => DiagnosticsPanel.FilterBar.FilterEndCalendar;
-    private Button DownloadLogsButton => DiagnosticsPanel.FilterBar.DownloadLogsButton;
     private Button ClearDiagnosticsButton => DiagnosticsPanel.FilterBar.ClearDiagnosticsButton;
     private TextBox RawFindTextBox => DiagnosticsPanel.RawOutputPanel.FindBar.FindTextBox;
     private Button RawFindPrevButton => DiagnosticsPanel.RawOutputPanel.FindBar.FindPrevButton;
@@ -152,6 +152,10 @@ public partial class MainWindow : Window
     private TextBlock ProcessedFindCountText => DiagnosticsPanel.ProcessedOutputPanel.FindBar.FindCountText;
     private RichTextBox RawLogTextBox => DiagnosticsPanel.RawOutputPanel.LogOutputView.LogTextBox;
     private RichTextBox ProcessedLogTextBox => DiagnosticsPanel.ProcessedOutputPanel.LogOutputView.LogTextBox;
+    private MenuItem DownloadProcessedLogsMenuItem => DownloadProcessedLogsMenuItemControl;
+    private MenuItem DownloadAdditionalInfoTemplateMenuItem => DownloadAdditionalInfoTemplateMenuItemControl;
+    private MenuItem AutoscrollMenuItem => AutoscrollMenuItemControl;
+    private MenuItem AboutMenuItem => AboutMenuItemControl;
 
     public MainWindow()
     {
@@ -171,6 +175,7 @@ public partial class MainWindow : Window
         _transport = CreateWebSocketTransport();
         RegisterTransportHandlers(_transport);
         UpdateAllLogLevelsVisibility();
+        _autoScrollEnabled = AutoscrollMenuItem.IsChecked;
     }
 
     private void WirePanelHandlers()
@@ -207,7 +212,10 @@ public partial class MainWindow : Window
         FilterEndHourCombo.SelectionChanged += FilterEndTimeCombo_SelectionChanged;
         FilterEndMinuteCombo.SelectionChanged += FilterEndTimeCombo_SelectionChanged;
         ClearDiagnosticsButton.Click += ClearDiagnostics_Click;
-        DownloadLogsButton.Click += DownloadLogsButton_Click;
+        DownloadProcessedLogsMenuItem.Click += DownloadLogsButton_Click;
+        DownloadAdditionalInfoTemplateMenuItem.Click += DownloadAdditionalInfoTemplateMenuItem_Click;
+        AutoscrollMenuItem.Click += AutoscrollMenuItem_Click;
+        AboutMenuItem.Click += AboutMenuItem_Click;
 
         RawFindTextBox.TextChanged += RawFindTextBox_TextChanged;
         RawFindPrevButton.Click += RawFindPrevButton_Click;
@@ -1794,6 +1802,49 @@ public partial class MainWindow : Window
         _exportService.Export(request, dialog.FileName);
     }
 
+    private void DownloadAdditionalInfoTemplateMenuItem_Click(object sender, RoutedEventArgs e)
+    {
+        var templatePath = ResolveAdditionalInfoTemplatePath();
+        if (templatePath == null)
+        {
+            MessageBox.Show(this, "Additional info template not found.", "Download Additional Info Template",
+                MessageBoxButton.OK, MessageBoxImage.Warning);
+            return;
+        }
+
+        var dialog = new SaveFileDialog
+        {
+            Filter = "Excel (*.xlsx)|*.xlsx|All files (*.*)|*.*",
+            FileName = Path.GetFileName(templatePath)
+        };
+
+        if (dialog.ShowDialog(this) != true)
+        {
+            return;
+        }
+
+        File.Copy(templatePath, dialog.FileName, overwrite: true);
+    }
+
+    private void AutoscrollMenuItem_Click(object sender, RoutedEventArgs e)
+    {
+        _autoScrollEnabled = AutoscrollMenuItem.IsChecked;
+        if (_autoScrollEnabled)
+        {
+            RawLogTextBox.ScrollToEnd();
+            ProcessedLogTextBox.ScrollToEnd();
+        }
+    }
+
+    private void AboutMenuItem_Click(object sender, RoutedEventArgs e)
+    {
+        var about = new AboutWindow
+        {
+            Owner = this
+        };
+        about.ShowDialog();
+    }
+
     private ExportRequest BuildExportRequest()
     {
         var apexFile = string.IsNullOrWhiteSpace(_projectFilePath)
@@ -2165,7 +2216,10 @@ public partial class MainWindow : Window
         AppendRunsWithHighlights(paragraph, line, _rawFindState.Query, RawMatchColor, applyHighlights: !string.IsNullOrWhiteSpace(_rawFindState.Query), Brushes.Black);
         _rawVisibleLineCount++;
         QueueRawLayoutUpdate();
-        RawLogTextBox.ScrollToEnd();
+        if (_autoScrollEnabled)
+        {
+            RawLogTextBox.ScrollToEnd();
+        }
         if (!string.IsNullOrWhiteSpace(_rawFindState.Query))
         {
             UpdateFindState(_rawFindState, _rawFindState.Query, GetRawText(), RawFindCountText, RawFindPrevButton, RawFindNextButton, resetIndex: false);
@@ -2243,7 +2297,7 @@ public partial class MainWindow : Window
 
     private void UpdateDownloadLogsState()
     {
-        DownloadLogsButton.IsEnabled = GetFilteredProcessedCount() > 0;
+        DownloadProcessedLogsMenuItem.IsEnabled = GetFilteredProcessedCount() > 0;
     }
 
     private int GetFilteredProcessedCount()
@@ -2287,11 +2341,27 @@ public partial class MainWindow : Window
         AppendProcessedRunsWithHighlights(paragraph, line);
         _processedVisibleLineCount++;
         QueueProcessedLayoutUpdate();
-        ProcessedLogTextBox.ScrollToEnd();
+        if (_autoScrollEnabled)
+        {
+            ProcessedLogTextBox.ScrollToEnd();
+        }
         if (!string.IsNullOrWhiteSpace(_processedFindState.Query))
         {
             UpdateProcessedFindState(_processedFindState, _processedFindState.Query, ProcessedFindCountText, ProcessedFindPrevButton, ProcessedFindNextButton, resetIndex: false);
         }
+    }
+
+    private static string? ResolveAdditionalInfoTemplatePath()
+    {
+        var templateName = "Additional Info - Sung v4.xlsx";
+        var candidates = new[]
+        {
+            Path.Combine(AppContext.BaseDirectory, templateName),
+            Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "ProjectSpreadsheet", templateName)),
+            Path.Combine(Environment.CurrentDirectory, "ProjectSpreadsheet", templateName)
+        };
+
+        return candidates.FirstOrDefault(File.Exists);
     }
 
     private void AppendProcessedRunsWithHighlights(Paragraph paragraph, string line)

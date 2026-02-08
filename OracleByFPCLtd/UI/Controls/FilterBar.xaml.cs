@@ -26,6 +26,5 @@ public partial class FilterBar : UserControl
     public Popup FilterEndDatePopup => FilterEndDatePopupControl;
     public Calendar FilterStartCalendar => FilterStartCalendarControl;
     public Calendar FilterEndCalendar => FilterEndCalendarControl;
-    public Button DownloadLogsButton => DownloadLogsButtonControl;
     public Button ClearDiagnosticsButton => ClearDiagnosticsButtonControl;
 }

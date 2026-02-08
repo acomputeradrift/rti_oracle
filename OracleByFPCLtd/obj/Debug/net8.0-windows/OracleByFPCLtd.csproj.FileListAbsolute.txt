@@ -71,3 +71,5 @@ Y:\Desktop\Development\Oracle\OracleByFPCLtd\bin\Debug\net8.0-windows\ICSharpCod
 Y:\Desktop\Development\Oracle\OracleByFPCLtd\bin\Debug\net8.0-windows\SixLabors.Fonts.dll
 Y:\Desktop\Development\Oracle\OracleByFPCLtd\bin\Debug\net8.0-windows\SixLabors.ImageSharp.dll
 Y:\Desktop\Development\Oracle\OracleByFPCLtd\bin\Debug\net8.0-windows\de\PdfSharpCore.resources.dll
+Y:\Desktop\Development\Oracle\OracleByFPCLtd\obj\Debug\net8.0-windows\AboutWindow.baml
+Y:\Desktop\Development\Oracle\OracleByFPCLtd\obj\Debug\net8.0-windows\AboutWindow.g.cs
