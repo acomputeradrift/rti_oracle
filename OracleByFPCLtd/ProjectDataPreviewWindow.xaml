@@ -215,6 +215,29 @@
           </StackPanel>
         </ScrollViewer>
       </TabItem>
+      <TabItem Header="Additional Info">
+        <ScrollViewer VerticalScrollBarVisibility="Auto">
+          <StackPanel>
+            <TextBlock Text="Entries" Margin="0,0,0,6" FontWeight="SemiBold" />
+            <DataGrid ItemsSource="{Binding AdditionalInfoEntries}"
+                      AutoGenerateColumns="False"
+                      IsReadOnly="True"
+                      HeadersVisibility="Column"
+                      CanUserAddRows="False"
+                      Height="240">
+              <DataGrid.Columns>
+                <DataGridTextColumn Header="Driver" Binding="{Binding DriverName}" Width="*" />
+                <DataGridTextColumn Header="Type" Binding="{Binding MapType}" Width="120" />
+                <DataGridTextColumn Header="Index" Binding="{Binding Index}" Width="80" />
+                <DataGridTextColumn Header="Name" Binding="{Binding Name}" Width="*" />
+              </DataGrid.Columns>
+            </DataGrid>
+
+            <TextBlock Text="Errors" Margin="0,12,0,6" FontWeight="SemiBold" />
+            <ListBox ItemsSource="{Binding AdditionalInfoErrors}" Height="160" />
+          </StackPanel>
+        </ScrollViewer>
+      </TabItem>
     </TabControl>
 
     <StackPanel Grid.Row="2" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,8,0,0">

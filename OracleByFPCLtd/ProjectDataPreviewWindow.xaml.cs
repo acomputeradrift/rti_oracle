@@ -5,6 +5,7 @@ using System.Threading.Tasks;
 using System.Windows;
 using Microsoft.Win32;
 using OracleByFPCLtd.ProjectData;
+using OracleByFPCLtd.ProjectData.Models;
 
 namespace OracleByFPCLtd;
 
@@ -12,6 +13,7 @@ public partial class ProjectDataPreviewWindow : Window
 {
     private readonly string _apexPath;
     private readonly IProjectDataExtractor _extractor;
+    private readonly AdditionalData? _additionalData;
     private ApexDiscoveryPreloadResult? _preload;
 
     public ObservableCollection<DiagnosticsMappingEntry> DiagnosticsMapping { get; } = new();
@@ -25,13 +27,16 @@ public partial class ProjectDataPreviewWindow : Window
     public ObservableCollection<Rs232PortEntry> Rs232Ports { get; } = new();
     public ObservableCollection<RoomMappingEntry> RoomMappings { get; } = new();
     public ObservableCollection<DriverTemplateVariableEntry> DriverTemplateVariables { get; } = new();
+    public ObservableCollection<AdditionalInfoDisplayEntry> AdditionalInfoEntries { get; } = new();
+    public ObservableCollection<string> AdditionalInfoErrors { get; } = new();
 
-    public ProjectDataPreviewWindow(string apexPath)
+    public ProjectDataPreviewWindow(string apexPath, AdditionalData? additionalData = null)
     {
         InitializeComponent();
         DataContext = this;
         _apexPath = apexPath;
         _extractor = new ProjectDataExtractor();
+        _additionalData = additionalData;
         Loaded += ProjectDataPreviewWindow_Loaded;
     }
 
@@ -128,6 +133,7 @@ public partial class ProjectDataPreviewWindow : Window
                 DriverTemplateVariables.Add(entry);
             }
 
+            LoadAdditionalInfoEntries();
             _preload = result.ApexDiscoveryPreload;
             if (Owner is MainWindow mainWindow)
             {
@@ -207,6 +213,26 @@ public partial class ProjectDataPreviewWindow : Window
         }
 
         return "";
+    }
+
+    private void LoadAdditionalInfoEntries()
+    {
+        AdditionalInfoEntries.Clear();
+        AdditionalInfoErrors.Clear();
+        if (_additionalData is null)
+        {
+            return;
+        }
+
+        foreach (var entry in AdditionalInfoDisplayBuilder.Build(_additionalData))
+        {
+            AdditionalInfoEntries.Add(entry);
+        }
+
+        foreach (var error in _additionalData.Errors)
+        {
+            AdditionalInfoErrors.Add(error);
+        }
     }
 
     public sealed record DriverConfigMapEntry(

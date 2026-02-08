@@ -121,6 +121,7 @@ public sealed class AdditionalData
 {
     public List<string> Errors { get; } = new();
     public List<string> MatchedDriverNames { get; } = new();
+    public Dictionary<string, AdditionalDriverData> Drivers { get; } = new(StringComparer.Ordinal);
 
     public static AdditionalData FromExtractionResult(ProjectDataExtractionResult result)
     {
@@ -130,4 +131,10 @@ public sealed class AdditionalData
     public void ApplyTo(ProjectDataExtractionResult result)
     {
     }
+}
+
+public sealed class AdditionalDriverData
+{
+    public Dictionary<int, string> InputNames { get; } = new();
+    public Dictionary<int, string> OutputNames { get; } = new();
 }

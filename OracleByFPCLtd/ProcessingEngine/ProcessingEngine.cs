@@ -37,8 +37,19 @@ public sealed class ProcessingEngine
 
     public ProcessedLine ProcessEvent(DiagnosticEvent evt)
     {
+        var defaultText = $"{evt.RawLineNumber} {evt.RawText}";
+        var driverLine = _driverMappingService.Map(evt, _bundle);
+        if (driverLine.IsUnresolved || !string.Equals(driverLine.Text, defaultText, StringComparison.Ordinal))
+        {
+            return driverLine;
+        }
+
         var systemLine = _systemMappingService.Map(evt, _bundle);
-        _ = _driverMappingService.Map(evt, _bundle);
+        if (systemLine.IsUnresolved || !string.Equals(systemLine.Text, defaultText, StringComparison.Ordinal))
+        {
+            return systemLine;
+        }
+
         _ = _additionalDataMappingService.Map(evt, _bundle);
         return systemLine;
     }

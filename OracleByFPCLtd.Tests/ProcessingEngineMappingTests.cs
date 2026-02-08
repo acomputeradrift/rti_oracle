@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using OracleByFPCLtd.DriverProfiles;
 using OracleByFPCLtd.ProcessingEngine.Mapping;
 using OracleByFPCLtd.ProcessingEngine.Models;
 using OracleByFPCLtd.ProcessingEngine.Parsing;
@@ -56,6 +57,49 @@ public sealed class ProcessingEngineMappingTests
         Assert.True(line.IsUnresolved);
     }
 
+    [Fact]
+    public void DriverMappingServiceMapsVauxSourceSelect()
+    {
+        var bundle = BuildBundleWithVaux();
+        var service = new DriverMappingService();
+        var evt = new DiagnosticEvent(5, "Driver - Command:'Vaux Lattis Matrix\\Output Settings\\Source Select(Route All, 13, 1)' Sustain:NO");
+
+        var line = service.Map(evt, bundle);
+
+        Assert.Equal("5 Driver - Command:'Vaux Lattis Matrix\\Output Settings\\Source Select(Route All, Gym, Shaw 1)' Sustain:NO", line.Text);
+        Assert.False(line.IsUnresolved);
+    }
+
+    [Fact]
+    public void VauxProfileMapsSourceSelect()
+    {
+        var bundle = BuildBundleWithVaux();
+        var mapper = VauxLattisMatrixProfile.Mapper;
+        var rawText = "Driver - Command:'Vaux Lattis Matrix\\Output Settings\\Source Select(Route All, 13, 1)' Sustain:NO";
+
+        var mapped = mapper.TryMap(rawText, bundle, out var mappedText, out var unresolved);
+
+        Assert.True(mapped);
+        Assert.Equal("Driver - Command:'Vaux Lattis Matrix\\Output Settings\\Source Select(Route All, Gym, Shaw 1)' Sustain:NO", mappedText);
+        Assert.False(unresolved);
+    }
+
+    [Theory]
+    [InlineData("Output Mute(Toggle, 13)", "Output Mute(Toggle, Gym)")]
+    [InlineData("Output Off(13)", "Output Off(Gym)")]
+    [InlineData("Volume Up(13)", "Volume Up(Gym)")]
+    public void DriverMappingServiceMapsVauxOutputIndex(string input, string expected)
+    {
+        var bundle = BuildBundleWithVaux();
+        var service = new DriverMappingService();
+        var evt = new DiagnosticEvent(3, $"Driver - Command:'Vaux Lattis Matrix\\Output Settings\\{input}' Sustain:YES");
+
+        var line = service.Map(evt, bundle);
+
+        Assert.Equal($"3 Driver - Command:'Vaux Lattis Matrix\\Output Settings\\{expected}' Sustain:YES", line.Text);
+        Assert.False(line.IsUnresolved);
+    }
+
     private static ProjectDataBundle BuildBundle()
     {
         var bundle = new ProjectDataBundle();
@@ -68,6 +112,16 @@ public sealed class ProcessingEngineMappingTests
             0,
             "Room Select"));
         bundle.System.PageIndexMap["81|0"] = "Room Select";
+        return bundle;
+    }
+
+    private static ProjectDataBundle BuildBundleWithVaux()
+    {
+        var bundle = new ProjectDataBundle();
+        var driverData = new AdditionalDriverData();
+        driverData.InputNames[1] = "Shaw 1";
+        driverData.OutputNames[13] = "Gym";
+        bundle.Additional.Drivers["Vaux Lattis Matrix"] = driverData;
         return bundle;
     }
 }

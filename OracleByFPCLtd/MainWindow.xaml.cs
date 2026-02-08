@@ -81,6 +81,7 @@ public partial class MainWindow : Window
     private readonly RecentProjectService _recentProjectService = new();
     private readonly RecentIpService _recentIpService = new();
     private readonly AdditionalInfoService _additionalInfoService = new();
+    private readonly AdditionalInfoCache _additionalInfoCache = new();
     private readonly ProcessedLogsExportService _exportService = new(
         new PdfSharpRenderer(),
         new ExportFileWriter());
@@ -93,6 +94,7 @@ public partial class MainWindow : Window
     private readonly Dictionary<string, string> _friendlyNames = new(StringComparer.OrdinalIgnoreCase);
     private readonly Dictionary<string, int> _deviceNameToId = new(StringComparer.OrdinalIgnoreCase);
     private ProcessingEngine.ProcessingEngine? _processingEngine;
+    private AdditionalData? _lastAdditionalData;
     private static readonly string[] AnchorNames =
     {
         "EVENTS_INPUT",
@@ -1651,7 +1653,7 @@ public partial class MainWindow : Window
             return;
         }
 
-        var preview = new ProjectDataPreviewWindow(_projectFilePath)
+        var preview = new ProjectDataPreviewWindow(_projectFilePath, _lastAdditionalData)
         {
             Owner = this
         };
@@ -1732,7 +1734,7 @@ public partial class MainWindow : Window
 
         if (openPreview)
         {
-            var preview = new ProjectDataPreviewWindow(filePath)
+            var preview = new ProjectDataPreviewWindow(filePath, _lastAdditionalData)
             {
                 Owner = this
             };
@@ -1994,6 +1996,7 @@ public partial class MainWindow : Window
     public void InitializeProcessing(ProjectDataExtractionResult result)
     {
         var additionalData = LoadAdditionalData(result);
+        _lastAdditionalData = additionalData;
         InitializeProcessing(result, additionalData);
     }
 
@@ -2034,18 +2037,34 @@ public partial class MainWindow : Window
 
     private AdditionalData LoadAdditionalData(ProjectDataExtractionResult result)
     {
-        var driverNames = result.ApexDiscoveryPreload.DriverConfigMap.Values
-            .Select(entry => entry.DeviceName)
-            .Where(name => !string.IsNullOrWhiteSpace(name))
-            .Distinct(StringComparer.Ordinal);
-
-        var data = AdditionalDataExtractor.Extract(_additionalInfoPath, driverNames);
-        if (data.Errors.Count > 0)
+        if (string.IsNullOrWhiteSpace(_projectFilePath) || !File.Exists(_projectFilePath))
         {
-            ShowMessageOnUiThread(string.Join(Environment.NewLine, data.Errors), "Additional Info", MessageBoxImage.Warning);
+            return new AdditionalData();
         }
 
-        return data;
+        var projectLastWrite = File.GetLastWriteTimeUtc(_projectFilePath);
+        DateTime? additionalLastWrite = null;
+        if (!string.IsNullOrWhiteSpace(_additionalInfoPath) && File.Exists(_additionalInfoPath))
+        {
+            additionalLastWrite = File.GetLastWriteTimeUtc(_additionalInfoPath);
+        }
+
+        var key = new AdditionalInfoCacheKey(_projectFilePath, projectLastWrite, _additionalInfoPath, additionalLastWrite);
+        return _additionalInfoCache.GetOrLoad(key, () =>
+        {
+            var driverNames = result.ApexDiscoveryPreload.DriverConfigMap.Values
+                .Select(entry => entry.DeviceName)
+                .Where(name => !string.IsNullOrWhiteSpace(name))
+                .Distinct(StringComparer.Ordinal);
+
+            var data = AdditionalDataExtractor.Extract(_additionalInfoPath, driverNames);
+            if (data.Errors.Count > 0)
+            {
+                ShowMessageOnUiThread(string.Join(Environment.NewLine, data.Errors), "Additional Info", MessageBoxImage.Warning);
+            }
+
+            return data;
+        });
     }
 
     private void ShowMessageOnUiThread(string message, string title, MessageBoxImage image)
