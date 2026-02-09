@@ -168,6 +168,45 @@ public sealed class ProcessingEngineMappingTests
         Assert.True(line.IsUnresolved);
     }
 
+    [Fact]
+    public void DriverMappingServiceTreatsSystemManagerAsProfile()
+    {
+        var bundle = new ProjectDataBundle();
+        var service = new DriverMappingService();
+        var evt = new DiagnosticEvent(11, "Driver - Command:'System Manager\\Layer Visibility\\Set Layer Visibility(Source List)' Sustain:NO");
+
+        var line = service.Map(evt, bundle);
+
+        Assert.Equal("11 Driver - Command:'System Manager\\Layer Visibility\\Set Layer Visibility(Source List)' Sustain:NO", line.Text);
+        Assert.False(line.IsUnresolved);
+    }
+
+    [Fact]
+    public void DriverMappingServiceTreatsRtiVirtualMultiroomAmpAsProfile()
+    {
+        var bundle = new ProjectDataBundle();
+        var service = new DriverMappingService();
+        var evt = new DiagnosticEvent(12, "Driver - Command:'RTI Virtual Multiroom Amp\\Room Three\\Power(Off)' Sustain:NO");
+
+        var line = service.Map(evt, bundle);
+
+        Assert.Equal("12 Driver - Command:'RTI Virtual Multiroom Amp\\Room Three\\Power(Off)' Sustain:NO", line.Text);
+        Assert.False(line.IsUnresolved);
+    }
+
+    [Fact]
+    public void DriverMappingServiceTreatsActivitiesDriverEventsAsProfile()
+    {
+        var bundle = new ProjectDataBundle();
+        var service = new DriverMappingService();
+        var evt = new DiagnosticEvent(13, "Driver event 'Audio OFF in Room Three'");
+
+        var line = service.Map(evt, bundle);
+
+        Assert.Equal("13 Driver event 'Audio OFF in Room Three'", line.Text);
+        Assert.False(line.IsUnresolved);
+    }
+
     private static ProjectDataBundle BuildBundle()
     {
         var bundle = new ProjectDataBundle();

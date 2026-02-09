@@ -6,7 +6,9 @@ using System.ComponentModel;
 using System.Globalization;
 using System.IO;
 using System.Linq;
+using System.Text.Encodings.Web;
 using System.Text.Json;
+using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
@@ -76,6 +78,8 @@ public partial class MainWindow : Window
     private static readonly Color RawFocusMatchColor = Color.FromRgb(255, 165, 0);
     private static readonly Color ProcessedMatchColor = Color.FromRgb(255, 236, 153);
     private static readonly Color ProcessedFocusMatchColor = Color.FromRgb(255, 165, 0);
+    private static readonly Regex NoProfileDriverCommandPattern = new Regex("Driver - Command:\\s*'(?<driver>[^\\\\']+)", RegexOptions.IgnoreCase | RegexOptions.Compiled);
+    private static readonly Regex NoProfileDriverEventPattern = new Regex("happens on\\s*'(?<driver>[^\\\\']+)", RegexOptions.IgnoreCase | RegexOptions.Compiled);
     private readonly DispatcherTimer _rawFindTimer = new();
     private readonly DispatcherTimer _processedFindTimer = new();
     private readonly OracleSettingsStore _settingsStore = new();
@@ -94,6 +98,7 @@ public partial class MainWindow : Window
     private readonly WebSocketMessageFormatter _messageFormatter = new(DateOnly.FromDateTime(DateTime.Today));
     private readonly Dictionary<string, string> _friendlyNames = new(StringComparer.OrdinalIgnoreCase);
     private readonly Dictionary<string, int> _deviceNameToId = new(StringComparer.OrdinalIgnoreCase);
+    private readonly Dictionary<string, HashSet<string>> _noProfileMessages = new(StringComparer.OrdinalIgnoreCase);
     private ProcessingEngine.ProcessingEngine? _processingEngine;
     private AdditionalData? _lastAdditionalData;
     private static readonly string[] AnchorNames =
@@ -176,6 +181,7 @@ public partial class MainWindow : Window
         RegisterTransportHandlers(_transport);
         UpdateAllLogLevelsVisibility();
         _autoScrollEnabled = AutoscrollMenuItem.IsChecked;
+        Closing += MainWindow_Closing;
     }
 
     private void WirePanelHandlers()
@@ -2081,6 +2087,7 @@ public partial class MainWindow : Window
 
         _processedLogLines.Clear();
         _processedLogLines.AddRange(processed);
+        RecordNoProfileMessages(_processedLogLines);
         if (_filterActive)
         {
             ApplyCurrentFilter();
@@ -2240,6 +2247,7 @@ public partial class MainWindow : Window
                 continue;
             }
 
+            RecordNoProfileMessage(line);
             if (hasLines)
             {
                 paragraph.Inlines.Add(new LineBreak());
@@ -2318,6 +2326,7 @@ public partial class MainWindow : Window
             _processedVisibleLineCount = 0;
         }
 
+        RecordNoProfileMessage(line);
         _processedLogLines.Add(line);
         UpdateDownloadLogsState();
 
@@ -2350,6 +2359,148 @@ public partial class MainWindow : Window
             UpdateProcessedFindState(_processedFindState, _processedFindState.Query, ProcessedFindCountText, ProcessedFindPrevButton, ProcessedFindNextButton, resetIndex: false);
         }
     }
+
+    private void RecordNoProfileMessages(IEnumerable<string> lines)
+    {
+        foreach (var line in lines)
+        {
+            RecordNoProfileMessage(line);
+        }
+    }
+
+    private void RecordNoProfileMessage(string line)
+    {
+        if (string.IsNullOrWhiteSpace(line) || !line.Contains("[No Profile!]", StringComparison.Ordinal))
+        {
+            return;
+        }
+
+        var raw = line.Replace(" [No Profile!]", "", StringComparison.Ordinal);
+        raw = StripLeadingLineNumber(raw);
+        if (string.IsNullOrWhiteSpace(raw))
+        {
+            return;
+        }
+
+        var driverName = ExtractNoProfileDriverName(raw);
+        if (!_noProfileMessages.TryGetValue(driverName, out var messages))
+        {
+            messages = new HashSet<string>(StringComparer.Ordinal);
+            _noProfileMessages[driverName] = messages;
+        }
+
+        messages.Add(raw);
+    }
+
+    private static string StripLeadingLineNumber(string text)
+    {
+        if (string.IsNullOrWhiteSpace(text))
+        {
+            return text;
+        }
+
+        var spaceIndex = text.IndexOf(' ');
+        if (spaceIndex <= 0)
+        {
+            return text;
+        }
+
+        var prefix = text.Substring(0, spaceIndex);
+        return int.TryParse(prefix, NumberStyles.Integer, CultureInfo.InvariantCulture, out _) ? text.Substring(spaceIndex + 1) : text;
+    }
+
+    private static string ExtractNoProfileDriverName(string rawText)
+    {
+        var match = NoProfileDriverCommandPattern.Match(rawText);
+        if (match.Success)
+        {
+            return match.Groups["driver"].Value.Trim();
+        }
+
+        match = NoProfileDriverEventPattern.Match(rawText);
+        if (match.Success)
+        {
+            return match.Groups["driver"].Value.Trim();
+        }
+
+        return "Unknown Driver";
+    }
+
+    private void MainWindow_Closing(object? sender, CancelEventArgs e)
+    {
+        try
+        {
+            if (_noProfileMessages.Count == 0)
+            {
+                return;
+            }
+
+            var report = BuildNoProfileReport();
+            var reportPath = WriteNoProfileReportToDesktop(report);
+            MessageBox.Show(
+                this,
+                $"Saved no-profile driver report to your Desktop:\n{reportPath}\n\nPlease email this file to feeny.jamie@gmail.com.",
+                "Beta Report",
+                MessageBoxButton.OK,
+                MessageBoxImage.Information);
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show(
+                this,
+                $"Failed to write no-profile driver report: {ex.Message}",
+                "Beta Report",
+                MessageBoxButton.OK,
+                MessageBoxImage.Warning);
+        }
+        finally
+        {
+            _noProfileMessages.Clear();
+        }
+    }
+
+    private NoProfileReport BuildNoProfileReport()
+    {
+        var drivers = _noProfileMessages
+            .OrderBy(entry => entry.Key, StringComparer.OrdinalIgnoreCase)
+            .Select(entry => new NoProfileDriverReport(
+                entry.Key,
+                entry.Value.OrderBy(message => message, StringComparer.Ordinal).ToList()))
+            .ToList();
+
+        return new NoProfileReport(
+            DateTime.UtcNow,
+            GetAppVersion(),
+            drivers);
+    }
+
+    private static string GetAppVersion()
+    {
+        return typeof(MainWindow).Assembly.GetName().Version?.ToString() ?? "unknown";
+    }
+
+    private static string WriteNoProfileReportToDesktop(NoProfileReport report)
+    {
+        var desktop = Environment.GetFolderPath(Environment.SpecialFolder.DesktopDirectory);
+        var fileName = $"oracle_no_profile_messages_{DateTime.Now:yyyyMMdd_HHmmss}.json";
+        var path = Path.Combine(desktop, fileName);
+        var json = JsonSerializer.Serialize(report, new JsonSerializerOptions
+        {
+            WriteIndented = true,
+            Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping
+        });
+        File.WriteAllText(path, json);
+        return path;
+    }
+
+    private sealed record NoProfileReport(
+        DateTime CreatedUtc,
+        string AppVersion,
+        List<NoProfileDriverReport> Drivers);
+
+    private sealed record NoProfileDriverReport(
+        string DriverName,
+        List<string> Messages);
 
     private static string? ResolveAdditionalInfoTemplatePath()
     {

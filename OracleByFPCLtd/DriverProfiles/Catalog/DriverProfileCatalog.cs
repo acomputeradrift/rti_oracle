@@ -13,7 +13,10 @@ public static class DriverProfileCatalog
             RtiInternalProfile.Definition,
             RtiSystemVariableEventsProfile.Definition,
             VauxLattisMatrixProfile.Definition,
-            ClipsalCbusProfile.Definition
+            ClipsalCbusProfile.Definition,
+            SystemManagerProfile.Definition,
+            RtiVirtualMultiroomAmpProfile.Definition,
+            ActivitiesProfile.Definition
         };
     }
 
