@@ -154,6 +154,11 @@ public sealed class ProjectDataExtractorTests
     {
         var path = Path.Combine(AppContext.BaseDirectory, "Fixtures", "TEST - System Manager v10.apex");
         Assert.True(File.Exists(path), $"Fixture missing at {path}");
+        var cachePath = ProjectDataCacheStore.GetCachePath(path);
+        if (File.Exists(cachePath))
+        {
+            File.Delete(cachePath);
+        }
         return path;
     }
 

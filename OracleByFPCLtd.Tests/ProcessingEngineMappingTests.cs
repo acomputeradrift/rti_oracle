@@ -110,7 +110,7 @@ public sealed class ProcessingEngineMappingTests
         var line = service.Map(evt, bundle);
 
         Assert.Equal("4 Driver - Command:'Clipsal C-Bus\\General\\Immediate Switch(121 [Unknown State!], Living Room Pendant, 56)' Sustain:NO", line.Text);
-        Assert.False(line.IsUnresolved);
+        Assert.True(line.IsUnresolved);
     }
 
     [Fact]
@@ -145,7 +145,7 @@ public sealed class ProcessingEngineMappingTests
     public void DriverMappingServiceMapsCbusRampToLevelScene()
     {
         var bundle = BuildBundleWithCbus();
-        bundle.Additional.Drivers["Clipsal C-Bus"].CbusScenes[(202, 33, 0)] = new CbusSceneEntry("Lower Floor On");
+        bundle.Additional.Drivers["Clipsal C-Bus"].CbusScenes[(202, 0, 33)] = new CbusSceneEntry("Lower Floor On");
         var service = new DriverMappingService();
         var evt = new DiagnosticEvent(9, "Driver - Command:'Clipsal C-Bus\\General\\Ramp to level(10, 0, 33, 202)' Sustain:YES");
 

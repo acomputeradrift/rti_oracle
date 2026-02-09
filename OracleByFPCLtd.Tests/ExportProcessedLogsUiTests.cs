@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Reflection;
 using System.Threading;
 using System.Windows;
+using System.Windows.Threading;
 using OracleByFPCLtd.ExportProcessedLogs.Models;
 using Xunit;
 
@@ -101,22 +102,32 @@ public sealed class ExportProcessedLogsUiTests
         using var done = new ManualResetEvent(false);
         var thread = new Thread(() =>
         {
-            try
+            var dispatcher = Dispatcher.CurrentDispatcher;
+            dispatcher.BeginInvoke(new Action(() =>
             {
-                action();
-            }
-            catch (Exception ex)
-            {
-                failure = ex;
-            }
-            finally
-            {
-                done.Set();
-            }
+                try
+                {
+                    action();
+                }
+                catch (Exception ex)
+                {
+                    failure = ex;
+                }
+                finally
+                {
+                    done.Set();
+                    dispatcher.InvokeShutdown();
+                }
+            }));
+            Dispatcher.Run();
         });
         thread.SetApartmentState(ApartmentState.STA);
         thread.Start();
-        done.WaitOne();
+        if (!done.WaitOne(TimeSpan.FromSeconds(15)))
+        {
+            thread.IsBackground = true;
+            throw new TimeoutException("STA test timed out.");
+        }
         if (failure != null)
         {
             throw new InvalidOperationException("STA test failed.", failure);

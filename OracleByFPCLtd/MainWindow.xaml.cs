@@ -1686,7 +1686,7 @@ public partial class MainWindow : Window
         {
             var extractor = new ProjectDataExtractor();
             var result = await Task.Run(() => extractor.Extract(filePath));
-            InitializeProcessing(result);
+            Dispatcher.Invoke(() => InitializeProcessing(result));
         }
         catch (Exception ex)
         {
