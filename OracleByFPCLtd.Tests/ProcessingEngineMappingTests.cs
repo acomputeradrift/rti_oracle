@@ -169,6 +169,72 @@ public sealed class ProcessingEngineMappingTests
     }
 
     [Fact]
+    public void DriverMappingServiceFormatsTimestampedCbusRampToLevelScene()
+    {
+        var bundle = BuildBundleWithCbus();
+        bundle.Additional.Drivers["Clipsal C-Bus"].CbusScenes[(202, 0, 32)] = new CbusSceneEntry("Landscape Lighting On");
+        var service = new DriverMappingService();
+        var evt = new DiagnosticEvent(10, "[2026-02-10 20:03:30.112] Driver - Command:'Clipsal C-Bus\\General\\Ramp to level(10, 0, 32, 202)' Sustain:YES");
+
+        var line = service.Map(evt, bundle);
+
+        Assert.Equal("10 [2026-02-10 20:03:30.112] Driver Command (Clipsal C-Bus): 'Landscape Lighting On ramped over 4 seconds.'", line.Text);
+        Assert.False(line.IsUnresolved);
+    }
+
+    [Fact]
+    public void DriverMappingServiceKeepsNoFormatTagForTimestampedSystemManagerRouteCommand()
+    {
+        var bundle = new ProjectDataBundle();
+        var service = new DriverMappingService();
+        var evt = new DiagnosticEvent(15, "[2026-02-10 19:15:33.701] Driver - Command:'System Manager\\[Hide]\\Route Command(2, 1, 3)' Sustain:NO");
+
+        var line = service.Map(evt, bundle);
+
+        Assert.Equal("15 [2026-02-10 19:15:33.701] Driver Command (System Manager): 'System Manager\\[Hide]\\Route Command(2, 1, 3)' [No Format!]", line.Text);
+        Assert.False(line.IsUnresolved);
+    }
+
+    [Fact]
+    public void DriverMappingServiceMarksNoMapForSystemManagerSetSourceByRoomWithNumericSource()
+    {
+        var bundle = new ProjectDataBundle();
+        var service = new DriverMappingService();
+        var evt = new DiagnosticEvent(4, "[2026-02-11 13:45:16.196] Driver - Command:'System Manager\\Routing\\Set Source By Room(Room Three, 26)' Sustain:NO");
+
+        var line = service.Map(evt, bundle);
+
+        Assert.Equal("4 [2026-02-11 13:45:16.196] Driver Command (System Manager): 'Source for Room Three set to 26.' [No Map!]", line.Text);
+        Assert.True(line.IsUnresolved);
+    }
+
+    [Fact]
+    public void DriverMappingServiceMarksNoMapForSystemManagerSetSourceWithNumericSource()
+    {
+        var bundle = new ProjectDataBundle();
+        var service = new DriverMappingService();
+        var evt = new DiagnosticEvent(22, "[2026-02-11 13:45:51.332] Driver - Command:'System Manager\\Routing\\Set Source(7)' Sustain:NO");
+
+        var line = service.Map(evt, bundle);
+
+        Assert.Equal("22 [2026-02-11 13:45:51.332] Driver Command (System Manager): 'Source set to 7.' [No Map!]", line.Text);
+        Assert.True(line.IsUnresolved);
+    }
+
+    [Fact]
+    public void DriverMappingServiceAppendsNoMapForUnresolvedCommandAfterFormatting()
+    {
+        var bundle = new ProjectDataBundle();
+        var service = new DriverMappingService();
+        var evt = new DiagnosticEvent(16, "[2026-02-10 19:00:39.485] Driver - Command:'Vaux Lattis Matrix\\Output Settings\\Source Select(Route All, 13, 1)' Sustain:NO");
+
+        var line = service.Map(evt, bundle);
+
+        Assert.Equal("16 [2026-02-10 19:00:39.485] Driver Command (Vaux Lattis Matrix): '13 set to source 1.' [No Map!]", line.Text);
+        Assert.True(line.IsUnresolved);
+    }
+
+    [Fact]
     public void DriverMappingServiceMarksNoProfile()
     {
         var bundle = new ProjectDataBundle();
@@ -217,6 +283,19 @@ public sealed class ProcessingEngineMappingTests
         var line = service.Map(evt, bundle);
 
         Assert.Equal("13 Driver event 'Audio OFF in Room Three'", line.Text);
+        Assert.False(line.IsUnresolved);
+    }
+
+    [Fact]
+    public void DriverMappingServiceTreatsLutronCasetaRa2SelectAsProfile()
+    {
+        var bundle = new ProjectDataBundle();
+        var service = new DriverMappingService();
+        var evt = new DiagnosticEvent(14, "Driver - Command:'Lutron Caseta / RA2 Select\\Switches\\Switch Commands(Master - East Pendant (ID 55), Toggle)' Sustain:NO");
+
+        var line = service.Map(evt, bundle);
+
+        Assert.Equal("14 Driver - Command:'Lutron Caseta / RA2 Select\\Switches\\Switch Commands(Master - East Pendant (ID 55), Toggle)' Sustain:NO", line.Text);
         Assert.False(line.IsUnresolved);
     }
 

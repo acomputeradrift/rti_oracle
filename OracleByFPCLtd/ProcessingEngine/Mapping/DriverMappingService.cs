@@ -1,5 +1,6 @@
 using System;
 using OracleByFPCLtd.DriverProfiles.Catalog;
+using OracleByFPCLtd.DriverProfiles.Services;
 using OracleByFPCLtd.ProcessingEngine.Models;
 using OracleByFPCLtd.ProjectData.Models;
 
@@ -38,7 +39,16 @@ public sealed class DriverMappingService
                 continue;
             }
 
-            if (unresolved && ShouldAppendUnresolved(mappedText))
+            if (DriverMessageTemplateFormatter.TryFormatDriverCommand(mappedText, profile.DeviceName, out var formattedCommand))
+            {
+                mappedText = formattedCommand;
+            }
+
+            if (unresolved && IsDriverCommandLine(mappedText) && ShouldAppendNoMap(mappedText))
+            {
+                mappedText += " [No Map!]";
+            }
+            else if (unresolved && ShouldAppendUnresolved(mappedText))
             {
                 mappedText += " [UNRESOLVED]";
             }
@@ -58,6 +68,19 @@ public sealed class DriverMappingService
     {
         return text.Contains("Driver - Command:", StringComparison.OrdinalIgnoreCase)
             || text.Contains("Driver event", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static bool IsDriverCommandLine(string text)
+    {
+        return text.Contains("Driver - Command:", StringComparison.OrdinalIgnoreCase)
+            || text.Contains("Driver Command (", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static bool ShouldAppendNoMap(string text)
+    {
+        return !text.Contains("[No Map!]", StringComparison.Ordinal)
+            && !text.Contains("[Unknown State!]", StringComparison.Ordinal)
+            && !text.Contains("[No Profile!]", StringComparison.Ordinal);
     }
 
     private static bool ShouldAppendUnresolved(string text)

@@ -24,7 +24,14 @@ public static class DriverProfileCatalog
             TwoWayStringsProfile.Definition,
             YamahaAventageProfile.Definition,
             RtiVirtualMultiroomAmpProfile.Definition,
-            ActivitiesProfile.Definition
+            ActivitiesProfile.Definition,
+            LayerSwitchV2Profile.Definition,
+            LutronCasetaRa2SelectProfile.Definition,
+            SamsungExLinkProfile.Definition,
+            QMotionQzHub3Profile.Definition,
+            RtiVipUhdCtrlProfile.Definition,
+            VhdxProfile.Definition,
+            JandyIAqualinkProfile.Definition
         };
     }
 
