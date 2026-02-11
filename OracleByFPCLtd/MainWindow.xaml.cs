@@ -2377,6 +2377,7 @@ public partial class MainWindow : Window
 
         var raw = line.Replace(" [No Profile!]", "", StringComparison.Ordinal);
         raw = StripLeadingLineNumber(raw);
+        raw = StripLeadingTimestamp(raw);
         if (string.IsNullOrWhiteSpace(raw))
         {
             return;
@@ -2407,6 +2408,29 @@ public partial class MainWindow : Window
 
         var prefix = text.Substring(0, spaceIndex);
         return int.TryParse(prefix, NumberStyles.Integer, CultureInfo.InvariantCulture, out _) ? text.Substring(spaceIndex + 1) : text;
+    }
+
+    private static string StripLeadingTimestamp(string text)
+    {
+        if (string.IsNullOrWhiteSpace(text))
+        {
+            return text;
+        }
+
+        var trimmed = text.TrimStart();
+        if (!trimmed.StartsWith('[', StringComparison.Ordinal))
+        {
+            return text;
+        }
+
+        var closeIndex = trimmed.IndexOf(']');
+        if (closeIndex < 0)
+        {
+            return text;
+        }
+
+        var remainder = trimmed.Substring(closeIndex + 1).TrimStart();
+        return string.IsNullOrWhiteSpace(remainder) ? text : remainder;
     }
 
     private static string ExtractNoProfileDriverName(string rawText)

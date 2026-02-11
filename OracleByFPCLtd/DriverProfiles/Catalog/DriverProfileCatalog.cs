@@ -14,7 +14,15 @@ public static class DriverProfileCatalog
             RtiSystemVariableEventsProfile.Definition,
             VauxLattisMatrixProfile.Definition,
             ClipsalCbusProfile.Definition,
+            AvproEdgeMxNet1GProfile.Definition,
+            BijouSeriesProfile.Definition,
+            RtiAdDspMatrixProfile.Definition,
+            RtiMusicProfile.Definition,
+            Sonance8130Profile.Definition,
+            SonosProfile.Definition,
             SystemManagerProfile.Definition,
+            TwoWayStringsProfile.Definition,
+            YamahaAventageProfile.Definition,
             RtiVirtualMultiroomAmpProfile.Definition,
             ActivitiesProfile.Definition
         };

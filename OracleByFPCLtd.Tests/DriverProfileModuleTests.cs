@@ -73,4 +73,20 @@ public sealed class DriverProfileModuleTests
         Assert.Equal("RTI Internal", profile.DeviceName);
         Assert.Contains(profile.DiscoveryRules, rule => rule.Description.Contains("Device Page Mapping", StringComparison.Ordinal));
     }
+
+    [Fact]
+    public void CatalogIncludesNoProfileDriverCoverage()
+    {
+        // Requirement: mission.md - Core Capabilities #3/#5; invariants.md - Explicit Mapping.
+        var profiles = DriverProfileCatalog.All().ToList();
+
+        Assert.Contains(profiles, profile => profile.DeviceName == "AVProEdge MXNet_1G");
+        Assert.Contains(profiles, profile => profile.DeviceName == "BijouSeries");
+        Assert.Contains(profiles, profile => profile.DeviceName == "RTI AD DSP Matrix");
+        Assert.Contains(profiles, profile => profile.DeviceName == "RTI Music");
+        Assert.Contains(profiles, profile => profile.DeviceName == "Sonance 8130");
+        Assert.Contains(profiles, profile => profile.DeviceName == "Sonos");
+        Assert.Contains(profiles, profile => profile.DeviceName == "Two Way Strings");
+        Assert.Contains(profiles, profile => profile.DeviceName == "Yamaha AVENTAGE");
+    }
 }
