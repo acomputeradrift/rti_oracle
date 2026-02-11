@@ -47,6 +47,6 @@ public sealed class OracleSettingsStore
     private static string GetDefaultPath()
     {
         var folder = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
-        return Path.Combine(folder, "Oracle by FP&C Ltd", "settings.json");
+        return Path.Combine(folder, "Oracle by FP&C", "settings.json");
     }
 }

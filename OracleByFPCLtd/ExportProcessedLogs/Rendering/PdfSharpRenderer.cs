@@ -39,7 +39,7 @@ public sealed class PdfSharpRenderer : IPdfRenderer
         DrawLogo(gfx, headerLeft, headerTop);
         var headerTextLeft = headerLeft + LogoSize + HeaderGap;
         y = headerTop;
-        DrawText(gfx, "Oracle by FP&C Ltd Export", titleFont, XBrushes.Black, headerTextLeft, y);
+        DrawText(gfx, "Oracle by FP&C Export", titleFont, XBrushes.Black, headerTextLeft, y);
         y += GetLineHeight(gfx, titleFont) + HeaderBlockSpacing;
         y = DrawLines(gfx, headerLines, headerFont, XBrushes.Black, headerTextLeft, y, 1);
         y = DrawLines(gfx, new[] { filterLine }, headerFont, XBrushes.Black, headerTextLeft, y, 1);

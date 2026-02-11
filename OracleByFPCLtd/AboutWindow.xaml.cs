@@ -9,6 +9,9 @@ public partial class AboutWindow : Window
     public AboutWindow()
     {
         InitializeComponent();
+        var label = $"Oracle by FP&C {AppVersion.CurrentLabel()}";
+        VersionTextBlock.Text = label;
+        Title = $"About {AppVersion.CurrentLabel()}";
     }
 
     private void Hyperlink_RequestNavigate(object sender, RequestNavigateEventArgs e)

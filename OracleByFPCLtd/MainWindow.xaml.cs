@@ -27,6 +27,7 @@ using OracleByFPCLtd.ExportProcessedLogs.IO;
 using OracleByFPCLtd.ExportProcessedLogs.Models;
 using OracleByFPCLtd.ExportProcessedLogs.Rendering;
 using OracleByFPCLtd.ExportProcessedLogs.Services;
+using OracleByFPCLtd.DriverProfiles.Models;
 using OracleByFPCLtd.ProjectData;
 using OracleByFPCLtd.ProjectData.Extractors;
 using OracleByFPCLtd.ProjectData.Models;
@@ -104,6 +105,7 @@ public partial class MainWindow : Window
     private readonly Dictionary<string, HashSet<string>> _noProfileMessages = new(StringComparer.OrdinalIgnoreCase);
     private ProcessingEngine.ProcessingEngine? _processingEngine;
     private AdditionalData? _lastAdditionalData;
+    private IReadOnlyList<AdditionalInfoSheetSchema> _requiredAdditionalInfoSchemas = Array.Empty<AdditionalInfoSheetSchema>();
     private CancellationTokenSource? _reconnectCts;
     private bool _isReconnecting;
     private int _reconnectAttempt;
@@ -173,10 +175,12 @@ public partial class MainWindow : Window
     public MainWindow()
     {
         InitializeComponent();
+        Title = $"Oracle by FP&C {AppVersion.CurrentLabel()}";
         WirePanelHandlers();
         ConfigureLogOutputBoxes();
         ConfigureFilterControls();
         UpdateDownloadLogsState();
+        DownloadAdditionalInfoTemplateMenuItem.IsEnabled = false;
         ConfigureFindTimers();
         LoadSettings();
         DataContext = this;
@@ -1858,7 +1862,11 @@ public partial class MainWindow : Window
         {
             var extractor = new ProjectDataExtractor();
             var result = await Task.Run(() => extractor.Extract(filePath));
-            Dispatcher.Invoke(() => InitializeProcessing(result));
+            Dispatcher.Invoke(() =>
+            {
+                InitializeProcessing(result);
+                UpdateAdditionalInfoTemplateAvailability(result);
+            });
         }
         catch (Exception ex)
         {
@@ -1976,10 +1984,9 @@ public partial class MainWindow : Window
 
     private void DownloadAdditionalInfoTemplateMenuItem_Click(object sender, RoutedEventArgs e)
     {
-        var templatePath = ResolveAdditionalInfoTemplatePath();
-        if (templatePath == null)
+        if (_requiredAdditionalInfoSchemas.Count == 0)
         {
-            MessageBox.Show(this, "Additional info template not found.", "Download Additional Info Template",
+            MessageBox.Show(this, "No additional info template is required for this project.", "Download Additional Info Template",
                 MessageBoxButton.OK, MessageBoxImage.Warning);
             return;
         }
@@ -1987,7 +1994,7 @@ public partial class MainWindow : Window
         var dialog = new SaveFileDialog
         {
             Filter = "Excel (*.xlsx)|*.xlsx|All files (*.*)|*.*",
-            FileName = Path.GetFileName(templatePath)
+            FileName = BuildAdditionalInfoTemplateFileName()
         };
 
         if (dialog.ShowDialog(this) != true)
@@ -1995,7 +2002,7 @@ public partial class MainWindow : Window
             return;
         }
 
-        File.Copy(templatePath, dialog.FileName, overwrite: true);
+        AdditionalInfoTemplateBuilder.Create(dialog.FileName, _requiredAdditionalInfoSchemas);
     }
 
     private void AutoscrollMenuItem_Click(object sender, RoutedEventArgs e)
@@ -2692,17 +2699,28 @@ public partial class MainWindow : Window
         string DriverName,
         List<string> Messages);
 
-    private static string? ResolveAdditionalInfoTemplatePath()
+    private void UpdateAdditionalInfoTemplateAvailability(ProjectDataExtractionResult result)
     {
-        var templateName = "Additional Info - Sung v4.xlsx";
-        var candidates = new[]
-        {
-            Path.Combine(AppContext.BaseDirectory, templateName),
-            Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "ProjectSpreadsheet", templateName)),
-            Path.Combine(Environment.CurrentDirectory, "ProjectSpreadsheet", templateName)
-        };
+        _requiredAdditionalInfoSchemas = AdditionalInfoTemplatePlanner.DetermineSchemas(result.ApexDiscoveryPreload.DriverConfigMap.Values)
+            .ToList();
+        DownloadAdditionalInfoTemplateMenuItem.IsEnabled = _requiredAdditionalInfoSchemas.Count > 0;
 
-        return candidates.FirstOrDefault(File.Exists);
+        if (_requiredAdditionalInfoSchemas.Count == 0)
+        {
+            return;
+        }
+
+    }
+
+    private string BuildAdditionalInfoTemplateFileName()
+    {
+        if (string.IsNullOrWhiteSpace(_projectFilePath))
+        {
+            return "Additional Info Template.xlsx";
+        }
+
+        var baseName = Path.GetFileNameWithoutExtension(_projectFilePath);
+        return $"{baseName} Additional Info Template.xlsx";
     }
 
     private void AppendProcessedRunsWithHighlights(Paragraph paragraph, string line)

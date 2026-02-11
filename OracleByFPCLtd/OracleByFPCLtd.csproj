@@ -19,4 +19,8 @@
       <Link>feeny-logo-100-circle-black-back.png</Link>
     </Resource>
   </ItemGroup>
+
+  <ItemGroup>
+    <Resource Include="Resources\\Cursors\\white-arrow.cur" />
+  </ItemGroup>
 </Project>

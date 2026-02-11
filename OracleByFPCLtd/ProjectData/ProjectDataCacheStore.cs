@@ -18,7 +18,7 @@ public static class ProjectDataCacheStore
     {
         var folder = Path.Combine(
             Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-            "Oracle by FP&C Ltd",
+            "Oracle by FP&C",
             "ProjectCache");
         var hash = ComputePathHash(apexPath);
         return Path.Combine(folder, $"{hash}.json");
