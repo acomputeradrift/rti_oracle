@@ -19,6 +19,7 @@ using System.Windows.Documents;
 using System.Windows.Media;
 using System.Windows.Threading;
 using Microsoft.Win32;
+using OracleByFPCLtd.DriverProfiles.Catalog;
 using OracleByFPCLtd.DiagnosticsTransport;
 using OracleByFPCLtd.DiagnosticsTransport.Connection;
 using OracleByFPCLtd.DiagnosticsTransport.Controls;
@@ -170,6 +171,7 @@ public partial class MainWindow : Window
     private MenuItem DownloadProcessedLogsMenuItem => DownloadProcessedLogsMenuItemControl;
     private MenuItem DownloadAdditionalInfoTemplateMenuItem => DownloadAdditionalInfoTemplateMenuItemControl;
     private MenuItem AutoscrollMenuItem => AutoscrollMenuItemControl;
+    private MenuItem DriverProfilesMenuItem => DriverProfilesMenuItemControl;
     private MenuItem AboutMenuItem => AboutMenuItemControl;
 
     public MainWindow()
@@ -233,6 +235,7 @@ public partial class MainWindow : Window
         DownloadProcessedLogsMenuItem.Click += DownloadLogsButton_Click;
         DownloadAdditionalInfoTemplateMenuItem.Click += DownloadAdditionalInfoTemplateMenuItem_Click;
         AutoscrollMenuItem.Click += AutoscrollMenuItem_Click;
+        DriverProfilesMenuItem.Click += DriverProfilesMenuItem_Click;
         AboutMenuItem.Click += AboutMenuItem_Click;
 
         RawFindTextBox.TextChanged += RawFindTextBox_TextChanged;
@@ -2022,6 +2025,83 @@ public partial class MainWindow : Window
             Owner = this
         };
         about.ShowDialog();
+    }
+
+    private void DriverProfilesMenuItem_Click(object sender, RoutedEventArgs e)
+    {
+        var profiles = DriverProfileCatalog.All()
+            .Select(profile => profile.DeviceName)
+            .Where(name => !string.IsNullOrWhiteSpace(name))
+            .Where(name => !string.Equals(name, "RTI Internal", StringComparison.OrdinalIgnoreCase))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .OrderBy(name => name, StringComparer.OrdinalIgnoreCase)
+            .ToList();
+
+        if (profiles.Count == 0)
+        {
+            MessageBox.Show(this, "No driver profiles are currently registered.", "Driver Profiles",
+                MessageBoxButton.OK, MessageBoxImage.Information);
+            return;
+        }
+
+        var timestampBrush = new SolidColorBrush(Color.FromRgb(120, 120, 120));
+        var rows = new StackPanel();
+        foreach (var profileName in profiles)
+        {
+            var row = new TextBlock
+            {
+                Margin = new Thickness(0, 0, 0, 6),
+                TextWrapping = TextWrapping.Wrap
+            };
+
+            row.Inlines.Add(new Run(profileName) { FontWeight = FontWeights.Bold });
+            row.Inlines.Add(new Run($" ({GetProfileTimestampText(profileName)})") { Foreground = timestampBrush });
+            rows.Children.Add(row);
+        }
+
+        var header = new TextBlock
+        {
+            Text = $"Current driver profiles ({profiles.Count})",
+            Margin = new Thickness(0, 0, 0, 10),
+            FontWeight = FontWeights.SemiBold
+        };
+
+        var content = new DockPanel
+        {
+            Margin = new Thickness(14)
+        };
+        DockPanel.SetDock(header, Dock.Top);
+        content.Children.Add(header);
+        content.Children.Add(new ScrollViewer
+        {
+            VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
+            Content = rows
+        });
+
+        var dialog = new Window
+        {
+            Owner = this,
+            Title = "Driver Profiles",
+            Width = 540,
+            Height = 620,
+            MinWidth = 420,
+            MinHeight = 320,
+            WindowStartupLocation = WindowStartupLocation.CenterOwner,
+            Background = Brushes.White,
+            Content = content
+        };
+        dialog.ShowDialog();
+    }
+
+    private static string GetProfileTimestampText(string profileName)
+    {
+        if (!DriverProfileVersionCatalog.TryGetLastUpdatedUtc(profileName, out var lastUpdatedUtc))
+        {
+            return "last updated unknown";
+        }
+
+        var localTimestamp = lastUpdatedUtc.ToLocalTime().ToString("yyyy-MM-dd HH:mm", CultureInfo.InvariantCulture);
+        return $"last updated {localTimestamp}";
     }
 
     private ExportRequest BuildExportRequest()

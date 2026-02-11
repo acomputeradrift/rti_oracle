@@ -43,6 +43,7 @@ public sealed class SystemData
     public List<TriggerPortEntry> TriggerPorts { get; } = new();
     public List<Rs232PortEntry> Rs232Ports { get; } = new();
     public List<RoomMappingEntry> RoomMappings { get; } = new();
+    public List<SourceCatalogEntry> SourceCatalog { get; } = new();
 
     public static SystemData FromExtractionResult(ProjectDataExtractionResult result)
     {
@@ -65,6 +66,7 @@ public sealed class SystemData
         data.TriggerPorts.AddRange(result.ApexDiscoveryPreload.TriggerPorts);
         data.Rs232Ports.AddRange(result.ApexDiscoveryPreload.Rs232Ports);
         data.RoomMappings.AddRange(result.ApexDiscoveryPreload.RoomMappings);
+        data.SourceCatalog.AddRange(result.ApexDiscoveryPreload.SourceCatalog);
         return data;
     }
 
@@ -88,6 +90,7 @@ public sealed class SystemData
         result.ApexDiscoveryPreload.TriggerPorts.AddRange(TriggerPorts);
         result.ApexDiscoveryPreload.Rs232Ports.AddRange(Rs232Ports);
         result.ApexDiscoveryPreload.RoomMappings.AddRange(RoomMappings);
+        result.ApexDiscoveryPreload.SourceCatalog.AddRange(SourceCatalog);
     }
 }
 

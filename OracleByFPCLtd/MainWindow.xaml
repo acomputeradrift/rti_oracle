@@ -49,6 +49,7 @@
         <MenuItem x:Name="AutoscrollMenuItemControl" Header="Autoscroll" IsCheckable="True" IsChecked="True" />
       </MenuItem>
       <MenuItem Header="_Help">
+        <MenuItem x:Name="DriverProfilesMenuItemControl" Header="Driver Profiles" />
         <MenuItem x:Name="AboutMenuItemControl" Header="About" />
       </MenuItem>
     </Menu>

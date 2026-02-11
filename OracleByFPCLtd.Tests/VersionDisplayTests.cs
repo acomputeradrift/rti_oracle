@@ -1,6 +1,7 @@
 using System;
 using System.Reflection;
 using System.Threading;
+using System.Windows.Documents;
 using System.Windows.Threading;
 using OracleByFPCLtd;
 using OracleByFPCLtd.UI.Panels;
@@ -31,6 +32,32 @@ public sealed class VersionDisplayTests
             var text = GetAboutVersionText(window);
             Assert.Equal(expected, text);
         });
+    }
+
+    [Fact]
+    public void AboutWindowVersionIsClickable()
+    {
+        RunOnSta(() =>
+        {
+            var window = new AboutWindow();
+            var field = typeof(AboutWindow).GetField("VersionLink", BindingFlags.Instance | BindingFlags.NonPublic);
+            Assert.NotNull(field);
+            var hyperlink = field!.GetValue(window) as Hyperlink;
+            Assert.NotNull(hyperlink);
+            Assert.Equal("_changelog", hyperlink!.Tag);
+        });
+    }
+
+    [Fact]
+    public void AboutWindowCanLoadChangelogForDisplay()
+    {
+        var method = typeof(AboutWindow).GetMethod("LoadChangelogForDisplay", BindingFlags.Static | BindingFlags.NonPublic);
+        Assert.NotNull(method);
+        var result = method!.Invoke(null, null) as string;
+        Assert.False(string.IsNullOrWhiteSpace(result));
+        Assert.Contains("## [1.1]", result, StringComparison.Ordinal);
+        Assert.DoesNotContain("All notable changes for RTI Oracle should be recorded in this file.", result, StringComparison.Ordinal);
+        Assert.DoesNotContain("## [Unreleased]", result, StringComparison.Ordinal);
     }
 
     private static string GetAboutVersionText(AboutWindow window)

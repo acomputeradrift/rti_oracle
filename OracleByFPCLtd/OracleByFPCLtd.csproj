@@ -23,4 +23,12 @@
   <ItemGroup>
     <Resource Include="Resources\\Cursors\\white-arrow.cur" />
   </ItemGroup>
+
+  <ItemGroup>
+    <Content Include="..\ApplicationPackaging\CHANGELOG.md">
+      <Link>CHANGELOG.md</Link>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <CopyToPublishDirectory>Always</CopyToPublishDirectory>
+    </Content>
+  </ItemGroup>
 </Project>

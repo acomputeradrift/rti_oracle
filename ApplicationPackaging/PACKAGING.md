@@ -1,55 +1,89 @@
 # Packaging (Windows Single-File EXE)
 
 ## Goal
-Build a single-file Windows x64 `.exe` from this repo without modifying source version numbers. Version is injected only at packaging time via `dotnet publish`.
+Build a single-file Windows x64 `.exe` with a packaging-time version and store each release in a dedicated version folder for long-term traceability.
 
 ## Prereqs
 - Windows machine with .NET SDK 8 installed.
-- Repo available on `Y:\Desktop\Development\Oracle` (adjust if needed).
+- Repo available on `Y:\Desktop\Development\Oracle`.
+- Packaging output root: `Y:\Desktop\Development\ShippedPackages\OracleByFPC`.
 
-## Versioning Strategy (Option A)
-Use `-p:Version=<X>` on `dotnet publish` to set the version displayed in the app.
+## Release Layout
+Each shipped version gets its own folder:
 
-Example versions:
-- `1.0` (first package)
-- `1.1` (next package)
-- `1.2` (next package)
+```text
+Y:\Desktop\Development\ShippedPackages\OracleByFPC\
+  v1.1\
+    build-info.txt
+    CHANGELOG.md
+    source-staging\
+      OracleByFPCLtd\...
+      UserInterface\...
+    publish\
+      OracleByFPC_v1.1.exe
+      OracleByFPCLtd.pdb
+```
 
-## Packaging Steps
+This keeps versions easy to find and compare later.
 
-1. Pick the next version (example: `1.1`).
-2. Use a clean staging folder (prevents repo pollution).
-3. Run `dotnet publish` with the version parameter.
+## Versioning
+Use `-p:Version=<X>` on `dotnet publish`.
 
-### Example Commands (Windows PowerShell)
+Examples:
+- `1.0`
+- `1.1`
+- `1.2`
+
+## Packaging Command (PowerShell)
+Use the script in this folder:
+
 ```powershell
-# 1) Create a staging folder
-mkdir Y:\Desktop\Development\TestPackages\OracleByFPCLtd-staging
+Y:\Desktop\Development\Oracle\ApplicationPackaging\package.ps1 -Version 1.1
+```
 
-# 2) Copy only required project files (exclude bin/obj)
-robocopy Y:\Desktop\Development\Oracle\OracleByFPCLtd `
-  Y:\Desktop\Development\TestPackages\OracleByFPCLtd-staging\OracleByFPCLtd `
-  /E /XD bin obj
+## Manual Equivalent (PowerShell)
+```powershell
+$version = "1.1"
+$repo = "Y:\Desktop\Development\Oracle"
+$root = "Y:\Desktop\Development\ShippedPackages\OracleByFPC"
+$release = Join-Path $root ("v" + $version)
+$staging = Join-Path $release "source-staging"
+$publish = Join-Path $release "publish"
 
-# 3) Ensure the UI image resource exists in staging
-mkdir Y:\Desktop\Development\TestPackages\OracleByFPCLtd-staging\UserInterface
-copy Y:\Desktop\Development\Oracle\UserInterface\feeny-logo-100-circle-black-back.png `
-  Y:\Desktop\Development\TestPackages\OracleByFPCLtd-staging\UserInterface
+if (Test-Path $release) {
+  Remove-Item $release -Recurse -Force
+}
 
-# 4) Publish single-file, self-contained, versioned EXE
-dotnet publish Y:\Desktop\Development\TestPackages\OracleByFPCLtd-staging\OracleByFPCLtd\OracleByFPCLtd.csproj `
+New-Item -ItemType Directory -Force -Path $staging | Out-Null
+New-Item -ItemType Directory -Force -Path $publish | Out-Null
+
+robocopy "$repo\OracleByFPCLtd" "$staging\OracleByFPCLtd" /E /XD bin obj
+robocopy "$repo\UserInterface" "$staging\UserInterface" feeny-logo-100-circle-black-back.png
+
+dotnet publish "$staging\OracleByFPCLtd\OracleByFPCLtd.csproj" `
   -c Release -r win-x64 --self-contained true `
   -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true `
-  -p:Version=1.1 `
-  -o Y:\Desktop\Development\TestPackages\OracleByFPCLtd-staging\publish
-```
+  -p:Version=$version `
+  -o $publish
 
-## Output
-The EXE will be at:
-```
-Y:\Desktop\Development\TestPackages\OracleByFPCLtd-staging\publish\OracleByFPCLtd.exe
+# Rename final EXE artifact
+if (Test-Path "$publish\OracleByFPC_v$version.exe") {
+  Remove-Item "$publish\OracleByFPC_v$version.exe" -Force
+}
+Rename-Item "$publish\OracleByFPCLtd.exe" "OracleByFPC_v$version.exe"
+
+Copy-Item "$repo\ApplicationPackaging\CHANGELOG.md" "$release\CHANGELOG.md" -Force
+"Version: $version`r`nBuilt: $(Get-Date -Format 'yyyy-MM-dd HH:mm')`r`n" | Set-Content "$release\build-info.txt"
 ```
 
 ## Notes
-- Only the `-p:Version=` value changes for each package.
-- This version should surface in the app title and Help → About once the UI is wired to `AssemblyInformationalVersion` or `AssemblyVersion`.
+- Re-shipping a version intentionally overwrites that version folder.
+- Keep the changelog in `ApplicationPackaging\CHANGELOG.md` up to date before packaging.
+- If packaging fails, fix and re-run with the same version to overwrite.
+- Final artifact name must be `OracleByFPC_v<version>.exe`.
+
+## Troubleshooting
+- In PowerShell, line continuation is backtick `` ` `` (not `\`).
+- Use Windows paths (`Y:\...`) in PowerShell commands.
+- If `MSB1009 Project file does not exist`, verify staging first:
+  - `Test-Path "$staging\OracleByFPCLtd\OracleByFPCLtd.csproj"` should be `True`.

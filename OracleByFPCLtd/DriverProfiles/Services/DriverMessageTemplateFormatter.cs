@@ -664,8 +664,8 @@ public static class DriverMessageTemplateFormatter
         }
 
         var tail = parts[^1];
-        var openIndex = tail.LastIndexOf('(');
         var closeIndex = tail.LastIndexOf(')');
+        var openIndex = FindOpenParenIndexForTrailingArgs(tail, closeIndex);
         if (openIndex <= 0 || closeIndex <= openIndex)
         {
             actionName = tail.Trim();
@@ -676,6 +676,36 @@ public static class DriverMessageTemplateFormatter
         var argsText = tail.Substring(openIndex + 1, closeIndex - openIndex - 1).Trim();
         args = SplitArgs(argsText);
         return !string.IsNullOrWhiteSpace(actionName);
+    }
+
+    private static int FindOpenParenIndexForTrailingArgs(string value, int closeIndex)
+    {
+        if (string.IsNullOrWhiteSpace(value) || closeIndex <= 0 || closeIndex >= value.Length)
+        {
+            return -1;
+        }
+
+        var depth = 0;
+        for (var i = closeIndex; i >= 0; i--)
+        {
+            var ch = value[i];
+            if (ch == ')')
+            {
+                depth++;
+                continue;
+            }
+
+            if (ch == '(')
+            {
+                depth--;
+                if (depth == 0)
+                {
+                    return i;
+                }
+            }
+        }
+
+        return -1;
     }
 
     private static List<string> SplitArgs(string argsText)

@@ -71,7 +71,8 @@ public sealed class ProjectDataExtractor : IProjectDataExtractor
             throw new FileNotFoundException("APEX file not found.", apexPath);
         }
 
-        if (ProjectDataCacheStore.TryLoad(apexPath, out var cached))
+        if (ProjectDataCacheStore.TryLoad(apexPath, out var cached)
+            && cached.ApexDiscoveryPreload.SourceCatalog.Count > 0)
         {
             return cached;
         }

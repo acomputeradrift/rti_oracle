@@ -23,6 +23,7 @@ public sealed class ApexDiscoveryPreloadResult
     public List<TriggerPortEntry> TriggerPorts { get; } = new();
     public List<Rs232PortEntry> Rs232Ports { get; } = new();
     public List<RoomMappingEntry> RoomMappings { get; } = new();
+    public List<SourceCatalogEntry> SourceCatalog { get; } = new();
     public List<DriverTemplateVariableEntry> DriverTemplateVariables { get; } = new();
 }
 
@@ -78,6 +79,12 @@ public sealed record RoomMappingEntry(
     string ControllerDeviceName,
     int? PageId,
     string PageName);
+public sealed record SourceCatalogEntry(
+    int DeviceId,
+    int RoomId,
+    int ControlType,
+    string SourceName,
+    string SourceDisplayName);
 public sealed record DriverTemplateVariableEntry(
     int DriverDeviceId,
     string DriverDeviceName,
@@ -121,6 +128,7 @@ public static class ApexDiscoveryPreloadExtractor
         LoadTriggerPorts(connection, result.TriggerPorts);
         LoadRs232Ports(connection, result.Rs232Ports);
         LoadRoomMappings(connection, result.RoomMappings);
+        LoadSourceCatalog(connection, result.SourceCatalog);
         LoadDriverTemplateVariables(connection, result.DriverTemplateVariables);
 
         return result;
@@ -773,6 +781,45 @@ ORDER BY r.RoomId, s.DeviceId, dv.DeviceId, p.PageId;
                 reader.IsDBNull(5) ? "" : reader.GetString(5),
                 reader.IsDBNull(6) ? (int?)null : reader.GetInt32(6),
                 reader.IsDBNull(7) ? "" : reader.GetString(7)));
+        }
+    }
+
+    private static void LoadSourceCatalog(SqliteConnection connection, List<SourceCatalogEntry> entries)
+    {
+        using var command = connection.CreateCommand();
+        command.CommandText = """
+SELECT
+  DeviceId,
+  RoomId,
+  ControlType,
+  Name,
+  DisplayName
+FROM Devices
+WHERE ControlType IN (5, 6)
+ORDER BY DeviceId;
+""";
+
+        using var reader = command.ExecuteReader();
+        while (reader.Read())
+        {
+            if (reader.IsDBNull(0))
+            {
+                continue;
+            }
+
+            var sourceName = reader.IsDBNull(3) ? "" : reader.GetString(3);
+            var sourceDisplayName = reader.IsDBNull(4) ? "" : reader.GetString(4);
+            if (string.IsNullOrWhiteSpace(sourceDisplayName))
+            {
+                sourceDisplayName = sourceName;
+            }
+
+            entries.Add(new SourceCatalogEntry(
+                reader.GetInt32(0),
+                reader.IsDBNull(1) ? 0 : reader.GetInt32(1),
+                reader.IsDBNull(2) ? 0 : reader.GetInt32(2),
+                sourceName,
+                sourceDisplayName));
         }
     }
 

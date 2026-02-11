@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Text.RegularExpressions;
 using OracleByFPCLtd.DriverProfiles.Models;
 using OracleByFPCLtd.ProjectData.Models;
@@ -44,6 +45,13 @@ public static class SystemManagerProfile
 
             if (DriverCommandPattern.IsMatch(rawText) || DriverEventPattern.IsMatch(rawText))
             {
+                if (TryResolveSourceIndexCommands(rawText, bundle, out var resolvedText, out var sourceUnresolved))
+                {
+                    mappedText = resolvedText;
+                    unresolved = sourceUnresolved;
+                    return true;
+                }
+
                 unresolved = HasUnresolvedSourceIndex(rawText);
                 return true;
             }
@@ -124,6 +132,99 @@ public static class SystemManagerProfile
         private static bool IsNumericArg(string value)
         {
             return int.TryParse(value, out _);
+        }
+
+        private static bool TryResolveSourceIndexCommands(string rawText, ProjectDataBundle bundle, out string resolvedText, out bool unresolved)
+        {
+            resolvedText = rawText;
+            unresolved = false;
+
+            var match = CommandCapturePattern.Match(rawText);
+            if (!match.Success)
+            {
+                return false;
+            }
+
+            var command = match.Groups["command"].Value;
+            if (!TryParseCommand(command, out var actionName, out var args))
+            {
+                return false;
+            }
+
+            var isSetSource = actionName.Equals("Set Source", StringComparison.OrdinalIgnoreCase) && args.Count >= 1;
+            var isSetSourceByRoom = actionName.Equals("Set Source By Room", StringComparison.OrdinalIgnoreCase) && args.Count >= 2;
+            if (!isSetSource && !isSetSourceByRoom)
+            {
+                return false;
+            }
+
+            var sourceArgIndex = isSetSource ? 0 : 1;
+            if (!IsNumericArg(args[sourceArgIndex]))
+            {
+                return false;
+            }
+
+            if (!TryResolveSystemManagerSourceIndex(bundle, args[sourceArgIndex], out var sourceName))
+            {
+                unresolved = true;
+                return true;
+            }
+
+            args[sourceArgIndex] = sourceName;
+            var updatedCommand = RebuildCommandWithArgs(command, args);
+            var replacementStart = match.Groups["command"].Index;
+            resolvedText = rawText.Substring(0, replacementStart)
+                + updatedCommand
+                + rawText.Substring(replacementStart + match.Groups["command"].Length);
+            return true;
+        }
+
+        private static bool TryResolveSystemManagerSourceIndex(ProjectDataBundle bundle, string rawIndex, out string sourceName)
+        {
+            sourceName = "";
+            if (!int.TryParse(rawIndex, out var zeroBasedIndex))
+            {
+                return false;
+            }
+
+            if (zeroBasedIndex < 0)
+            {
+                return false;
+            }
+
+            var orderedSources = bundle.System.SourceCatalog
+                .OrderBy(entry => entry.DeviceId)
+                .ToList();
+            var sourceNumber = zeroBasedIndex + 1;
+            if (sourceNumber <= 0 || sourceNumber > orderedSources.Count)
+            {
+                return false;
+            }
+
+            var entry = orderedSources[sourceNumber - 1];
+            sourceName = string.IsNullOrWhiteSpace(entry.SourceDisplayName) ? entry.SourceName : entry.SourceDisplayName;
+            return !string.IsNullOrWhiteSpace(sourceName);
+        }
+
+        private static string RebuildCommandWithArgs(string originalCommand, IReadOnlyList<string> args)
+        {
+            var parts = originalCommand.Split('\\', StringSplitOptions.RemoveEmptyEntries);
+            if (parts.Length == 0)
+            {
+                return originalCommand;
+            }
+
+            var tail = parts[^1];
+            var openIndex = tail.LastIndexOf('(');
+            var closeIndex = tail.LastIndexOf(')');
+            if (openIndex <= 0 || closeIndex <= openIndex)
+            {
+                return originalCommand;
+            }
+
+            var actionName = tail.Substring(0, openIndex).Trim();
+            parts[^1] = $"{actionName}({string.Join(", ", args)})";
+            return string.Join("\\", parts);
         }
     }
 }

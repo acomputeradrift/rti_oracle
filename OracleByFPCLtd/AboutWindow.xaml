@@ -8,11 +8,15 @@
   <Border Padding="16" BorderBrush="#CCCCCC" BorderThickness="1">
     <StackPanel HorizontalAlignment="Center">
       <TextBlock x:Name="VersionTextBlock"
-                 Text="Oracle by FP&amp;C v1"
                  FontSize="16"
                  FontWeight="SemiBold"
                  Margin="0,0,0,12"
-                 TextAlignment="Center" />
+                 TextAlignment="Center">
+        <Run Text="Oracle by FP&amp;C " />
+        <Hyperlink x:Name="VersionLink"
+                   Tag="_changelog"
+                   Click="VersionLink_Click" />
+      </TextBlock>
       <Image Source="pack://application:,,,/feeny-logo-100-circle-black-back.png"
              Width="100"
              Height="100"

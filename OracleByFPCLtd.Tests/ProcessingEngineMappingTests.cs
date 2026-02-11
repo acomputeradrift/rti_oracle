@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using OracleByFPCLtd.DriverProfiles;
+using OracleByFPCLtd.ProjectData;
 using OracleByFPCLtd.ProcessingEngine.Mapping;
 using OracleByFPCLtd.ProcessingEngine.Models;
 using OracleByFPCLtd.ProcessingEngine.Parsing;
@@ -209,6 +210,32 @@ public sealed class ProcessingEngineMappingTests
     }
 
     [Fact]
+    public void DriverMappingServiceResolvesSystemManagerSetSourceByRoomWithSourceCatalogOffset()
+    {
+        var bundle = BuildBundleWithSystemManagerSourceCatalog();
+        var service = new DriverMappingService();
+        var evt = new DiagnosticEvent(34, "[2026-02-11 14:34:26.358] Driver - Command:'System Manager\\Routing\\Set Source By Room(Room Five, 28)' Sustain:NO");
+
+        var line = service.Map(evt, bundle);
+
+        Assert.Equal("34 [2026-02-11 14:34:26.358] Driver Command (System Manager): 'Source for Room Five set to Other Source (Room 5).'", line.Text);
+        Assert.False(line.IsUnresolved);
+    }
+
+    [Fact]
+    public void DriverMappingServiceResolvesSystemManagerSetSourceWithSourceCatalogOffset()
+    {
+        var bundle = BuildBundleWithSystemManagerSourceCatalog();
+        var service = new DriverMappingService();
+        var evt = new DiagnosticEvent(3, "[2026-02-11 14:29:23.662] Driver - Command:'System Manager\\Routing\\Set Source(7)' Sustain:NO");
+
+        var line = service.Map(evt, bundle);
+
+        Assert.Equal("3 [2026-02-11 14:29:23.662] Driver Command (System Manager): 'Source set to Video Source (Global).'", line.Text);
+        Assert.False(line.IsUnresolved);
+    }
+
+    [Fact]
     public void DriverMappingServiceMarksNoMapForSystemManagerSetSourceWithNumericSource()
     {
         var bundle = new ProjectDataBundle();
@@ -347,6 +374,44 @@ public sealed class ProcessingEngineMappingTests
         var driverData = new AdditionalDriverData();
         driverData.CbusGroups[(56, 78)] = new CbusGroupEntry("Living Room", "Pendant");
         bundle.Additional.Drivers["Clipsal C-Bus"] = driverData;
+        return bundle;
+    }
+
+    private static ProjectDataBundle BuildBundleWithSystemManagerSourceCatalog()
+    {
+        var bundle = new ProjectDataBundle();
+        bundle.System.SourceCatalog.AddRange(new[]
+        {
+            new SourceCatalogEntry(1, 0, 5, "Home (Global)", "Home (Global)"),
+            new SourceCatalogEntry(7, 1, 5, "Home (Room 1)", "Home (Room 1)"),
+            new SourceCatalogEntry(8, 2, 5, "Home (Room 2)", "Home (Room 2)"),
+            new SourceCatalogEntry(9, 3, 5, "Home (Room 3)", "Home (Room 3)"),
+            new SourceCatalogEntry(10, 4, 5, "Home (Room 4)", "Home (Room 4)"),
+            new SourceCatalogEntry(11, 5, 5, "Home (Room 5)", "Home (Room 5)"),
+            new SourceCatalogEntry(12, 0, 5, "Audio Source (Global)", "Audio Source (Global)"),
+            new SourceCatalogEntry(13, 0, 5, "Video Source (Global)", "Video Source (Global)"),
+            new SourceCatalogEntry(14, 1, 5, "Audio Source (Room 1)", "Audio Source (Room 1)"),
+            new SourceCatalogEntry(15, 1, 5, "Video Source (Room 1)", "Video Source (Room 1)"),
+            new SourceCatalogEntry(16, 2, 5, "Audio Source (Room 2)", "Audio Source (Room 2)"),
+            new SourceCatalogEntry(17, 2, 5, "Video Source (Room 2)", "Video Source (Room 2)"),
+            new SourceCatalogEntry(18, 3, 5, "Audio Source (Room 3)", "Audio Source (Room 3)"),
+            new SourceCatalogEntry(19, 3, 5, "Video Source (Room 3)", "Video Source (Room 3)"),
+            new SourceCatalogEntry(20, 4, 5, "Audio Source (Room 4)", "Audio Source (Room 4)"),
+            new SourceCatalogEntry(21, 4, 5, "Video Source (Room 4)", "Video Source (Room 4)"),
+            new SourceCatalogEntry(22, 5, 5, "Audio Source (Room 5)", "Audio Source (Room 5)"),
+            new SourceCatalogEntry(23, 5, 5, "Video Source (Room 5)", "Video Source (Room 5)"),
+            new SourceCatalogEntry(25, 1, 6, "Audio - Zone 1 (Room 1)", "Audio - Zone 1 (Room 1)"),
+            new SourceCatalogEntry(26, 2, 6, "Audio - Zone 2 (Room 2)", "Audio - Zone 2 (Room 2)"),
+            new SourceCatalogEntry(27, 3, 6, "Audio - Zone 3 (Room 3)", "Audio - Zone 3 (Room 3)"),
+            new SourceCatalogEntry(28, 4, 6, "Audio - Zone 4 (Room 4)", "Audio - Zone 4 (Room 4)"),
+            new SourceCatalogEntry(29, 5, 6, "Audio - Zone 5 (Room 5)", "Audio - Zone 5 (Room 5)"),
+            new SourceCatalogEntry(31, 1, 6, "Video - Zone 1 (Room 1)", "Video - Zone 1 (Room 1)"),
+            new SourceCatalogEntry(32, 1, 5, "Other Source (Room 1)", "Other Source (Room 1)"),
+            new SourceCatalogEntry(33, 2, 5, "Other Source (Room 2)", "Other Source (Room 2)"),
+            new SourceCatalogEntry(34, 3, 5, "Other Source (Room 3)", "Other Source (Room 3)"),
+            new SourceCatalogEntry(35, 4, 5, "Other Source (Room 4)", "Other Source (Room 4)"),
+            new SourceCatalogEntry(36, 5, 5, "Other Source (Room 5)", "Other Source (Room 5)")
+        });
         return bundle;
     }
 }
