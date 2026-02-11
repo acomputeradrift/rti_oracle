@@ -73,6 +73,7 @@ public sealed class ProcessingEngine
             result.DiagnosticsMapping.Add(new DiagnosticsMappingEntry(
                 entry.Value,
                 entry.Key,
+                entry.Key,
                 0,
                 0,
                 0,

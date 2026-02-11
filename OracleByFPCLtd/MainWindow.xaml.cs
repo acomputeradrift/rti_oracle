@@ -9,6 +9,7 @@ using System.Linq;
 using System.Text.Encodings.Web;
 using System.Text.Json;
 using System.Text.RegularExpressions;
+using System.Threading;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
@@ -44,6 +45,8 @@ public partial class MainWindow : Window
     private const string FilterInvalidKeywordMessage = "Invalid keyword filter. Use comma-separated terms, with optional +include / -exclude.";
     private const string FilterInvalidDateMessage = "Invalid date/time filter. Use yyyy-MM-dd HH:mm.";
     private const string FilterInvalidRangeMessage = "Invalid date/time range. Start must be before End.";
+    private const int ReconnectDelaySeconds = 3;
+    private const int ReconnectInitialDelaySeconds = 3;
     private const double ProcessedWidthPadding = 12;
     private const double RawWidthPadding = 12;
     private static readonly TimeSpan FindDebounceInterval = TimeSpan.FromMilliseconds(200);
@@ -101,6 +104,11 @@ public partial class MainWindow : Window
     private readonly Dictionary<string, HashSet<string>> _noProfileMessages = new(StringComparer.OrdinalIgnoreCase);
     private ProcessingEngine.ProcessingEngine? _processingEngine;
     private AdditionalData? _lastAdditionalData;
+    private CancellationTokenSource? _reconnectCts;
+    private bool _isReconnecting;
+    private int _reconnectAttempt;
+    private bool _suppressReconnect;
+    private string? _lastConnectedIp;
     private static readonly string[] AnchorNames =
     {
         "EVENTS_INPUT",
@@ -1476,6 +1484,38 @@ public partial class MainWindow : Window
         }
 
         AppendLog(message);
+        HandleTransportFailure(message);
+    }
+
+    private void HandleTransportFailure(string message)
+    {
+        if (_suppressReconnect || _useTcpCapture || _isConnecting)
+        {
+            return;
+        }
+
+        var shouldReconnect = !_transport.IsConnected || IsRemoteCloseMessage(message);
+
+        var ip = _lastConnectedIp ?? IpTextBox.Text.Trim();
+        if (string.IsNullOrWhiteSpace(ip))
+        {
+            Dispatcher.Invoke(() =>
+            {
+                StatusText.Text = "Disconnected";
+                DisconnectButton.IsEnabled = false;
+                ConnectButton.IsEnabled = true;
+                DiscoverButton.IsEnabled = true;
+                UpdateAllLogLevelsVisibility();
+            });
+            return;
+        }
+
+        if (!shouldReconnect)
+        {
+            return;
+        }
+
+        Dispatcher.Invoke(() => StartReconnectLoop(ip));
     }
 
     private void RegisterTransportHandlers(IDiagnosticsTransport transport)
@@ -1508,19 +1548,31 @@ public partial class MainWindow : Window
         try
         {
             var results = await _transport.DiscoverAsync(TimeSpan.FromSeconds(2));
-            DiscoveredCombo.ItemsSource = results.OrderBy(ip => ip).ToList();
-            if (results.Count == 1)
+            var sorted = results.OrderBy(ip => ip).ToList();
+            if (sorted.Count > 0)
+            {
+                var items = new List<string> { "Select a device..." };
+                items.AddRange(sorted);
+                DiscoveredCombo.ItemsSource = items;
+                DiscoveredCombo.SelectedIndex = 0;
+            }
+            else
+            {
+                DiscoveredCombo.ItemsSource = sorted;
+            }
+
+            if (sorted.Count == 1)
             {
                 if (_apexUploaded)
                 {
-                    IpTextBox.Text = results[0];
+                    IpTextBox.Text = sorted[0];
                 }
             }
-            StatusText.Text = results.Count == 0 ? "No devices found" : $"Found {results.Count}";
+            StatusText.Text = sorted.Count == 0 ? "No Devices Found" : $"Found {sorted.Count}";
         }
         catch (Exception ex)
         {
-            StatusText.Text = "Discovery failed";
+            StatusText.Text = "Discovery Failed";
             AppendLog($"[error] Discovery failed: {ex.Message}");
         }
         finally
@@ -1531,9 +1583,21 @@ public partial class MainWindow : Window
 
     private async void ConnectButton_Click(object sender, RoutedEventArgs e)
     {
+        if (_isReconnecting)
+        {
+            StopReconnectLoop();
+            StatusText.Text = "Reconnect Stopped";
+            ConnectButton.Content = "Connect";
+            ConnectButton.IsEnabled = true;
+            DiscoverButton.IsEnabled = true;
+            return;
+        }
+
+        StopReconnectLoop();
+        _suppressReconnect = false;
         if (!_apexUploaded)
         {
-            StatusText.Text = "Upload project first";
+            StatusText.Text = "Upload Project First";
             return;
         }
 
@@ -1577,6 +1641,8 @@ public partial class MainWindow : Window
             }
             StatusText.Text = "Connected";
             DisconnectButton.IsEnabled = true;
+            ConnectButton.Content = "Connect";
+            _lastConnectedIp = ip;
             UpdateAllLogLevelsVisibility();
             if (!string.IsNullOrWhiteSpace(_projectFilePath))
             {
@@ -1588,10 +1654,11 @@ public partial class MainWindow : Window
         }
         catch (Exception ex)
         {
-            StatusText.Text = "Connect failed";
+            StatusText.Text = "Connect Failed";
             AppendLog($"[error] Connect failed: {ex.Message}");
             ConnectButton.IsEnabled = true;
             DiscoverButton.IsEnabled = true;
+            ConnectButton.Content = "Connect";
         }
         finally
         {
@@ -1601,7 +1668,10 @@ public partial class MainWindow : Window
 
     private async void DisconnectButton_Click(object sender, RoutedEventArgs e)
     {
+        _suppressReconnect = true;
+        StopReconnectLoop();
         await _transport.DisconnectAsync();
+        _suppressReconnect = false;
         _rawLineNumber = 1;
         _messageFormatter.Reset(DateOnly.FromDateTime(DateTime.Today));
         StatusText.Text = "Disconnected";
@@ -1612,13 +1682,109 @@ public partial class MainWindow : Window
         UpdateAllLogLevelsVisibility();
     }
 
+    private void StartReconnectLoop(string ip)
+    {
+        if (_isReconnecting)
+        {
+            return;
+        }
+
+        _reconnectCts?.Cancel();
+        _reconnectCts = new CancellationTokenSource();
+        _isReconnecting = true;
+        _reconnectAttempt = 0;
+        StatusText.Text = "Attempting Reconnect...";
+        DisconnectButton.IsEnabled = false;
+        DiscoverButton.IsEnabled = false;
+        ConnectButton.IsEnabled = true;
+        ConnectButton.Content = "Stop";
+        UpdateAllLogLevelsVisibility();
+
+        _ = Task.Run(() => ReconnectLoopAsync(ip, _reconnectCts.Token));
+    }
+
+    private async Task ReconnectLoopAsync(string ip, CancellationToken token)
+    {
+        try
+        {
+            await Task.Delay(TimeSpan.FromSeconds(ReconnectInitialDelaySeconds), token);
+
+            while (!token.IsCancellationRequested)
+            {
+                try
+                {
+                    _isConnecting = true;
+                    _reconnectAttempt++;
+                    Dispatcher.Invoke(() =>
+                    {
+                    StatusText.Text = $"Attempting Reconnect... {_reconnectAttempt}";
+                    });
+                    await _transport.ConnectAsync(ip);
+                    if (!_useTcpCapture)
+                    {
+                        await LoadDriversAsync(ip);
+                    }
+
+                    Dispatcher.Invoke(() =>
+                    {
+                        StatusText.Text = "Connected";
+                        DisconnectButton.IsEnabled = true;
+                        DiscoverButton.IsEnabled = true;
+                        ConnectButton.IsEnabled = false;
+                        ConnectButton.Content = "Connect";
+                        UpdateAllLogLevelsVisibility();
+                    });
+
+                    _lastConnectedIp = ip;
+                    _isReconnecting = false;
+                    _isConnecting = false;
+                    return;
+                }
+                catch (Exception ex)
+                {
+                    AppendLog($"[error] Reconnect failed: {ex.Message}");
+                    _isConnecting = false;
+                }
+
+                await Task.Delay(TimeSpan.FromSeconds(ReconnectDelaySeconds), token);
+            }
+        }
+        catch (OperationCanceledException)
+        {
+        }
+    }
+
+    private void StopReconnectLoop()
+    {
+        _reconnectCts?.Cancel();
+        _reconnectCts = null;
+        _isReconnecting = false;
+        _reconnectAttempt = 0;
+        ConnectButton.Content = "Connect";
+    }
+
+    private static bool IsRemoteCloseMessage(string message)
+    {
+        if (string.IsNullOrWhiteSpace(message))
+        {
+            return false;
+        }
+
+        return message.Contains("WebSocket error", StringComparison.OrdinalIgnoreCase)
+            || message.Contains("closed", StringComparison.OrdinalIgnoreCase)
+            || message.Contains("close handshake", StringComparison.OrdinalIgnoreCase);
+    }
+
     private void DiscoveredCombo_SelectionChanged(object sender, SelectionChangedEventArgs e)
     {
         if (DiscoveredCombo.SelectedItem is string selected)
         {
             if (_apexUploaded)
             {
-                IpTextBox.Text = selected;
+                if (!string.Equals(selected, "Select a device...", StringComparison.Ordinal))
+                {
+                    IpTextBox.Text = selected;
+                }
             }
         }
     }
@@ -2418,7 +2584,7 @@ public partial class MainWindow : Window
         }
 
         var trimmed = text.TrimStart();
-        if (!trimmed.StartsWith('[', StringComparison.Ordinal))
+        if (!trimmed.StartsWith("[", StringComparison.Ordinal))
         {
             return text;
         }

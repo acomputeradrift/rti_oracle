@@ -58,6 +58,19 @@ public sealed class ProcessingEngineMappingTests
     }
 
     [Fact]
+    public void SystemMappingServiceResolvesDisplayName()
+    {
+        var bundle = BuildBundleWithDisplayName();
+        var service = new SystemMappingService();
+        var evt = new DiagnosticEvent(12, "[2026-01-24 10:00:00.000] Change to page 1 on device 'iPad'");
+
+        var line = service.Map(evt, bundle);
+
+        Assert.Equal("12 [2026-01-24 10:00:00.000] Change to page \"Main\" on device 'iPad'", line.Text);
+        Assert.False(line.IsUnresolved);
+    }
+
+    [Fact]
     public void DriverMappingServiceMapsVauxSourceSelect()
     {
         var bundle = BuildBundleWithVaux();
@@ -213,12 +226,29 @@ public sealed class ProcessingEngineMappingTests
         bundle.System.DiagnosticsMapping.Add(new OracleByFPCLtd.ProjectData.DiagnosticsMappingEntry(
             81,
             "RTiPanel (iPhone X or newer)",
+            "RTiPanel (iPhone X or newer)",
             0,
             0,
             0,
             0,
             "Room Select"));
         bundle.System.PageIndexMap["81|0"] = "Room Select";
+        return bundle;
+    }
+
+    private static ProjectDataBundle BuildBundleWithDisplayName()
+    {
+        var bundle = new ProjectDataBundle();
+        bundle.System.DiagnosticsMapping.Add(new OracleByFPCLtd.ProjectData.DiagnosticsMappingEntry(
+            15,
+            "RTiPanel (iPad)",
+            "iPad",
+            0,
+            0,
+            0,
+            0,
+            "Main"));
+        bundle.System.PageIndexMap["15|0"] = "Main";
         return bundle;
     }
 

@@ -43,7 +43,7 @@ public sealed class ProjectDataBundleTests
     private static ProjectDataExtractionResult BuildLegacyResult()
     {
         var result = new ProjectDataExtractionResult();
-        result.DiagnosticsMapping.Add(new DiagnosticsMappingEntry(1, "Device", 0, 0, 0, 0, "Page"));
+        result.DiagnosticsMapping.Add(new DiagnosticsMappingEntry(1, "Device", "Device", 0, 0, 0, 0, "Page"));
         result.ProjectReport.Add(new ProjectReportEntry("Room", 1, 0, 0, "Room", ""));
         result.ProjectTest.Add(new ProjectTestEntry(1, "Device", 0, 1, 0, "Source", 1, 0, "Page", 1, 1, "Button"));
 

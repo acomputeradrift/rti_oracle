@@ -70,6 +70,12 @@ public sealed class SystemMappingService
             {
                 deviceNameToId[entry.DeviceName] = entry.DeviceId;
             }
+
+            if (!string.IsNullOrWhiteSpace(entry.DeviceDisplayName)
+                && !deviceNameToId.ContainsKey(entry.DeviceDisplayName))
+            {
+                deviceNameToId[entry.DeviceDisplayName] = entry.DeviceId;
+            }
         }
 
         return deviceNameToId.Count > 0;

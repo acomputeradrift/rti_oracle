@@ -282,6 +282,7 @@ public sealed class LegacyWebSocketDiagnosticsTransport : IDiagnosticsTransport
                     result = await socket.ReceiveAsync(messageBuffer, token);
                     if (result.MessageType == WebSocketMessageType.Close)
                     {
+                        EmitError("[error] WebSocket closed by remote host.");
                         await DisconnectAsync();
                         return;
                     }

@@ -2,11 +2,14 @@ using System;
 using System.Collections.Generic;
 using System.Reflection;
 using System.Threading;
+using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Documents;
 using System.Windows.Media;
 using System.Windows.Threading;
+using OracleByFPCLtd.DiagnosticsTransport;
+using OracleByFPCLtd.UI.Panels;
 using OracleByFPCLtd.ProjectData;
 using Xunit;
 
@@ -117,6 +120,58 @@ public sealed class MainWindowProcessedOutputTests
             Assert.False(double.IsNaN(processed.Document.PageWidth));
             Assert.Equal(processed.Document.PageWidth, processed.Document.ColumnWidth);
             Assert.True(processed.Document.PageWidth > 0);
+            window.Hide();
+        });
+    }
+
+    [Fact]
+    public void DiscoverShowsPlaceholderWhenResultsFound()
+    {
+        RunOnSta(() =>
+        {
+            var window = new MainWindow();
+            window.Show();
+            window.UpdateLayout();
+            var transport = new FakeDiagnosticsTransport
+            {
+                DiscoverResults = new List<string> { "10.0.0.10" }
+            };
+
+            InvokeSetTransport(window, transport, false);
+            InvokeDiscover(window);
+            DoEvents();
+
+            var combo = GetConnectionPanel(window).DiscoveredCombo;
+            Assert.NotNull(combo.ItemsSource);
+            var items = (IList<string>)combo.ItemsSource!;
+            Assert.True(items.Count >= 2);
+            Assert.Equal("Select a device...", items[0]);
+            window.Hide();
+        });
+    }
+
+    [Fact]
+    public void TransportErrorStartsReconnectStatus()
+    {
+        RunOnSta(() =>
+        {
+            var window = new MainWindow();
+            window.Show();
+            window.UpdateLayout();
+            var transport = new FakeDiagnosticsTransport
+            {
+                ConnectShouldFail = true
+            };
+            InvokeSetTransport(window, transport, false);
+            SetPrivateField(window, "_apexUploaded", true);
+            SetIpAddress(window, "10.0.0.10");
+
+            transport.RaiseTransportError("[error] WebSocket closed by remote host.");
+            DoEvents();
+
+            var status = GetConnectionPanel(window).StatusText;
+            Assert.Equal("Attempting Reconnect...", status.Text);
+            Assert.Equal("Stop", GetConnectionPanel(window).ConnectButton.Content);
             window.Hide();
         });
     }
@@ -237,6 +292,7 @@ public sealed class MainWindowProcessedOutputTests
         var result = new ProjectDataExtractionResult();
         result.DiagnosticsMapping.Add(new DiagnosticsMappingEntry(
             81,
+            "RTiPanel (iPhone X or newer)",
             "RTiPanel (iPhone X or newer)",
             0,
             0,
@@ -363,6 +419,50 @@ public sealed class MainWindowProcessedOutputTests
         return (MenuItem)menuItem!;
     }
 
+    private static void InvokeDiscover(MainWindow window)
+    {
+        var method = typeof(MainWindow).GetMethod("DiscoverButton_Click", BindingFlags.Instance | BindingFlags.NonPublic);
+        Assert.NotNull(method);
+        method!.Invoke(window, new object[] { window, new RoutedEventArgs() });
+    }
+
+    private static void InvokeSetTransport(MainWindow window, IDiagnosticsTransport transport, bool useTcpCapture)
+    {
+        var method = typeof(MainWindow).GetMethod("SetTransport", BindingFlags.Instance | BindingFlags.NonPublic);
+        Assert.NotNull(method);
+        method!.Invoke(window, new object[] { transport, useTcpCapture });
+    }
+
+    private static void SetPrivateField(MainWindow window, string fieldName, object value)
+    {
+        var field = typeof(MainWindow).GetField(fieldName, BindingFlags.Instance | BindingFlags.NonPublic);
+        Assert.NotNull(field);
+        field!.SetValue(window, value);
+    }
+
+    private static void SetIpAddress(MainWindow window, string ip)
+    {
+        GetConnectionPanel(window).IpTextBox.Text = ip;
+    }
+
+    private static ConnectionPanel GetConnectionPanel(MainWindow window)
+    {
+        var field = typeof(MainWindow).GetField("ConnectionPanel", BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public);
+        Assert.NotNull(field);
+        return (ConnectionPanel)field!.GetValue(window)!;
+    }
+
+    private static void DoEvents()
+    {
+        var frame = new DispatcherFrame();
+        Dispatcher.CurrentDispatcher.BeginInvoke(DispatcherPriority.Background, new DispatcherOperationCallback(_ =>
+        {
+            frame.Continue = false;
+            return null;
+        }), null);
+        Dispatcher.PushFrame(frame);
+    }
+
     private static void RunOnSta(Action action)
     {
         Exception? failure = null;
@@ -399,5 +499,31 @@ public sealed class MainWindowProcessedOutputTests
         {
             throw new InvalidOperationException("STA test failed.", failure);
         }
+    }
+
+    private sealed class FakeDiagnosticsTransport : IDiagnosticsTransport
+    {
+        public event EventHandler<string>? RawMessageReceived;
+        public event EventHandler<string>? TransportInfo;
+        public event EventHandler<string>? TransportError;
+
+        public bool IsConnected { get; set; }
+        public List<string> DiscoverResults { get; set; } = new();
+        public bool ConnectShouldFail { get; set; }
+
+        public Task<List<string>> DiscoverAsync(TimeSpan timeout) => Task.FromResult(DiscoverResults);
+        public Task ConnectAsync(string ip)
+        {
+            if (ConnectShouldFail)
+            {
+                return Task.FromException(new InvalidOperationException("Connect failed."));
+            }
+            return Task.CompletedTask;
+        }
+        public Task DisconnectAsync() => Task.CompletedTask;
+        public Task SendLogLevelAsync(string type, string level) => Task.CompletedTask;
+        public Task<List<DriverInfo>> LoadDriversAsync(string ip) => Task.FromResult(new List<DriverInfo>());
+
+        public void RaiseTransportError(string message) => TransportError?.Invoke(this, message);
     }
 }

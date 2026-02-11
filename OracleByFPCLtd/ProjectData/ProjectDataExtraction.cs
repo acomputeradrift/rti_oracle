@@ -22,6 +22,7 @@ public sealed class ProjectDataExtractionResult
 public sealed record DiagnosticsMappingEntry(
     int DeviceId,
     string DeviceName,
+    string DeviceDisplayName,
     int RtiAddress,
     int PageIndex,
     int PageId,
@@ -119,6 +120,7 @@ public sealed class ProjectDataExtractor : IProjectDataExtractor
                     result.DiagnosticsMapping.Add(new DiagnosticsMappingEntry(
                         device.DeviceId,
                         device.Name,
+                        device.DisplayName,
                         rtiAddress,
                         page.PageIndex,
                         page.PageId,
@@ -319,7 +321,7 @@ public sealed class ProjectDataExtractor : IProjectDataExtractor
     {
         var results = new List<DeviceRow>();
         using var command = connection.CreateCommand();
-        command.CommandText = "SELECT DeviceId, RoomId, Name FROM Devices ORDER BY DeviceId";
+        command.CommandText = "SELECT DeviceId, RoomId, Name, DisplayName FROM Devices ORDER BY DeviceId";
         using var reader = command.ExecuteReader();
         while (reader.Read())
         {
@@ -328,7 +330,11 @@ public sealed class ProjectDataExtractor : IProjectDataExtractor
                 continue;
             }
 
-            results.Add(new DeviceRow(reader.GetInt32(0), reader.GetInt32(1), reader.IsDBNull(2) ? "" : reader.GetString(2)));
+            results.Add(new DeviceRow(
+                reader.GetInt32(0),
+                reader.GetInt32(1),
+                reader.IsDBNull(2) ? "" : reader.GetString(2),
+                reader.IsDBNull(3) ? "" : reader.GetString(3)));
         }
         return results;
     }
@@ -477,7 +483,7 @@ public sealed class ProjectDataExtractor : IProjectDataExtractor
         return results;
     }
 
-    private sealed record DeviceRow(int DeviceId, int RoomId, string Name);
+    private sealed record DeviceRow(int DeviceId, int RoomId, string Name, string DisplayName);
     private sealed record RoomRow(int RoomId, string Name, int HomePageId, int RoomOrder);
     private sealed record PortLabelRow(int PortLabelId, int RtiAddress, int LabelKey, string LabelName);
     private sealed record PageNameRow(int PageNameId, string PageName);

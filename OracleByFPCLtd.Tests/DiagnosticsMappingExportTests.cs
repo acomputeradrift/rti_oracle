@@ -17,8 +17,8 @@ public sealed class DiagnosticsMappingExportTests
         // Requirement: mission.md - Core Capabilities #3/#4; invariants.md - Output Honesty.
         var rows = new List<DiagnosticsMappingEntry>
         {
-            new(81, "Panel", 3, 0, 10, 100, "Room Select"),
-            new(81, "Panel", 3, 1, 11, 101, "Overview")
+            new(81, "Panel", "Panel", 3, 0, 10, 100, "Room Select"),
+            new(81, "Panel", "Panel", 3, 1, 11, 101, "Overview")
         };
         var preload = new ApexDiscoveryPreloadResult();
         preload.DriverConfigMap[1] = new DriverConfigEntry(
