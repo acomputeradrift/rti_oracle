@@ -2132,11 +2132,24 @@ public partial class MainWindow : Window
         {
             using var doc = JsonDocument.Parse(raw);
             var root = doc.RootElement;
-            if (root.TryGetProperty("messageType", out var messageTypeElement)
-                && string.Equals(messageTypeElement.GetString(), "LogLevels", StringComparison.OrdinalIgnoreCase))
+            if (root.TryGetProperty("messageType", out var messageTypeElement))
             {
-                isLogLine = false;
-                return HandleLogLevels(root);
+                var messageType = messageTypeElement.GetString();
+                if (string.Equals(messageType, "LogLevels", StringComparison.OrdinalIgnoreCase))
+                {
+                    isLogLine = false;
+                    return HandleLogLevels(root);
+                }
+
+                if (string.Equals(messageType, "MessageLog", StringComparison.OrdinalIgnoreCase)
+                    && root.TryGetProperty("text", out var textElement))
+                {
+                    var text = textElement.GetString();
+                    if (LogLevelAckParser.TryParse(text, out var dName, out var level))
+                    {
+                        UpdateDriverFromLogLevel(dName, level);
+                    }
+                }
             }
         }
         catch
@@ -2302,10 +2315,35 @@ public partial class MainWindow : Window
             });
 
             AppendLog($"[info] Loaded {list.Count} drivers");
+            await ForceDiagnosticsLogLevelAsync(list);
         }
         catch (Exception ex)
         {
             AppendLog($"[error] Failed to load drivers: {ex.Message}");
+        }
+    }
+
+    private async Task ForceDiagnosticsLogLevelAsync(IReadOnlyList<DiagnosticsTransport.DriverInfo> drivers)
+    {
+        if (drivers == null || drivers.Count == 0)
+        {
+            return;
+        }
+
+        if (!DiagnosticsDriverSelector.TryGetDiagnosticsDriverDName(drivers, out var dName))
+        {
+            AppendLog("[warn] Diagnostics driver not found; skipping log level pin.");
+            return;
+        }
+
+        try
+        {
+            await _transport.SendLogLevelAsync(dName, "3");
+            AppendLog($"[local] Set {dName} to 3 (Diagnostics driver).");
+        }
+        catch (Exception ex)
+        {
+            AppendLog($"[warn] Failed to set {dName} to 3: {ex.Message}");
         }
     }
 

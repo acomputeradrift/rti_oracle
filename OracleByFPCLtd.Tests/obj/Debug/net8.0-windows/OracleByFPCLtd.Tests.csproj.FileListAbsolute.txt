@@ -2,6 +2,7 @@ Y:\Desktop\Development\Oracle\OracleByFPCLtd.Tests\bin\Debug\net8.0-windows\.msC
 Y:\Desktop\Development\Oracle\OracleByFPCLtd.Tests\bin\Debug\net8.0-windows\testhost.dll
 Y:\Desktop\Development\Oracle\OracleByFPCLtd.Tests\bin\Debug\net8.0-windows\OracleByFPCLtd.deps.json
 Y:\Desktop\Development\Oracle\OracleByFPCLtd.Tests\bin\Debug\net8.0-windows\OracleByFPCLtd.runtimeconfig.json
+Y:\Desktop\Development\Oracle\OracleByFPCLtd.Tests\bin\Debug\net8.0-windows\CHANGELOG.md
 Y:\Desktop\Development\Oracle\OracleByFPCLtd.Tests\bin\Debug\net8.0-windows\OracleByFPCLtd.exe
 Y:\Desktop\Development\Oracle\OracleByFPCLtd.Tests\bin\Debug\net8.0-windows\testhost.exe
 Y:\Desktop\Development\Oracle\OracleByFPCLtd.Tests\bin\Debug\net8.0-windows\xunit.runner.visualstudio.testadapter.dll

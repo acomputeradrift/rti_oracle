@@ -3,7 +3,8 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:panels="clr-namespace:OracleByFPCLtd.UI.Panels"
         Title="Oracle by FP&amp;C" Height="720" Width="1000" Background="#F3F3F3"
-        MinHeight="480" MinWidth="720">
+        MinHeight="480" MinWidth="720"
+        Icon="pack://application:,,,/Resources/AppIcon.ico">
   <Window.Resources>
     <BooleanToVisibilityConverter x:Key="BoolToVis" />
     <Style x:Key="LevelButtonStyle" TargetType="Button">

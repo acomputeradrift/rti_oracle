@@ -2,7 +2,8 @@ param(
     [Parameter(Mandatory=$true)]
     [string]$Version,
     [string]$RepoRoot = "Y:\Desktop\Development\Oracle",
-    [string]$PackagesRoot = "Y:\Desktop\Development\ShippedPackages\OracleByFPC"
+    [string]$PackagesRoot = "Y:\Desktop\Development\ShippedPackages\OracleByFPC",
+    [switch]$StartupOptimized = $true
 )
 
 $ErrorActionPreference = "Stop"
@@ -16,6 +17,7 @@ $versionedExe = Join-Path $publishDir ("OracleByFPC_v" + $Version + ".exe")
 Write-Host "Packaging OracleByFPCLtd v$Version"
 Write-Host "RepoRoot: $RepoRoot"
 Write-Host "ReleaseDir: $releaseDir"
+Write-Host "StartupOptimized: $StartupOptimized"
 
 if (Test-Path $releaseDir) {
     Write-Host "Existing release directory found, overwriting: $releaseDir"
@@ -45,11 +47,24 @@ Copy-Item "$RepoRoot\ApplicationPackaging\CHANGELOG.md" "$stagingDir\Application
 # Publish single-file EXE
 $csproj = "$stagingDir\OracleByFPCLtd\OracleByFPCLtd.csproj"
 
-dotnet publish $csproj `
-  -c Release -r win-x64 --self-contained true `
-  -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true `
-  -p:Version=$Version `
-  -o $publishDir
+$publishArgs = @(
+    "publish", $csproj,
+    "-c", "Release",
+    "-r", "win-x64",
+    "--self-contained", "true",
+    "-p:PublishSingleFile=true",
+    "-p:IncludeNativeLibrariesForSelfExtract=true",
+    "-p:Version=$Version",
+    "-o", $publishDir
+)
+
+if ($StartupOptimized) {
+    # Faster startup at the expense of larger package and longer publish time.
+    $publishArgs += "-p:PublishReadyToRun=true"
+    $publishArgs += "-p:EnableCompressionInSingleFile=false"
+}
+
+dotnet @publishArgs
 
 if (!(Test-Path $defaultExe)) {
     throw "Publish succeeded but expected EXE not found: $defaultExe"

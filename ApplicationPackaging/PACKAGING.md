@@ -13,14 +13,14 @@ Each shipped version gets its own folder:
 
 ```text
 Y:\Desktop\Development\ShippedPackages\OracleByFPC\
-  v1.1\
+  v1.1.2\
     build-info.txt
     CHANGELOG.md
     source-staging\
       OracleByFPCLtd\...
       UserInterface\...
     publish\
-      OracleByFPC_v1.1.exe
+      OracleByFPC_v1.1.2.exe
       OracleByFPCLtd.pdb
 ```
 
@@ -32,18 +32,24 @@ Use `-p:Version=<X>` on `dotnet publish`.
 Examples:
 - `1.0`
 - `1.1`
-- `1.2`
+- `1.1.2`
 
 ## Packaging Command (PowerShell)
 Use the script in this folder:
 
 ```powershell
-Y:\Desktop\Development\Oracle\ApplicationPackaging\package.ps1 -Version 1.1
+Y:\Desktop\Development\Oracle\ApplicationPackaging\package.ps1 -Version 1.1.2
+```
+
+For maximum startup performance (default in script):
+
+```powershell
+Y:\Desktop\Development\Oracle\ApplicationPackaging\package.ps1 -Version 1.1.2 -StartupOptimized
 ```
 
 ## Manual Equivalent (PowerShell)
 ```powershell
-$version = "1.1"
+$version = "1.1.2"
 $repo = "Y:\Desktop\Development\Oracle"
 $root = "Y:\Desktop\Development\ShippedPackages\OracleByFPC"
 $release = Join-Path $root ("v" + $version)
@@ -63,6 +69,7 @@ robocopy "$repo\UserInterface" "$staging\UserInterface" feeny-logo-100-circle-bl
 dotnet publish "$staging\OracleByFPCLtd\OracleByFPCLtd.csproj" `
   -c Release -r win-x64 --self-contained true `
   -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true `
+  -p:PublishReadyToRun=true -p:EnableCompressionInSingleFile=false `
   -p:Version=$version `
   -o $publish
 
@@ -81,6 +88,7 @@ Copy-Item "$repo\ApplicationPackaging\CHANGELOG.md" "$release\CHANGELOG.md" -For
 - Keep the changelog in `ApplicationPackaging\CHANGELOG.md` up to date before packaging.
 - If packaging fails, fix and re-run with the same version to overwrite.
 - Final artifact name must be `OracleByFPC_v<version>.exe`.
+- Startup is usually fastest when launching the EXE from a local disk on the client PC (not from a network share path).
 
 ## Troubleshooting
 - In PowerShell, line continuation is backtick `` ` `` (not `\`).

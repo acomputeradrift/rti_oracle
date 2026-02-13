@@ -1,5 +1,23 @@
 # Changelog
 
+## [1.1.3] - 2026-02-13
+
+### Added
+- On connect, force the Diagnostics driver log level to 3 to ensure MessageLog acks are emitted.
+
+### Fixed
+- Driver log level status now updates from MessageLog ack lines in addition to LogLevels snapshots.
+
+## [1.1.2] - 2026-02-13
+
+### Fixed
+- Improved startup rendering compatibility for remote desktop sessions by forcing software rendering in-app.
+
+## [1.1.1] - 2026-02-13
+
+### Changed
+- Maintenance release with no new end-user features.
+
 ## [1.1] - 2026-02-11
 
 ### Added
