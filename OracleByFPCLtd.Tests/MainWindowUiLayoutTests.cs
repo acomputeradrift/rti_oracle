@@ -31,6 +31,10 @@ public sealed class MainWindowUiLayoutTests
             Assert.NotNull(connection.DiscoveredCombo);
             Assert.NotNull(connection.StatusText);
 
+            var statusPanel = (OracleByFPCLtd.UI.Panels.StatusPanel)window.FindName("StatusPanel")!;
+            Assert.NotNull(statusPanel.StatusHeaderText);
+            Assert.NotNull(statusPanel.StatusOutputTextBox);
+
             var projectData = (OracleByFPCLtd.UI.Panels.ProjectDataPanel)window.FindName("ProjectDataPanel")!;
             Assert.NotNull(projectData.ProjectDataHeaderText);
             Assert.NotNull(projectData.UploadProjectButton);
@@ -113,19 +117,21 @@ public sealed class MainWindowUiLayoutTests
     }
 
     [Fact]
-    public void HeaderLayoutOrdersLogoConnectionProjectData()
+    public void HeaderLayoutOrdersLogoStatusConnectionProjectData()
     {
         RunOnSta(() =>
         {
             var window = new MainWindow();
 
             var logo = (FrameworkElement)window.FindName("AppLogoImage")!;
+            var status = (FrameworkElement)window.FindName("StatusBorder")!;
             var connection = (FrameworkElement)window.FindName("ConnectBoxBorder")!;
             var projectData = (FrameworkElement)window.FindName("ProjectDataBorder")!;
 
             Assert.Equal(0, Grid.GetColumn(logo));
-            Assert.Equal(1, Grid.GetColumn(connection));
-            Assert.Equal(3, Grid.GetColumn(projectData));
+            Assert.Equal(2, Grid.GetColumn(status));
+            Assert.Equal(4, Grid.GetColumn(connection));
+            Assert.Equal(6, Grid.GetColumn(projectData));
         });
     }
 

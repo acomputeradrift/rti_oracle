@@ -18,6 +18,7 @@ public sealed class UiDecompositionTests
             var window = new MainWindow();
 
             Assert.IsType<ConnectionPanel>(window.FindName("ConnectionPanel"));
+            Assert.IsType<StatusPanel>(window.FindName("StatusPanel"));
             Assert.IsType<ProjectDataPanel>(window.FindName("ProjectDataPanel"));
             Assert.IsType<DriverLogLevelsPanel>(window.FindName("DriverLogLevelsPanel"));
             Assert.IsType<DiagnosticsPanel>(window.FindName("DiagnosticsPanel"));

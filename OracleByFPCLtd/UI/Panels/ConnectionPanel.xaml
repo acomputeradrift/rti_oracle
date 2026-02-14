@@ -15,12 +15,12 @@
               IsEnabled="False"
               ToolTip="Upload a project (.apex) to enable connecting." />
       <Button x:Name="DisconnectButtonControl" Content="Disconnect" Width="90" Height="26" IsEnabled="False" />
-      <TextBlock x:Name="StatusTextControl" Text="Idle" VerticalAlignment="Center" Margin="12,0,0,0" />
+      <TextBlock x:Name="StatusTextControl" Text="Idle" VerticalAlignment="Center" Margin="12,0,0,0" Visibility="Collapsed" />
     </StackPanel>
     <StackPanel Orientation="Horizontal" Grid.Row="2">
       <Button x:Name="DiscoverButtonControl" Content="Discover" Width="90" Height="26" Margin="0,0,8,0" />
       <TextBlock Text="Discovered:" VerticalAlignment="Center" Margin="0,0,8,0" />
-      <ComboBox x:Name="DiscoveredComboControl" Width="260" Height="26" />
+      <ComboBox x:Name="DiscoveredComboControl" Width="220" Height="26" />
     </StackPanel>
   </Grid>
 </UserControl>

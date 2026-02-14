@@ -50,7 +50,7 @@ public sealed class LegacyWebSocketDiagnosticsTransport : IDiagnosticsTransport
         var uri = new Uri($"ws://{ip}:1234/diagnosticswss");
         await _socket.ConnectAsync(uri, _socketCts.Token);
 
-        EmitInfo("[info] Connected to WebSocket");
+        EmitInfo("[success] Connected to WebSocket.");
 
         await SendSubscribeAsync("MessageLog", "true");
         await SendSubscribeAsync("Sysvar", "true");

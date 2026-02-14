@@ -1,0 +1,25 @@
+<UserControl x:Class="OracleByFPCLtd.UI.Panels.StatusPanel"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+  <Grid>
+    <Grid.RowDefinitions>
+      <RowDefinition Height="Auto" />
+      <RowDefinition Height="*" />
+    </Grid.RowDefinitions>
+
+    <TextBlock x:Name="StatusHeaderTextControl"
+               Text="Status"
+               FontWeight="SemiBold"
+               Margin="0,0,0,8" />
+
+    <RichTextBox x:Name="StatusOutputTextBoxControl"
+                 Grid.Row="1"
+                 IsReadOnly="True"
+                 IsDocumentEnabled="False"
+                 VerticalScrollBarVisibility="Auto"
+                 HorizontalScrollBarVisibility="Auto"
+                 FontFamily="Consolas"
+                 FontSize="12"
+                 MinHeight="68" />
+  </Grid>
+</UserControl>

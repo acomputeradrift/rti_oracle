@@ -54,28 +54,32 @@
       </MenuItem>
     </Menu>
 
-    <Grid x:Name="TopHeaderGrid" Grid.Row="1" Grid.Column="0" Margin="0,0,0,8">
+    <Grid x:Name="TopHeaderGrid" Grid.Row="1" Grid.Column="0" Margin="0,0,0,8" Grid.IsSharedSizeScope="True">
       <Grid.RowDefinitions>
         <RowDefinition Height="Auto" />
         <RowDefinition Height="Auto" />
       </Grid.RowDefinitions>
       <Grid.ColumnDefinitions>
         <ColumnDefinition Width="Auto" />
-        <ColumnDefinition Width="*" />
         <ColumnDefinition Width="8" />
         <ColumnDefinition Width="*" />
+        <ColumnDefinition Width="8" />
+        <ColumnDefinition Width="Auto" SharedSizeGroup="HeaderPanelWidth" />
+        <ColumnDefinition Width="8" />
+        <ColumnDefinition Width="Auto" SharedSizeGroup="HeaderPanelWidth" />
       </Grid.ColumnDefinitions>
 
       <Border x:Name="ConnectBoxBorder"
               Grid.Row="0"
               Grid.RowSpan="2"
-              Grid.Column="1"
+              Grid.Column="4"
               BorderBrush="#CCCCCC"
               BorderThickness="1"
               CornerRadius="4"
               Background="White"
               Padding="8"
               HorizontalAlignment="Stretch"
+              VerticalAlignment="Top"
               Height="{Binding ActualHeight, ElementName=ProjectDataBorder}">
         <panels:ConnectionPanel x:Name="ConnectionPanel" />
       </Border>
@@ -95,7 +99,21 @@
       <Border x:Name="ProjectDataBorder"
               Grid.Row="0"
               Grid.RowSpan="2"
-              Grid.Column="3"
+              Grid.Column="6"
+              BorderBrush="#CCCCCC"
+              BorderThickness="1"
+              CornerRadius="4"
+              Background="White"
+              Padding="8"
+              HorizontalAlignment="Stretch"
+              VerticalAlignment="Top">
+        <panels:ProjectDataPanel x:Name="ProjectDataPanel" />
+      </Border>
+
+      <Border x:Name="StatusBorder"
+              Grid.Row="0"
+              Grid.RowSpan="2"
+              Grid.Column="2"
               BorderBrush="#CCCCCC"
               BorderThickness="1"
               CornerRadius="4"
@@ -103,8 +121,8 @@
               Padding="8"
               HorizontalAlignment="Stretch"
               VerticalAlignment="Top"
-              Width="{Binding ActualWidth, ElementName=ConnectBoxBorder}">
-        <panels:ProjectDataPanel x:Name="ProjectDataPanel" />
+              Height="{Binding ActualHeight, ElementName=ProjectDataBorder}">
+        <panels:StatusPanel x:Name="StatusPanel" />
       </Border>
     </Grid>
 

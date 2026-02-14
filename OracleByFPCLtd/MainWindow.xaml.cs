@@ -138,6 +138,7 @@ public partial class MainWindow : Window
     private Button DiscoverButton => ConnectionPanel.DiscoverButton;
     private ComboBox DiscoveredCombo => ConnectionPanel.DiscoveredCombo;
     private TextBlock StatusText => ConnectionPanel.StatusText;
+    private RichTextBox AppStatusTextBox => StatusPanel.StatusOutputTextBox;
     private Button UploadProjectButton => ProjectDataPanel.UploadProjectButton;
     private TextBlock ProjectDataHeaderText => ProjectDataPanel.ProjectDataHeaderText;
     private ComboBox RecentProjectComboBox => ProjectDataPanel.RecentProjectComboBox;
@@ -1498,7 +1499,7 @@ public partial class MainWindow : Window
             return;
         }
 
-        AppendLog(message);
+        AppendAppStatus(message);
     }
 
     private void Transport_TransportError(object? sender, string message)
@@ -1508,7 +1509,7 @@ public partial class MainWindow : Window
             return;
         }
 
-        AppendLog(message);
+        AppendAppStatus(message);
         HandleTransportFailure(message);
     }
 
@@ -1541,7 +1542,7 @@ public partial class MainWindow : Window
         {
             Dispatcher.Invoke(() =>
             {
-                StatusText.Text = "Disconnected";
+                SetConnectionStatus("Disconnected");
                 DisconnectButton.IsEnabled = false;
                 ConnectButton.IsEnabled = true;
                 DiscoverButton.IsEnabled = true;
@@ -1585,7 +1586,7 @@ public partial class MainWindow : Window
     private async void DiscoverButton_Click(object sender, RoutedEventArgs e)
     {
         DiscoverButton.IsEnabled = false;
-        StatusText.Text = "Discovering...";
+        SetConnectionStatus("Discovering...");
 
         try
         {
@@ -1610,13 +1611,13 @@ public partial class MainWindow : Window
                     IpTextBox.Text = sorted[0];
                 }
             }
-            StatusText.Text = sorted.Count == 0 ? "No Devices Found" : $"Found {sorted.Count}";
+            SetConnectionStatus(sorted.Count == 0 ? "No Devices Found" : $"Found {sorted.Count}");
             ReportSuccess("DISCOVERY_SUCCESS", $"Discovery completed with {sorted.Count} result(s).", "discover");
         }
         catch (Exception ex)
         {
-            StatusText.Text = "Discovery Failed";
-            AppendLog($"[error] Discovery failed: {ex.Message}");
+            SetConnectionStatus("Discovery Failed");
+            AppendAppStatus($"[error] Discovery failed: {ex.Message}");
             ReportFailure("Discover", FailureCodes.DiscoveryFailed, $"Discovery failed: {ex.Message}", "discover");
         }
         finally
@@ -1630,7 +1631,7 @@ public partial class MainWindow : Window
         if (_isReconnecting)
         {
             StopReconnectLoop();
-            StatusText.Text = "Reconnect Stopped";
+            SetConnectionStatus("Reconnect Stopped");
             ConnectButton.Content = "Connect";
             ConnectButton.IsEnabled = true;
             DiscoverButton.IsEnabled = true;
@@ -1641,14 +1642,14 @@ public partial class MainWindow : Window
         _suppressReconnect = false;
         if (!_apexUploaded)
         {
-            StatusText.Text = "Upload Project First";
+            SetConnectionStatus("Upload Project First");
             return;
         }
 
         var ip = IpTextBox.Text.Trim();
         if (string.IsNullOrWhiteSpace(ip))
         {
-            StatusText.Text = "Enter an IP";
+            SetConnectionStatus("Enter an IP");
             return;
         }
 
@@ -1660,7 +1661,7 @@ public partial class MainWindow : Window
         _isConnecting = true;
         ConnectButton.IsEnabled = false;
         DiscoverButton.IsEnabled = false;
-        StatusText.Text = "Connecting...";
+        SetConnectionStatus("Connecting...");
 
         try
         {
@@ -1684,7 +1685,7 @@ public partial class MainWindow : Window
             {
                 await LoadDriversAsync(ip);
             }
-            StatusText.Text = "Connected";
+            SetConnectionStatus("Ready");
             DisconnectButton.IsEnabled = true;
             ConnectButton.Content = "Connect";
             _lastConnectedIp = ip;
@@ -1701,8 +1702,8 @@ public partial class MainWindow : Window
         }
         catch (Exception ex)
         {
-            StatusText.Text = "Connect Failed";
-            AppendLog($"[error] Connect failed: {ex.Message}");
+            SetConnectionStatus("Connect Failed");
+            AppendAppStatus($"[error] Connect failed: {ex.Message}");
             ReportFailure("Connect", FailureCodes.TransportNotConnected, $"Connect failed: {ex.Message}", ip);
             ConnectButton.IsEnabled = true;
             DiscoverButton.IsEnabled = true;
@@ -1723,7 +1724,7 @@ public partial class MainWindow : Window
         _rawLineNumber = 1;
         _messageFormatter.Reset(DateOnly.FromDateTime(DateTime.Today));
         _pendingLogLevelCommands.Clear();
-        StatusText.Text = "Disconnected";
+        SetConnectionStatus("Disconnected");
         DisconnectButton.IsEnabled = false;
         ConnectButton.IsEnabled = true;
         DiscoverButton.IsEnabled = true;
@@ -1742,7 +1743,7 @@ public partial class MainWindow : Window
         _reconnectCts = new CancellationTokenSource();
         _isReconnecting = true;
         _reconnectAttempt = 0;
-        StatusText.Text = "Attempting Reconnect...";
+        SetConnectionStatus("Attempting Reconnect...");
         DisconnectButton.IsEnabled = false;
         DiscoverButton.IsEnabled = false;
         ConnectButton.IsEnabled = true;
@@ -1766,7 +1767,7 @@ public partial class MainWindow : Window
                     _reconnectAttempt++;
                     Dispatcher.Invoke(() =>
                     {
-                    StatusText.Text = $"Attempting Reconnect... {_reconnectAttempt}";
+                    SetConnectionStatus($"Attempting Reconnect... {_reconnectAttempt}");
                     });
                     await _transport.ConnectAsync(ip);
                     if (!_useTcpCapture)
@@ -1776,7 +1777,7 @@ public partial class MainWindow : Window
 
                     Dispatcher.Invoke(() =>
                     {
-                        StatusText.Text = "Connected";
+                        SetConnectionStatus("Ready");
                         DisconnectButton.IsEnabled = true;
                         DiscoverButton.IsEnabled = true;
                         ConnectButton.IsEnabled = false;
@@ -1791,7 +1792,7 @@ public partial class MainWindow : Window
                 }
                 catch (Exception ex)
                 {
-                    AppendLog($"[error] Reconnect failed: {ex.Message}");
+                    AppendAppStatus($"[error] Reconnect failed: {ex.Message}");
                     _isConnecting = false;
                 }
 
@@ -1829,6 +1830,7 @@ public partial class MainWindow : Window
         var failure = new OperationFailure(code, message, context, DateTime.UtcNow);
         _featureHealthRegistry.Update(new FeatureOperation(feature, context, "", OperationStatus.Failed, 0, failure));
         _failureNotifier.AppendOperationalLog(failure);
+        AppendAppStatus("FAIL", BuildStatusMessage(code, message, context));
         _failureNotifier.ShowBlockingFailure(feature, failure);
     }
 
@@ -1836,11 +1838,18 @@ public partial class MainWindow : Window
     {
         _featureHealthRegistry.Update(new FeatureOperation(feature, failure.Context, "", OperationStatus.Failed, retryCount, failure));
         _failureNotifier.AppendOperationalLog(failure);
+        AppendAppStatus("FAIL", BuildStatusMessage(failure.Code, failure.Message, failure.Context));
         _failureNotifier.ShowBlockingFailure(feature, failure);
     }
 
     private void ReportSuccess(string code, string message, string context)
     {
+        var statusMessage = BuildStatusMessage(code, message, context);
+        if (!string.IsNullOrWhiteSpace(statusMessage))
+        {
+            AppendAppStatus("SUCCESS", statusMessage);
+        }
+
         _failureNotifier.AppendOperationalResult(code, "SUCCESS", message, context);
     }
 
@@ -2313,7 +2322,7 @@ public partial class MainWindow : Window
         });
     }
 
-    private async Task ApplyLogLevelCommandWithAckAsync(DriverEntry driver, int level)
+    private async Task<bool> ApplyLogLevelCommandWithAckAsync(DriverEntry driver, int level)
     {
         driver.OperationStatus = OperationStatus.Pending;
         var retryCount = 0;
@@ -2336,7 +2345,7 @@ public partial class MainWindow : Window
                         dispatchResult.Failure));
                 }
 
-                return;
+                return false;
             }
 
             var acknowledged = await WaitForLogLevelAckAsync(driver.DName, level, retryCount);
@@ -2344,8 +2353,13 @@ public partial class MainWindow : Window
             {
                 driver.OperationStatus = OperationStatus.Confirmed;
                 _featureHealthRegistry.Update(new FeatureOperation("LogLevel", driver.DName, level.ToString(CultureInfo.InvariantCulture), OperationStatus.Confirmed, retryCount, null));
-                ReportSuccess("LOGLEVEL_ACK_SUCCESS", $"Log level acknowledged at {level}.", BuildLogLevelSuccessContext(driver, level, retryCount));
-                return;
+                var driverName = string.IsNullOrWhiteSpace(driver.Name) ? driver.DName : driver.Name;
+                _failureNotifier.AppendOperationalResult(
+                    "LOGLEVEL_ACK_INFO",
+                    "INFO",
+                    $"{driverName} Log level acknowledged at {level}.",
+                    BuildLogLevelSuccessContext(driver, level, retryCount));
+                return true;
             }
 
             if (retryCount >= LogLevelAckMaxRetryCount)
@@ -2357,7 +2371,7 @@ public partial class MainWindow : Window
                     $"dName={driver.DName};level={level}",
                     DateTime.UtcNow);
                 ReportFailure("LogLevel", failure, retryCount);
-                return;
+                return false;
             }
 
             retryCount++;
@@ -2401,13 +2415,9 @@ public partial class MainWindow : Window
         }
 
         var baseContext = $"dName={driver.DName};level={level};retry={retryCount}";
-        if (!string.IsNullOrWhiteSpace(driver.Name)
-            && driver.Name.StartsWith("Diagnostics:", StringComparison.OrdinalIgnoreCase))
-        {
-            return $"{baseContext};name={driver.Name}";
-        }
-
-        return baseContext;
+        return string.IsNullOrWhiteSpace(driver.Name)
+            ? baseContext
+            : $"{baseContext};name={driver.Name}";
     }
 
     private void TryResolvePendingLogLevelCommand(string dName, int level)
@@ -2464,6 +2474,135 @@ public partial class MainWindow : Window
         });
     }
 
+    private void AppendAppStatus(string line, bool allowEmpty = false)
+    {
+        Dispatcher.Invoke(() =>
+        {
+            if (!allowEmpty && string.IsNullOrWhiteSpace(line))
+            {
+                return;
+            }
+            var trimmed = line.Trim();
+            if (TryParseStatusLine(trimmed, out var level, out var message))
+            {
+                AppendAppStatus(level, message);
+                return;
+            }
+
+            AppendAppStatus("INFO", trimmed);
+        });
+    }
+
+    private void AppendAppStatus(string level, string message)
+    {
+        var paragraph = AppStatusTextBox.Document.Blocks.OfType<Paragraph>().FirstOrDefault();
+        if (paragraph == null)
+        {
+            paragraph = new Paragraph { Margin = new Thickness(0) };
+            AppStatusTextBox.Document.Blocks.Add(paragraph);
+        }
+
+        var normalizedLevel = NormalizeStatusLevel(level);
+        var badge = $"[{normalizedLevel}]";
+        paragraph.Inlines.Add(new Run(badge)
+        {
+            FontWeight = FontWeights.SemiBold,
+            Foreground = GetStatusBrush(normalizedLevel)
+        });
+        paragraph.Inlines.Add(new Run($" {message}"));
+        paragraph.Inlines.Add(new LineBreak());
+        AppStatusTextBox.ScrollToEnd();
+    }
+
+    private void SetConnectionStatus(string status)
+    {
+        StatusText.Text = status;
+    }
+
+    private static string BuildStatusMessage(string code, string message, string context)
+    {
+        return code switch
+        {
+            "SETTINGS_LOAD_SUCCESS" => "Settings loaded.",
+            "PROJECT_PARSE_SUCCESS" => "Project data parsed.",
+            "CONNECT_SUCCESS" => "",
+            _ => message.Replace(" successfully.", ".", StringComparison.OrdinalIgnoreCase)
+        };
+    }
+
+    private static bool TryParseStatusLine(string line, out string level, out string message)
+    {
+        level = "INFO";
+        message = line;
+
+        if (line.StartsWith("[warn]", StringComparison.OrdinalIgnoreCase))
+        {
+            level = "WARN";
+            message = line.Substring(6).Trim();
+            return true;
+        }
+
+        if (line.StartsWith("[error]", StringComparison.OrdinalIgnoreCase))
+        {
+            level = "FAIL";
+            message = line.Substring(7).Trim();
+            return true;
+        }
+
+        if (line.StartsWith("[success]", StringComparison.OrdinalIgnoreCase))
+        {
+            level = "SUCCESS";
+            message = line.Substring(9).Trim();
+            return true;
+        }
+
+        if (line.StartsWith("[failed]", StringComparison.OrdinalIgnoreCase)
+            || line.StartsWith("[fail]", StringComparison.OrdinalIgnoreCase))
+        {
+            level = "FAIL";
+            message = line[(line.IndexOf(']') + 1)..].Trim();
+            return true;
+        }
+
+        if (line.StartsWith("[local]", StringComparison.OrdinalIgnoreCase))
+        {
+            level = "INFO";
+            message = line.Substring(7).Trim();
+            return true;
+        }
+
+        if (line.StartsWith("[info]", StringComparison.OrdinalIgnoreCase))
+        {
+            level = "INFO";
+            message = line.Substring(6).Trim();
+            return true;
+        }
+
+        return false;
+    }
+
+    private static string NormalizeStatusLevel(string level)
+    {
+        var normalized = level.Trim().ToUpperInvariant();
+        return normalized switch
+        {
+            "FAILED" => "FAIL",
+            "ERROR" => "FAIL",
+            _ => normalized
+        };
+    }
+
+    private static Brush GetStatusBrush(string level)
+    {
+        return level switch
+        {
+            "SUCCESS" => new SolidColorBrush((Color)ColorConverter.ConvertFromString("#2F7D32")),
+            "WARN" => new SolidColorBrush((Color)ColorConverter.ConvertFromString("#B26A00")),
+            "FAIL" => new SolidColorBrush((Color)ColorConverter.ConvertFromString("#B00020")),
+            _ => Brushes.Black
+        };
+    }
+
     private void UpdateRawLogTimestampBounds(string line)
     {
         if (!TryExtractTimestamp(line, out var timestamp))
@@ -2510,15 +2649,13 @@ public partial class MainWindow : Window
                 RefreshDriverView();
             });
 
-            AppendLog($"[info] Loaded {list.Count} drivers");
             ReportDriverLoadBreakdown(ip, list);
             await ForceDiagnosticsLogLevelAsync(list);
             _featureHealthRegistry.Update(new FeatureOperation("LoadDrivers", ip, "", OperationStatus.Confirmed, 0, null));
-            ReportSuccess("DRIVER_LOAD_SUCCESS", $"Loaded {list.Count} drivers.", ip);
         }
         catch (Exception ex)
         {
-            AppendLog($"[error] Failed to load drivers: {ex.Message}");
+            AppendAppStatus($"[error] Failed to load drivers: {ex.Message}");
             ReportFailure("LoadDrivers", FailureCodes.DriverLoadFailed, $"Failed to load drivers: {ex.Message}", ip);
         }
     }
@@ -2532,7 +2669,7 @@ public partial class MainWindow : Window
 
         if (!DiagnosticsDriverSelector.TryGetDiagnosticsDriverDName(drivers, out var dName))
         {
-            AppendLog("[warn] Diagnostics driver not found; skipping log level pin.");
+            AppendAppStatus("[warn] Diagnostics driver not found; skipping log level pin.");
             return;
         }
 
@@ -2545,12 +2682,12 @@ public partial class MainWindow : Window
                 Drivers.Add(driver);
             }
 
-            await ApplyLogLevelCommandWithAckAsync(driver, 3);
-            AppendLog($"[local] Requested {dName}=3 (Diagnostics driver).");
+            var acknowledged = await ApplyLogLevelCommandWithAckAsync(driver, 3);
+            ReportLogLevelBatchStatus("connect", acknowledged ? 1 : 0, 1);
         }
         catch (Exception ex)
         {
-            AppendLog($"[warn] Failed to set {dName} to 3: {ex.Message}");
+            AppendAppStatus($"[warn] Failed to set {dName} to 3: {ex.Message}");
         }
     }
 
@@ -3205,7 +3342,6 @@ public partial class MainWindow : Window
         driver.IsEnabled = isOn;
         var level = isOn ? driver.SelectedLevel : 0;
         await ApplyLogLevelCommandWithAckAsync(driver, level);
-        AppendLog($"[local] Requested {driver.DName}={(toggle.IsChecked == true ? level.ToString(CultureInfo.InvariantCulture) : "0")}");
     }
 
     private async void DriverLevelButton_Click(object sender, RoutedEventArgs e)
@@ -3228,7 +3364,6 @@ public partial class MainWindow : Window
         }
 
         await ApplyLogLevelCommandWithAckAsync(driver, level);
-        AppendLog($"[local] Requested {driver.DName}={level}");
     }
 
     private async void DriverAllLogLevels_Click(object sender, RoutedEventArgs e)
@@ -3244,12 +3379,16 @@ public partial class MainWindow : Window
             return;
         }
 
+        var ackCount = 0;
         foreach (var driver in Drivers)
         {
-            await ApplyLogLevelCommandWithAckAsync(driver, 3);
+            if (await ApplyLogLevelCommandWithAckAsync(driver, 3))
+            {
+                ackCount++;
+            }
         }
 
-        AppendLog("[local] Requested all drivers=3");
+        ReportLogLevelBatchStatus("all", ackCount, Drivers.Count);
     }
 
     private async void DriverSystemOnlyLogLevels_Click(object sender, RoutedEventArgs e)
@@ -3284,13 +3423,17 @@ public partial class MainWindow : Window
             return;
         }
 
+        var ackCount = 0;
         foreach (var driver in Drivers)
         {
             var level = targets.Contains(driver.DName) ? 3 : 0;
-            await ApplyLogLevelCommandWithAckAsync(driver, level);
+            if (await ApplyLogLevelCommandWithAckAsync(driver, level))
+            {
+                ackCount++;
+            }
         }
 
-        AppendLog("[local] Requested system drivers=3");
+        ReportLogLevelBatchStatus("system", ackCount, Drivers.Count);
     }
 
     private async void DriverNoneLogLevels_Click(object sender, RoutedEventArgs e)
@@ -3305,12 +3448,33 @@ public partial class MainWindow : Window
             return;
         }
 
+        var ackCount = 0;
         foreach (var driver in Drivers)
         {
-            await ApplyLogLevelCommandWithAckAsync(driver, 0);
+            if (await ApplyLogLevelCommandWithAckAsync(driver, 0))
+            {
+                ackCount++;
+            }
         }
 
-        AppendLog("[local] Requested all drivers=0");
+        ReportLogLevelBatchStatus("none", ackCount, Drivers.Count);
+    }
+
+    private void ReportLogLevelBatchStatus(string mode, int acknowledgedCount, int totalCount)
+    {
+        var safeTotal = Math.Max(totalCount, 0);
+        var safeAck = Math.Clamp(acknowledgedCount, 0, safeTotal);
+        var message = $"Status of {safeAck}/{safeTotal} driver log levels acknowledged.";
+        var context = $"mode={mode};ack={safeAck};total={safeTotal}";
+
+        if (safeAck == safeTotal)
+        {
+            ReportSuccess("LOGLEVEL_BATCH_CONFIRM_SUCCESS", message, context);
+            return;
+        }
+
+        AppendAppStatus("WARN", message);
+        _failureNotifier.AppendOperationalResult("LOGLEVEL_BATCH_CONFIRM_WARN", "WARN", message, context);
     }
 
     private void UpdateAllLogLevelsVisibility()

@@ -5,26 +5,56 @@
     <Grid.RowDefinitions>
       <RowDefinition Height="Auto" />
       <RowDefinition Height="Auto" />
-      <RowDefinition Height="Auto" />
     </Grid.RowDefinitions>
     <TextBlock x:Name="ProjectDataHeaderTextControl" Text="Project Data" FontWeight="SemiBold" Margin="0,0,0,8" />
-    <StackPanel Grid.Row="1" Orientation="Horizontal" Margin="0,0,0,6">
-      <Button x:Name="UploadProjectButtonControl" Content="Upload Project (.apex)" Width="180" Height="28" />
+    <Grid Grid.Row="1">
+      <Grid.RowDefinitions>
+        <RowDefinition Height="Auto" />
+        <RowDefinition Height="Auto" />
+      </Grid.RowDefinitions>
+      <Grid.ColumnDefinitions>
+        <ColumnDefinition Width="Auto" />
+        <ColumnDefinition Width="*" />
+        <ColumnDefinition Width="Auto" />
+      </Grid.ColumnDefinitions>
+
+      <Button x:Name="UploadProjectButtonControl"
+              Grid.Row="0"
+              Grid.Column="0"
+              Content="Upload Project (.apex)"
+              Width="180"
+              Height="28" />
       <ComboBox x:Name="RecentProjectComboBoxControl"
-                Width="240"
+                Grid.Row="0"
+                Grid.Column="1"
+                Width="220"
                 Height="24"
                 Margin="10,0,0,0"
                 DisplayMemberPath="FileName" />
       <Button x:Name="ProjectPreviewButtonControl"
+              Grid.Row="0"
+              Grid.RowSpan="2"
+              Grid.Column="2"
               Content="Show"
               Width="70"
-              Height="28"
               Margin="10,0,0,0"
-              IsEnabled="False" />
-    </StackPanel>
-    <StackPanel Grid.Row="2" Orientation="Horizontal">
-      <Button x:Name="UploadAdditionalInfoButtonControl" Content="Upload Additional Info (.xlsx)" Width="180" Height="28" />
-      <TextBlock x:Name="AdditionalInfoFileNameTextControl" Text="No additional info" VerticalAlignment="Center" Margin="10,0,0,0" TextTrimming="CharacterEllipsis" />
-    </StackPanel>
+              IsEnabled="False"
+              VerticalAlignment="Stretch" />
+
+      <Button x:Name="UploadAdditionalInfoButtonControl"
+              Grid.Row="1"
+              Grid.Column="0"
+              Content="Upload Additional Info (.xlsx)"
+              Width="180"
+              Height="28"
+              Margin="0,6,0,0" />
+      <TextBlock x:Name="AdditionalInfoFileNameTextControl"
+                 Grid.Row="1"
+                 Grid.Column="1"
+                 Text="No additional info"
+                 VerticalAlignment="Center"
+                 Margin="10,6,0,0"
+                 TextTrimming="CharacterEllipsis" />
+    </Grid>
   </Grid>
 </UserControl>
