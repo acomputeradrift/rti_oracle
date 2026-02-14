@@ -10,6 +10,7 @@ using System.Text;
 using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
+using OracleByFPCLtd.Reliability;
 namespace OracleByFPCLtd.DiagnosticsTransport;
 
 // Legacy transport retained for compatibility with existing behavior.
@@ -21,6 +22,7 @@ public sealed class LegacyWebSocketDiagnosticsTransport : IDiagnosticsTransport
     public event EventHandler<string>? RawMessageReceived;
     public event EventHandler<string>? TransportInfo;
     public event EventHandler<string>? TransportError;
+    public event EventHandler<FeatureOperation>? OperationStateChanged;
 
     public bool IsConnected => _socket != null && _socket.State == WebSocketState.Open;
 
@@ -62,8 +64,9 @@ public sealed class LegacyWebSocketDiagnosticsTransport : IDiagnosticsTransport
         {
             _socketCts?.Cancel();
         }
-        catch
+        catch (Exception ex)
         {
+            EmitError($"[warn][{FailureCodes.TransportNotConnected}] Failed to cancel socket token source: {ex.Message}");
         }
 
         if (_socket != null)
@@ -75,8 +78,9 @@ public sealed class LegacyWebSocketDiagnosticsTransport : IDiagnosticsTransport
                     await _socket.CloseAsync(WebSocketCloseStatus.NormalClosure, "Closing", CancellationToken.None);
                 }
             }
-            catch
+            catch (Exception ex)
             {
+                EmitError($"[warn][{FailureCodes.TransportNotConnected}] Failed to close socket cleanly: {ex.Message}");
             }
             finally
             {
@@ -86,8 +90,20 @@ public sealed class LegacyWebSocketDiagnosticsTransport : IDiagnosticsTransport
         }
     }
 
-    public async Task SendLogLevelAsync(string type, string level)
+    public async Task<CommandDispatchResult> SendLogLevelCommandAsync(string type, string level, CancellationToken token = default)
     {
+        OperationStateChanged?.Invoke(this, new FeatureOperation("LogLevel", type, level, OperationStatus.Pending, 0, null));
+
+        if (_socket == null || _socket.State != WebSocketState.Open)
+        {
+            var disconnectedFailure = CreateFailure(
+                FailureCodes.LogLevelDispatchFailed,
+                $"Unable to send log level for {type} because the transport is not connected.",
+                $"type={type};level={level}");
+            OperationStateChanged?.Invoke(this, new FeatureOperation("LogLevel", type, level, OperationStatus.Failed, 0, disconnectedFailure));
+            return CommandDispatchResult.Fail(disconnectedFailure);
+        }
+
         var payload = new
         {
             type = "Subscribe",
@@ -99,7 +115,30 @@ public sealed class LegacyWebSocketDiagnosticsTransport : IDiagnosticsTransport
             }
         };
 
-        await SendJsonAsync(payload);
+        try
+        {
+            await SendJsonAsync(payload, token);
+            OperationStateChanged?.Invoke(this, new FeatureOperation("LogLevel", type, level, OperationStatus.Confirmed, 0, null));
+            return CommandDispatchResult.Success();
+        }
+        catch (Exception ex)
+        {
+            var failure = CreateFailure(
+                FailureCodes.LogLevelDispatchFailed,
+                $"Unable to send log level for {type}: {ex.Message}",
+                $"type={type};level={level}");
+            OperationStateChanged?.Invoke(this, new FeatureOperation("LogLevel", type, level, OperationStatus.Failed, 0, failure));
+            return CommandDispatchResult.Fail(failure);
+        }
+    }
+
+    public async Task SendLogLevelAsync(string type, string level)
+    {
+        var result = await SendLogLevelCommandAsync(type, level);
+        if (!result.Dispatched)
+        {
+            throw new InvalidOperationException(result.Failure?.Message ?? "Log level command failed.");
+        }
     }
 
     public async Task<List<DriverInfo>> LoadDriversAsync(string ip)
@@ -255,16 +294,17 @@ public sealed class LegacyWebSocketDiagnosticsTransport : IDiagnosticsTransport
         await SendJsonAsync(payload);
     }
 
-    internal async Task SendJsonAsync<T>(T payload)
+    internal async Task SendJsonAsync<T>(T payload, CancellationToken token = default)
     {
         if (_socket == null || _socket.State != WebSocketState.Open)
         {
-            return;
+            throw new InvalidOperationException("Transport socket is not open.");
         }
 
         var json = JsonSerializer.Serialize(payload);
         var bytes = Encoding.UTF8.GetBytes(json);
-        await _socket.SendAsync(new ArraySegment<byte>(bytes), WebSocketMessageType.Text, true, _socketCts?.Token ?? CancellationToken.None);
+        var effectiveToken = token == default ? _socketCts?.Token ?? CancellationToken.None : token;
+        await _socket.SendAsync(new ArraySegment<byte>(bytes), WebSocketMessageType.Text, true, effectiveToken);
     }
 
     private async Task ReceiveLoopAsync(ClientWebSocket socket, CancellationToken token)
@@ -389,10 +429,16 @@ public sealed class LegacyWebSocketDiagnosticsTransport : IDiagnosticsTransport
             var json = await http.GetStringAsync(url);
             return !string.IsNullOrWhiteSpace(json);
         }
-        catch
+        catch (Exception ex)
         {
+            EmitError($"[warn][{FailureCodes.TransportNotConnected}] RTI probe failed for {ip}: {ex.Message}");
             return false;
         }
+    }
+
+    private static OperationFailure CreateFailure(string code, string message, string context)
+    {
+        return new OperationFailure(code, message, context, DateTime.UtcNow);
     }
 
     private void EmitInfo(string message)

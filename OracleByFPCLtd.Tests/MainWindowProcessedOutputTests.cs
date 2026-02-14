@@ -11,6 +11,7 @@ using System.Windows.Threading;
 using OracleByFPCLtd.DiagnosticsTransport;
 using OracleByFPCLtd.UI.Panels;
 using OracleByFPCLtd.ProjectData;
+using OracleByFPCLtd.Reliability;
 using Xunit;
 
 namespace OracleByFPCLtd.Tests;
@@ -506,6 +507,7 @@ public sealed class MainWindowProcessedOutputTests
         public event EventHandler<string>? RawMessageReceived;
         public event EventHandler<string>? TransportInfo;
         public event EventHandler<string>? TransportError;
+        public event EventHandler<FeatureOperation>? OperationStateChanged;
 
         public bool IsConnected { get; set; }
         public List<string> DiscoverResults { get; set; } = new();
@@ -521,6 +523,8 @@ public sealed class MainWindowProcessedOutputTests
             return Task.CompletedTask;
         }
         public Task DisconnectAsync() => Task.CompletedTask;
+        public Task<CommandDispatchResult> SendLogLevelCommandAsync(string type, string level, CancellationToken token = default)
+            => Task.FromResult(CommandDispatchResult.Success());
         public Task SendLogLevelAsync(string type, string level) => Task.CompletedTask;
         public Task<List<DriverInfo>> LoadDriversAsync(string ip) => Task.FromResult(new List<DriverInfo>());
 

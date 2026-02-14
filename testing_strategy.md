@@ -82,6 +82,8 @@ Failure tests must assert:
 - No guessing occurred  
 - Unknowns remain visible  
 - Processing continues safely where possible  
+- User-affecting command paths cannot fail silently; each must produce explicit operation state and observable failure evidence
+- Retry policies (where defined) execute deterministically and terminate in explicit success/failure state
 
 ---
 

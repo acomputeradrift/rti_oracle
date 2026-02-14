@@ -111,7 +111,11 @@ public static class LogLevelAckParser
             level = parsedLevel;
             return true;
         }
-        catch
+        catch (JsonException)
+        {
+            return false;
+        }
+        catch (FormatException)
         {
             return false;
         }

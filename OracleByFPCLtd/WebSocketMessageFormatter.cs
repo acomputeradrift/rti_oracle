@@ -66,7 +66,10 @@ public sealed class WebSocketMessageFormatter
                                 return $"Echo {type}/{res}";
                             }
                         }
-                        catch
+                        catch (JsonException)
+                        {
+                        }
+                        catch (FormatException)
                         {
                         }
                         return $"Echo {msg}";
@@ -99,7 +102,10 @@ public sealed class WebSocketMessageFormatter
                 return $"{type}/{resource} {raw}";
             }
         }
-        catch
+        catch (JsonException)
+        {
+        }
+        catch (FormatException)
         {
         }
 

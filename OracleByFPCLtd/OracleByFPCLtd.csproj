@@ -22,7 +22,9 @@
   </ItemGroup>
 
   <ItemGroup>
-    <Resource Include="Resources\\AppIcon.ico" />
+    <Resource Include="Resources\\AppIcon.ico">
+      <LogicalName>resources/appicon.ico</LogicalName>
+    </Resource>
     <Resource Include="Resources\\Cursors\\white-arrow.cur" />
   </ItemGroup>
 

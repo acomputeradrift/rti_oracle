@@ -1,5 +1,6 @@
 using System;
 using System.IO;
+using OracleByFPCLtd.Reliability;
 using OracleByFPCLtd.Settings.Models;
 using OracleByFPCLtd.Settings.Services;
 using OracleByFPCLtd.Settings.Storage;
@@ -70,6 +71,26 @@ public sealed class SettingsStoreTests
 
         Assert.Single(reloaded.RecentProjects);
         Assert.Single(reloaded.RecentIps);
+
+        if (File.Exists(path))
+        {
+            File.Delete(path);
+        }
+    }
+
+    [Fact]
+    public void LoadReportsFallbackWhenSettingsJsonIsCorrupt()
+    {
+        var path = Path.Combine(Path.GetTempPath(), $"{Guid.NewGuid():N}.json");
+        File.WriteAllText(path, "{invalid-json");
+        var store = new OracleSettingsStore(path);
+        OperationFailure? failure = null;
+
+        var loaded = store.Load(candidate => failure = candidate);
+
+        Assert.NotNull(loaded);
+        Assert.NotNull(failure);
+        Assert.Equal(FailureCodes.SettingsLoadFallback, failure!.Code);
 
         if (File.Exists(path))
         {

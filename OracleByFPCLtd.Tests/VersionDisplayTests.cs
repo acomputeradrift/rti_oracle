@@ -1,4 +1,5 @@
 using System;
+using System.Linq;
 using System.Reflection;
 using System.Threading;
 using System.Windows.Documents;
@@ -62,10 +63,18 @@ public sealed class VersionDisplayTests
 
     private static string GetAboutVersionText(AboutWindow window)
     {
-        var field = typeof(AboutWindow).GetField("VersionTextBlock", BindingFlags.Instance | BindingFlags.NonPublic);
-        Assert.NotNull(field);
-        var textBlock = (System.Windows.Controls.TextBlock)field!.GetValue(window)!;
-        return textBlock.Text;
+        var textField = typeof(AboutWindow).GetField("VersionTextBlock", BindingFlags.Instance | BindingFlags.NonPublic);
+        var linkField = typeof(AboutWindow).GetField("VersionLink", BindingFlags.Instance | BindingFlags.NonPublic);
+        Assert.NotNull(textField);
+        Assert.NotNull(linkField);
+
+        var textBlock = (System.Windows.Controls.TextBlock)textField!.GetValue(window)!;
+        var hyperlink = (Hyperlink)linkField!.GetValue(window)!;
+
+        var prefixRange = new TextRange(textBlock.ContentStart, hyperlink.ElementStart);
+        var linkText = string.Concat(hyperlink.Inlines.OfType<Run>().Select(run => run.Text));
+        var composed = $"{prefixRange.Text}{linkText}".Trim();
+        return string.Join(" ", composed.Split(' ', StringSplitOptions.RemoveEmptyEntries));
     }
 
     private static string GetVersionLabel(Assembly assembly)

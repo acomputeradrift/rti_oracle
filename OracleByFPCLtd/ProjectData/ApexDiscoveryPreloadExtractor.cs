@@ -969,7 +969,7 @@ ORDER BY d.DeviceId, sv.SysVarID;
         {
             document = XDocument.Parse(xml);
         }
-        catch
+        catch (Exception)
         {
             return variables;
         }

@@ -33,6 +33,7 @@ using OracleByFPCLtd.ProjectData;
 using OracleByFPCLtd.ProjectData.Extractors;
 using OracleByFPCLtd.ProjectData.Models;
 using OracleByFPCLtd.ProcessingEngine;
+using OracleByFPCLtd.Reliability;
 using OracleByFPCLtd.Settings.Models;
 using OracleByFPCLtd.Settings.Services;
 using OracleByFPCLtd.Settings.Storage;
@@ -49,6 +50,8 @@ public partial class MainWindow : Window
     private const string FilterInvalidRangeMessage = "Invalid date/time range. Start must be before End.";
     private const int ReconnectDelaySeconds = 3;
     private const int ReconnectInitialDelaySeconds = 3;
+    private const int LogLevelAckTimeoutMilliseconds = 3000;
+    private const int LogLevelAckMaxRetryCount = 1;
     private const double ProcessedWidthPadding = 12;
     private const double RawWidthPadding = 12;
     private static readonly TimeSpan FindDebounceInterval = TimeSpan.FromMilliseconds(200);
@@ -108,6 +111,9 @@ public partial class MainWindow : Window
     private AdditionalData? _lastAdditionalData;
     private IReadOnlyList<AdditionalInfoSheetSchema> _requiredAdditionalInfoSchemas = Array.Empty<AdditionalInfoSheetSchema>();
     private CancellationTokenSource? _reconnectCts;
+    private readonly Dictionary<string, PendingLogLevelCommand> _pendingLogLevelCommands = new(StringComparer.OrdinalIgnoreCase);
+    private readonly FeatureHealthRegistry _featureHealthRegistry = new();
+    private readonly IUserFailureNotifier _failureNotifier;
     private bool _isReconnecting;
     private int _reconnectAttempt;
     private bool _suppressReconnect;
@@ -177,6 +183,8 @@ public partial class MainWindow : Window
     public MainWindow()
     {
         InitializeComponent();
+        WindowIconLoader.TryApply(this);
+        _failureNotifier = new MainWindowFailureNotifier(this);
         Title = $"Oracle by FP&C {AppVersion.CurrentLabel()}";
         WirePanelHandlers();
         ConfigureLogOutputBoxes();
@@ -312,7 +320,17 @@ public partial class MainWindow : Window
 
     private void LoadSettings()
     {
-        _settings = _settingsStore.Load();
+        var loadFailed = false;
+        _settings = _settingsStore.Load(failure =>
+        {
+            loadFailed = true;
+            _failureNotifier.AppendOperationalLog(failure);
+        });
+        if (!loadFailed)
+        {
+            ReportSuccess("SETTINGS_LOAD_SUCCESS", "Settings loaded successfully.", "settings");
+        }
+
         UpdateRecentProjectList();
     }
 
@@ -1494,6 +1512,21 @@ public partial class MainWindow : Window
         HandleTransportFailure(message);
     }
 
+    private void Transport_OperationStateChanged(object? sender, FeatureOperation operation)
+    {
+        _featureHealthRegistry.Update(operation);
+        if (operation.Status != OperationStatus.Failed || operation.LastError == null)
+        {
+            return;
+        }
+
+        Dispatcher.Invoke(() =>
+        {
+            _failureNotifier.AppendOperationalLog(operation.LastError);
+            _failureNotifier.ShowBlockingFailure(operation.Feature, operation.LastError);
+        });
+    }
+
     private void HandleTransportFailure(string message)
     {
         if (_suppressReconnect || _useTcpCapture || _isConnecting)
@@ -1530,6 +1563,7 @@ public partial class MainWindow : Window
         transport.RawMessageReceived += Transport_RawMessageReceived;
         transport.TransportInfo += Transport_TransportInfo;
         transport.TransportError += Transport_TransportError;
+        transport.OperationStateChanged += Transport_OperationStateChanged;
     }
 
     private void UnregisterTransportHandlers(IDiagnosticsTransport transport)
@@ -1537,6 +1571,7 @@ public partial class MainWindow : Window
         transport.RawMessageReceived -= Transport_RawMessageReceived;
         transport.TransportInfo -= Transport_TransportInfo;
         transport.TransportError -= Transport_TransportError;
+        transport.OperationStateChanged -= Transport_OperationStateChanged;
     }
 
     private void SetTransport(IDiagnosticsTransport transport, bool useTcpCapture)
@@ -1576,11 +1611,13 @@ public partial class MainWindow : Window
                 }
             }
             StatusText.Text = sorted.Count == 0 ? "No Devices Found" : $"Found {sorted.Count}";
+            ReportSuccess("DISCOVERY_SUCCESS", $"Discovery completed with {sorted.Count} result(s).", "discover");
         }
         catch (Exception ex)
         {
             StatusText.Text = "Discovery Failed";
             AppendLog($"[error] Discovery failed: {ex.Message}");
+            ReportFailure("Discover", FailureCodes.DiscoveryFailed, $"Discovery failed: {ex.Message}", "discover");
         }
         finally
         {
@@ -1627,6 +1664,7 @@ public partial class MainWindow : Window
 
         try
         {
+            _featureHealthRegistry.Update(new FeatureOperation("Connect", ip, "", OperationStatus.Pending, 0, null));
             _messageFormatter.Reset(DateOnly.FromDateTime(DateTime.Today));
             _friendlyNames.Clear();
             var useTcpCapture = TcpCaptureCheckBox.IsChecked == true;
@@ -1658,11 +1696,14 @@ public partial class MainWindow : Window
                 _settingsStore.Save(_settings);
                 UpdateRecentProjectList(_projectFilePath);
             }
+            _featureHealthRegistry.Update(new FeatureOperation("Connect", ip, "", OperationStatus.Confirmed, 0, null));
+            ReportSuccess("CONNECT_SUCCESS", "Connection established.", ip);
         }
         catch (Exception ex)
         {
             StatusText.Text = "Connect Failed";
             AppendLog($"[error] Connect failed: {ex.Message}");
+            ReportFailure("Connect", FailureCodes.TransportNotConnected, $"Connect failed: {ex.Message}", ip);
             ConnectButton.IsEnabled = true;
             DiscoverButton.IsEnabled = true;
             ConnectButton.Content = "Connect";
@@ -1681,6 +1722,7 @@ public partial class MainWindow : Window
         _suppressReconnect = false;
         _rawLineNumber = 1;
         _messageFormatter.Reset(DateOnly.FromDateTime(DateTime.Today));
+        _pendingLogLevelCommands.Clear();
         StatusText.Text = "Disconnected";
         DisconnectButton.IsEnabled = false;
         ConnectButton.IsEnabled = true;
@@ -1782,6 +1824,26 @@ public partial class MainWindow : Window
             || message.Contains("close handshake", StringComparison.OrdinalIgnoreCase);
     }
 
+    private void ReportFailure(string feature, string code, string message, string context)
+    {
+        var failure = new OperationFailure(code, message, context, DateTime.UtcNow);
+        _featureHealthRegistry.Update(new FeatureOperation(feature, context, "", OperationStatus.Failed, 0, failure));
+        _failureNotifier.AppendOperationalLog(failure);
+        _failureNotifier.ShowBlockingFailure(feature, failure);
+    }
+
+    private void ReportFailure(string feature, OperationFailure failure, int retryCount = 0)
+    {
+        _featureHealthRegistry.Update(new FeatureOperation(feature, failure.Context, "", OperationStatus.Failed, retryCount, failure));
+        _failureNotifier.AppendOperationalLog(failure);
+        _failureNotifier.ShowBlockingFailure(feature, failure);
+    }
+
+    private void ReportSuccess(string code, string message, string context)
+    {
+        _failureNotifier.AppendOperationalResult(code, "SUCCESS", message, context);
+    }
+
     private void DiscoveredCombo_SelectionChanged(object sender, SelectionChangedEventArgs e)
     {
         if (DiscoveredCombo.SelectedItem is string selected)
@@ -1870,10 +1932,12 @@ public partial class MainWindow : Window
                 InitializeProcessing(result);
                 UpdateAdditionalInfoTemplateAvailability(result);
             });
+            ReportSuccess("PROJECT_PARSE_SUCCESS", "Project data parsed successfully.", filePath);
         }
         catch (Exception ex)
         {
             ShowMessageOnUiThread(ex.Message, "Project Data", MessageBoxImage.Error);
+            ReportFailure("ProjectData", FailureCodes.ProjectParseFailed, $"Project data parse failed: {ex.Message}", filePath);
         }
     }
 
@@ -1981,8 +2045,18 @@ public partial class MainWindow : Window
             return;
         }
 
-        var request = BuildExportRequest();
-        _exportService.Export(request, dialog.FileName);
+        try
+        {
+            _featureHealthRegistry.Update(new FeatureOperation("Export", dialog.FileName, "", OperationStatus.Pending, 0, null));
+            var request = BuildExportRequest();
+            _exportService.Export(request, dialog.FileName);
+            _featureHealthRegistry.Update(new FeatureOperation("Export", dialog.FileName, "", OperationStatus.Confirmed, 0, null));
+            ReportSuccess("EXPORT_SUCCESS", "Export completed successfully.", dialog.FileName);
+        }
+        catch (Exception ex)
+        {
+            ReportFailure("Export", FailureCodes.ExportFailed, $"Export failed: {ex.Message}", dialog.FileName);
+        }
     }
 
     private void DownloadAdditionalInfoTemplateMenuItem_Click(object sender, RoutedEventArgs e)
@@ -2152,7 +2226,7 @@ public partial class MainWindow : Window
                 }
             }
         }
-        catch
+        catch (Exception)
         {
         }
 
@@ -2233,8 +2307,129 @@ public partial class MainWindow : Window
 
             existing.SelectedLevel = level;
             existing.IsEnabled = level > 0;
+            existing.OperationStatus = OperationStatus.Confirmed;
+            TryResolvePendingLogLevelCommand(dName, level);
             RefreshDriverView();
         });
+    }
+
+    private async Task ApplyLogLevelCommandWithAckAsync(DriverEntry driver, int level)
+    {
+        driver.OperationStatus = OperationStatus.Pending;
+        var retryCount = 0;
+
+        while (true)
+        {
+            _featureHealthRegistry.Update(new FeatureOperation("LogLevel", driver.DName, level.ToString(CultureInfo.InvariantCulture), OperationStatus.Pending, retryCount, null));
+            var dispatchResult = await _transport.SendLogLevelCommandAsync(driver.DName, level.ToString(CultureInfo.InvariantCulture));
+            if (!dispatchResult.Dispatched)
+            {
+                driver.OperationStatus = OperationStatus.Failed;
+                if (dispatchResult.Failure != null)
+                {
+                    _featureHealthRegistry.Update(new FeatureOperation(
+                        "LogLevel",
+                        driver.DName,
+                        level.ToString(CultureInfo.InvariantCulture),
+                        OperationStatus.Failed,
+                        retryCount,
+                        dispatchResult.Failure));
+                }
+
+                return;
+            }
+
+            var acknowledged = await WaitForLogLevelAckAsync(driver.DName, level, retryCount);
+            if (acknowledged)
+            {
+                driver.OperationStatus = OperationStatus.Confirmed;
+                _featureHealthRegistry.Update(new FeatureOperation("LogLevel", driver.DName, level.ToString(CultureInfo.InvariantCulture), OperationStatus.Confirmed, retryCount, null));
+                ReportSuccess("LOGLEVEL_ACK_SUCCESS", $"Log level acknowledged at {level}.", BuildLogLevelSuccessContext(driver, level, retryCount));
+                return;
+            }
+
+            if (retryCount >= LogLevelAckMaxRetryCount)
+            {
+                driver.OperationStatus = OperationStatus.Failed;
+                var failure = new OperationFailure(
+                    FailureCodes.LogLevelAckTimeout,
+                    $"Log level for {driver.DName} did not acknowledge level {level} after retry.",
+                    $"dName={driver.DName};level={level}",
+                    DateTime.UtcNow);
+                ReportFailure("LogLevel", failure, retryCount);
+                return;
+            }
+
+            retryCount++;
+        }
+    }
+
+    private async Task<bool> WaitForLogLevelAckAsync(string dName, int level, int retryCount)
+    {
+        var key = BuildLogLevelAckKey(dName);
+        var timeoutSource = new CancellationTokenSource(TimeSpan.FromMilliseconds(LogLevelAckTimeoutMilliseconds));
+        _pendingLogLevelCommands[key] = new PendingLogLevelCommand(level, retryCount, timeoutSource);
+        try
+        {
+            while (!timeoutSource.IsCancellationRequested)
+            {
+                await Task.Delay(50, timeoutSource.Token);
+            }
+
+            return false;
+        }
+        catch (OperationCanceledException)
+        {
+            return !_pendingLogLevelCommands.ContainsKey(key);
+        }
+        finally
+        {
+            if (_pendingLogLevelCommands.TryGetValue(key, out var pending)
+                && ReferenceEquals(pending.TimeoutSource, timeoutSource))
+            {
+                _pendingLogLevelCommands.Remove(key);
+            }
+            timeoutSource.Dispose();
+        }
+    }
+
+    private static string BuildLogLevelSuccessContext(DriverEntry driver, int level, int retryCount)
+    {
+        if (driver == null)
+        {
+            return $"level={level};retry={retryCount}";
+        }
+
+        var baseContext = $"dName={driver.DName};level={level};retry={retryCount}";
+        if (!string.IsNullOrWhiteSpace(driver.Name)
+            && driver.Name.StartsWith("Diagnostics:", StringComparison.OrdinalIgnoreCase))
+        {
+            return $"{baseContext};name={driver.Name}";
+        }
+
+        return baseContext;
+    }
+
+    private void TryResolvePendingLogLevelCommand(string dName, int level)
+    {
+        var key = BuildLogLevelAckKey(dName);
+        if (!_pendingLogLevelCommands.TryGetValue(key, out var pending))
+        {
+            return;
+        }
+
+        if (pending.RequestedLevel != level)
+        {
+            return;
+        }
+
+        _pendingLogLevelCommands.Remove(key);
+        pending.TimeoutSource.Cancel();
+    }
+
+    private static string BuildLogLevelAckKey(string dName)
+    {
+        return dName.Trim().ToUpperInvariant();
     }
 
     private static int ParseDriverId(string dName)
@@ -2293,6 +2488,7 @@ public partial class MainWindow : Window
     {
         try
         {
+            _featureHealthRegistry.Update(new FeatureOperation("LoadDrivers", ip, "", OperationStatus.Pending, 0, null));
             var list = await _transport.LoadDriversAsync(ip);
 
             Dispatcher.Invoke(() =>
@@ -2315,11 +2511,15 @@ public partial class MainWindow : Window
             });
 
             AppendLog($"[info] Loaded {list.Count} drivers");
+            ReportDriverLoadBreakdown(ip, list);
             await ForceDiagnosticsLogLevelAsync(list);
+            _featureHealthRegistry.Update(new FeatureOperation("LoadDrivers", ip, "", OperationStatus.Confirmed, 0, null));
+            ReportSuccess("DRIVER_LOAD_SUCCESS", $"Loaded {list.Count} drivers.", ip);
         }
         catch (Exception ex)
         {
             AppendLog($"[error] Failed to load drivers: {ex.Message}");
+            ReportFailure("LoadDrivers", FailureCodes.DriverLoadFailed, $"Failed to load drivers: {ex.Message}", ip);
         }
     }
 
@@ -2338,13 +2538,66 @@ public partial class MainWindow : Window
 
         try
         {
-            await _transport.SendLogLevelAsync(dName, "3");
-            AppendLog($"[local] Set {dName} to 3 (Diagnostics driver).");
+            var driver = Drivers.FirstOrDefault(d => d.DName.Equals(dName, StringComparison.OrdinalIgnoreCase));
+            if (driver == null)
+            {
+                driver = new DriverEntry(ParseDriverId(dName), dName, dName);
+                Drivers.Add(driver);
+            }
+
+            await ApplyLogLevelCommandWithAckAsync(driver, 3);
+            AppendLog($"[local] Requested {dName}=3 (Diagnostics driver).");
         }
         catch (Exception ex)
         {
             AppendLog($"[warn] Failed to set {dName} to 3: {ex.Message}");
         }
+    }
+
+    private void ReportDriverLoadBreakdown(string ip, IReadOnlyList<DiagnosticsTransport.DriverInfo> projectDrivers)
+    {
+        var projectNames = projectDrivers
+            .Select(driver => string.IsNullOrWhiteSpace(driver.Name) ? driver.DName : driver.Name)
+            .Where(name => !string.IsNullOrWhiteSpace(name))
+            .Select(SanitizeContextValue)
+            .ToList();
+
+        List<string> populatedSystemDrivers = new();
+        List<string> missingSystemDrivers = new();
+        Dispatcher.Invoke(() =>
+        {
+            foreach (var anchor in AnchorNames)
+            {
+                var existing = Drivers.FirstOrDefault(driver => driver.DName.Equals(anchor, StringComparison.OrdinalIgnoreCase));
+                if (existing == null)
+                {
+                    missingSystemDrivers.Add(anchor);
+                    continue;
+                }
+
+                populatedSystemDrivers.Add(SanitizeContextValue(string.IsNullOrWhiteSpace(existing.Name) ? anchor : existing.Name));
+            }
+        });
+
+        var projectContext = $"ip={ip};count={projectDrivers.Count};drivers={JoinContextValues(projectNames)}";
+        ReportSuccess("DRIVER_LOAD_PROJECT_SUCCESS", $"Loaded {projectDrivers.Count} project drivers.", projectContext);
+
+        var systemContext =
+            $"ip={ip};count={populatedSystemDrivers.Count};drivers={JoinContextValues(populatedSystemDrivers)};missing={JoinContextValues(missingSystemDrivers)}";
+        ReportSuccess("DRIVER_LOAD_SYSTEM_SUCCESS", $"Loaded {populatedSystemDrivers.Count} system drivers.", systemContext);
+    }
+
+    private static string JoinContextValues(IReadOnlyCollection<string> values)
+    {
+        return values.Count == 0 ? "(none)" : string.Join(",", values);
+    }
+
+    private static string SanitizeContextValue(string value)
+    {
+        return value
+            .Replace(";", ":", StringComparison.Ordinal)
+            .Replace("|", "/", StringComparison.Ordinal)
+            .Trim();
     }
 
     public void InitializeProcessing(ProjectDataExtractionResult result)
@@ -2908,6 +3161,20 @@ public partial class MainWindow : Window
         public TextPointer LineStart { get; }
     }
 
+    private sealed class PendingLogLevelCommand
+    {
+        public PendingLogLevelCommand(int requestedLevel, int retryCount, CancellationTokenSource timeoutSource)
+        {
+            RequestedLevel = requestedLevel;
+            RetryCount = retryCount;
+            TimeoutSource = timeoutSource;
+        }
+
+        public int RequestedLevel { get; }
+        public int RetryCount { get; }
+        public CancellationTokenSource TimeoutSource { get; }
+    }
+
     private static bool IsAnchorName(string dName)
     {
         return AnchorNames.Any(anchor => string.Equals(anchor, dName, StringComparison.OrdinalIgnoreCase));
@@ -2936,9 +3203,9 @@ public partial class MainWindow : Window
 
         var isOn = toggle.IsChecked == true;
         driver.IsEnabled = isOn;
-        var level = isOn ? driver.SelectedLevel.ToString() : "0";
-        await _transport.SendLogLevelAsync(driver.DName, level);
-        AppendLog($"[local] Set {driver.DName} to {(toggle.IsChecked == true ? level : "0")}");
+        var level = isOn ? driver.SelectedLevel : 0;
+        await ApplyLogLevelCommandWithAckAsync(driver, level);
+        AppendLog($"[local] Requested {driver.DName}={(toggle.IsChecked == true ? level.ToString(CultureInfo.InvariantCulture) : "0")}");
     }
 
     private async void DriverLevelButton_Click(object sender, RoutedEventArgs e)
@@ -2960,8 +3227,8 @@ public partial class MainWindow : Window
             return;
         }
 
-        await _transport.SendLogLevelAsync(driver.DName, level.ToString());
-        AppendLog($"[local] Set {driver.DName} to {level}");
+        await ApplyLogLevelCommandWithAckAsync(driver, level);
+        AppendLog($"[local] Requested {driver.DName}={level}");
     }
 
     private async void DriverAllLogLevels_Click(object sender, RoutedEventArgs e)
@@ -2979,10 +3246,10 @@ public partial class MainWindow : Window
 
         foreach (var driver in Drivers)
         {
-            await _transport.SendLogLevelAsync(driver.DName, "3");
+            await ApplyLogLevelCommandWithAckAsync(driver, 3);
         }
 
-        AppendLog("[local] Set all drivers to 3");
+        AppendLog("[local] Requested all drivers=3");
     }
 
     private async void DriverSystemOnlyLogLevels_Click(object sender, RoutedEventArgs e)
@@ -3019,11 +3286,11 @@ public partial class MainWindow : Window
 
         foreach (var driver in Drivers)
         {
-            var level = targets.Contains(driver.DName) ? "3" : "0";
-            await _transport.SendLogLevelAsync(driver.DName, level);
+            var level = targets.Contains(driver.DName) ? 3 : 0;
+            await ApplyLogLevelCommandWithAckAsync(driver, level);
         }
 
-        AppendLog("[local] Set system drivers to 3");
+        AppendLog("[local] Requested system drivers=3");
     }
 
     private async void DriverNoneLogLevels_Click(object sender, RoutedEventArgs e)
@@ -3040,10 +3307,10 @@ public partial class MainWindow : Window
 
         foreach (var driver in Drivers)
         {
-            await _transport.SendLogLevelAsync(driver.DName, "0");
+            await ApplyLogLevelCommandWithAckAsync(driver, 0);
         }
 
-        AppendLog("[local] Set all drivers to 0");
+        AppendLog("[local] Requested all drivers=0");
     }
 
     private void UpdateAllLogLevelsVisibility()
@@ -3063,6 +3330,7 @@ public partial class MainWindow : Window
         private bool _isEnabled;
         private int _selectedLevel;
         private string _name;
+        private OperationStatus _operationStatus;
 
         public DriverEntry(int id, string name, string dName)
         {
@@ -3070,6 +3338,7 @@ public partial class MainWindow : Window
             _name = name;
             DName = dName;
             SelectedLevel = 3;
+            OperationStatus = OperationStatus.Confirmed;
         }
 
         public int Id { get; }
@@ -3112,6 +3381,21 @@ public partial class MainWindow : Window
                 }
                 _selectedLevel = value;
                 OnPropertyChanged(nameof(SelectedLevel));
+            }
+        }
+
+        public OperationStatus OperationStatus
+        {
+            get => _operationStatus;
+            set
+            {
+                if (_operationStatus == value)
+                {
+                    return;
+                }
+
+                _operationStatus = value;
+                OnPropertyChanged(nameof(OperationStatus));
             }
         }
 

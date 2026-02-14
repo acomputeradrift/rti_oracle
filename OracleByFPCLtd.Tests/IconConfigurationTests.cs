@@ -29,13 +29,14 @@ public sealed class IconConfigurationTests
     public void MainAndAboutWindowsUseAppIcon()
     {
         var repoRoot = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "..", "..", ".."));
-        var mainWindowXaml = Path.Combine(repoRoot, "OracleByFPCLtd", "MainWindow.xaml");
-        var aboutWindowXaml = Path.Combine(repoRoot, "OracleByFPCLtd", "AboutWindow.xaml");
-        Assert.True(File.Exists(mainWindowXaml), $"MainWindow not found: {mainWindowXaml}");
-        Assert.True(File.Exists(aboutWindowXaml), $"AboutWindow not found: {aboutWindowXaml}");
+        var mainWindowCodeBehind = Path.Combine(repoRoot, "OracleByFPCLtd", "MainWindow.xaml.cs");
+        var aboutWindowCodeBehind = Path.Combine(repoRoot, "OracleByFPCLtd", "AboutWindow.xaml.cs");
+        var iconLoader = Path.Combine(repoRoot, "OracleByFPCLtd", "WindowIconLoader.cs");
+        Assert.True(File.Exists(mainWindowCodeBehind), $"MainWindow code-behind not found: {mainWindowCodeBehind}");
+        Assert.True(File.Exists(aboutWindowCodeBehind), $"AboutWindow code-behind not found: {aboutWindowCodeBehind}");
+        Assert.True(File.Exists(iconLoader), $"Window icon loader not found: {iconLoader}");
 
-        var expectedIcon = "Icon=\"pack://application:,,,/Resources/AppIcon.ico\"";
-        Assert.Contains(expectedIcon, File.ReadAllText(mainWindowXaml), StringComparison.Ordinal);
-        Assert.Contains(expectedIcon, File.ReadAllText(aboutWindowXaml), StringComparison.Ordinal);
+        Assert.Contains("WindowIconLoader.TryApply(this);", File.ReadAllText(mainWindowCodeBehind), StringComparison.Ordinal);
+        Assert.Contains("WindowIconLoader.TryApply(this);", File.ReadAllText(aboutWindowCodeBehind), StringComparison.Ordinal);
     }
 }

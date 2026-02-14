@@ -1,10 +1,12 @@
 using System;
 using System.Collections.Generic;
+using System.Threading;
 using System.Threading.Tasks;
 using OracleByFPCLtd.DiagnosticsTransport;
 using OracleByFPCLtd.DiagnosticsTransport.Connection;
 using OracleByFPCLtd.DiagnosticsTransport.Controls;
 using OracleByFPCLtd.DiagnosticsTransport.Messaging;
+using OracleByFPCLtd.Reliability;
 using Xunit;
 
 namespace OracleByFPCLtd.Tests;
@@ -77,6 +79,23 @@ public sealed class DiagnosticsTransportFacadeTests
         Assert.Equal(1, logLevelController.SendCalls);
         Assert.Equal("Driver", logLevelController.LastType);
         Assert.Equal("Debug", logLevelController.LastLevel);
+    }
+
+    [Fact]
+    public async Task SendLogLevelCommandAsyncDelegatesToController()
+    {
+        var logLevelController = new FakeLogLevelController();
+        var facade = new DiagnosticsTransportFacade(
+            new FakeConnectionManager(),
+            new FakeMessageReceiver(),
+            logLevelController,
+            new FakeSysvarSubscriptionController());
+
+        var result = await facade.SendLogLevelCommandAsync("DRIVER//2", "1");
+
+        Assert.True(result.Dispatched);
+        Assert.Equal("DRIVER//2", logLevelController.LastType);
+        Assert.Equal("1", logLevelController.LastLevel);
     }
 
     [Fact]
@@ -196,9 +215,18 @@ public sealed class DiagnosticsTransportFacadeTests
 
     private sealed class FakeLogLevelController : ILogLevelController
     {
+        public event EventHandler<FeatureOperation>? OperationStateChanged;
         public int SendCalls { get; private set; }
         public string LastType { get; private set; } = "";
         public string LastLevel { get; private set; } = "";
+
+        public Task<CommandDispatchResult> SendLogLevelCommandAsync(string type, string level, CancellationToken token = default)
+        {
+            SendCalls++;
+            LastType = type;
+            LastLevel = level;
+            return Task.FromResult(CommandDispatchResult.Success());
+        }
 
         public Task SendLogLevelAsync(string type, string level)
         {

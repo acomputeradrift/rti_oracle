@@ -88,6 +88,8 @@ Operators can observe system behavior via:
 - Raw diagnostic log view  
 - Processed log view with visible mappings and unknowns  
 - Explicit surfacing of missing or unresolved data  
+- Explicit operation-state signaling for critical actions (`Pending`, `Confirmed`, `Failed`, `Degraded`)
+- On user-impacting failures: blocking popup plus persisted machine-readable error log line
 
 No hidden state is permitted.
 
@@ -147,4 +149,3 @@ Date: **2026-01-18**
 ---
 
 END OF RUNBOOK
-

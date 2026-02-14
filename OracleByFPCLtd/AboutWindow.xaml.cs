@@ -13,6 +13,7 @@ public partial class AboutWindow : Window
     public AboutWindow()
     {
         InitializeComponent();
+        WindowIconLoader.TryApply(this);
         var label = AppVersion.CurrentLabel();
         VersionLink.Inlines.Clear();
         VersionLink.Inlines.Add(new Run(label));

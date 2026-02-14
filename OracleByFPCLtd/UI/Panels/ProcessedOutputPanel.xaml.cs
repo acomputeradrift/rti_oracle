@@ -32,7 +32,7 @@ public partial class ProcessedOutputPanel : UserControl
             var streamInfo = Application.GetResourceStream(new Uri(resourceUri, UriKind.Absolute));
             return streamInfo == null ? null : new Cursor(streamInfo.Stream);
         }
-        catch
+        catch (Exception)
         {
             return null;
         }

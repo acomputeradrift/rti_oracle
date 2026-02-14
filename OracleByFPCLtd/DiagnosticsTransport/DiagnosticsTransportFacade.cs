@@ -1,9 +1,11 @@
 using System;
 using System.Collections.Generic;
+using System.Threading;
 using System.Threading.Tasks;
 using OracleByFPCLtd.DiagnosticsTransport.Connection;
 using OracleByFPCLtd.DiagnosticsTransport.Controls;
 using OracleByFPCLtd.DiagnosticsTransport.Messaging;
+using OracleByFPCLtd.Reliability;
 
 namespace OracleByFPCLtd.DiagnosticsTransport;
 
@@ -28,11 +30,13 @@ public sealed class DiagnosticsTransportFacade : IDiagnosticsTransport
         _connection.TransportInfo += (_, message) => TransportInfo?.Invoke(this, message);
         _connection.TransportError += (_, message) => TransportError?.Invoke(this, message);
         _receiver.RawMessageReceived += (_, message) => RawMessageReceived?.Invoke(this, message);
+        _logLevelController.OperationStateChanged += (_, operation) => OperationStateChanged?.Invoke(this, operation);
     }
 
     public event EventHandler<string>? RawMessageReceived;
     public event EventHandler<string>? TransportInfo;
     public event EventHandler<string>? TransportError;
+    public event EventHandler<FeatureOperation>? OperationStateChanged;
 
     public bool IsConnected => _connection.IsConnected;
 
@@ -41,6 +45,9 @@ public sealed class DiagnosticsTransportFacade : IDiagnosticsTransport
     public Task ConnectAsync(string ip) => _connection.ConnectAsync(ip);
 
     public Task DisconnectAsync() => _connection.DisconnectAsync();
+
+    public Task<CommandDispatchResult> SendLogLevelCommandAsync(string type, string level, CancellationToken token = default)
+        => _logLevelController.SendLogLevelCommandAsync(type, level, token);
 
     public Task SendLogLevelAsync(string type, string level) => _logLevelController.SendLogLevelAsync(type, level);
 

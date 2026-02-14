@@ -4,6 +4,7 @@ using System.IO;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
+using OracleByFPCLtd.Reliability;
 
 namespace OracleByFPCLtd.ProjectData;
 
@@ -24,7 +25,7 @@ public static class ProjectDataCacheStore
         return Path.Combine(folder, $"{hash}.json");
     }
 
-    public static bool TryLoad(string apexPath, out ProjectDataExtractionResult result)
+    public static bool TryLoad(string apexPath, out ProjectDataExtractionResult result, Action<OperationFailure>? onFailure = null)
     {
         result = new ProjectDataExtractionResult();
         if (string.IsNullOrWhiteSpace(apexPath))
@@ -44,8 +45,13 @@ public static class ProjectDataCacheStore
             var json = File.ReadAllText(cachePath);
             cache = JsonSerializer.Deserialize<ProjectDataCacheFile>(json, JsonOptions);
         }
-        catch
+        catch (Exception ex)
         {
+            onFailure?.Invoke(new OperationFailure(
+                FailureCodes.ProjectParseFailed,
+                $"Project cache load failed, cache ignored: {ex.Message}",
+                cachePath,
+                DateTime.UtcNow));
             return false;
         }
 

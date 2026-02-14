@@ -131,6 +131,8 @@ On error, ambiguity, or partial data:
 - Evidence must be preserved
 - Processing may continue where possible
 - Guessing is never permitted
+- Silent failure is forbidden: user-affecting operations must end in explicit status (`Pending`, `Confirmed`, `Failed`, or `Degraded`)
+- Any `Failed` status that affects use must surface both a visible alert and a persisted operational log entry
 
 A partial result is acceptable. A misleading result is not.
 
@@ -153,4 +155,3 @@ Date: **2026-01-18**
 ---
 
 END OF INVARIANTS
-

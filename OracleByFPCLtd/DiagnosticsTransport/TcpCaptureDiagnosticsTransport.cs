@@ -6,6 +6,7 @@ using System.Text;
 using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
+using OracleByFPCLtd.Reliability;
 
 namespace OracleByFPCLtd.DiagnosticsTransport;
 
@@ -32,6 +33,7 @@ public sealed class TcpCaptureDiagnosticsTransport : IDiagnosticsTransport
     public event EventHandler<string>? RawMessageReceived;
     public event EventHandler<string>? TransportInfo;
     public event EventHandler<string>? TransportError;
+    public event EventHandler<FeatureOperation>? OperationStateChanged;
 
     public bool IsConnected => _client != null && _client.Connected;
 
@@ -81,8 +83,9 @@ public sealed class TcpCaptureDiagnosticsTransport : IDiagnosticsTransport
         {
             _cts?.Cancel();
         }
-        catch
+        catch (Exception ex)
         {
+            EmitError($"[warn][{FailureCodes.TransportNotConnected}] Failed to cancel TCP capture token source: {ex.Message}");
         }
 
         _byteBuffer.Clear();
@@ -94,8 +97,9 @@ public sealed class TcpCaptureDiagnosticsTransport : IDiagnosticsTransport
             {
                 _client.Close();
             }
-            catch
+            catch (Exception ex)
             {
+                EmitError($"[warn][{FailureCodes.TransportNotConnected}] Failed to close TCP capture socket: {ex.Message}");
             }
             finally
             {
@@ -109,8 +113,19 @@ public sealed class TcpCaptureDiagnosticsTransport : IDiagnosticsTransport
 
     public Task SendLogLevelAsync(string type, string level)
     {
-        EmitInfo("[info] TCP capture does not send log level commands.");
-        return Task.CompletedTask;
+        return SendLogLevelCommandAsync(type, level);
+    }
+
+    public Task<CommandDispatchResult> SendLogLevelCommandAsync(string type, string level, CancellationToken token = default)
+    {
+        var failure = new OperationFailure(
+            FailureCodes.LogLevelDispatchFailed,
+            "TCP capture mode does not support outbound log level commands.",
+            $"type={type};level={level}",
+            DateTime.UtcNow);
+        OperationStateChanged?.Invoke(this, new FeatureOperation("LogLevel", type, level, OperationStatus.Failed, 0, failure));
+        EmitInfo("[warn][LOGLEVEL_DISPATCH_FAILED] TCP capture does not send log level commands.");
+        return Task.FromResult(CommandDispatchResult.Fail(failure));
     }
 
     public Task<List<DriverInfo>> LoadDriversAsync(string ip)

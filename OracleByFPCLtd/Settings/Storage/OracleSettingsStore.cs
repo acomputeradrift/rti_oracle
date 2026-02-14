@@ -1,6 +1,7 @@
 using System;
 using System.IO;
 using System.Text.Json;
+using OracleByFPCLtd.Reliability;
 using OracleByFPCLtd.Settings.Models;
 
 namespace OracleByFPCLtd.Settings.Storage;
@@ -14,7 +15,7 @@ public sealed class OracleSettingsStore
         _settingsPath = settingsPath ?? GetDefaultPath();
     }
 
-    public OracleSettings Load()
+    public OracleSettings Load(Action<OperationFailure>? onFailure = null)
     {
         if (!File.Exists(_settingsPath))
         {
@@ -26,8 +27,13 @@ public sealed class OracleSettingsStore
             var json = File.ReadAllText(_settingsPath);
             return JsonSerializer.Deserialize<OracleSettings>(json) ?? new OracleSettings();
         }
-        catch
+        catch (Exception ex)
         {
+            onFailure?.Invoke(new OperationFailure(
+                FailureCodes.SettingsLoadFallback,
+                $"Failed to load settings, using defaults: {ex.Message}",
+                _settingsPath,
+                DateTime.UtcNow));
             return new OracleSettings();
         }
     }
