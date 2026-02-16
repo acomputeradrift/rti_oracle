@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.1.3] - 2026-02-13
+
+### Added
+- On connect, force the Diagnostics driver log level to 3 to ensure MessageLog acks are emitted.
+
+### Fixed
+- Driver log level status now updates from MessageLog ack lines in addition to LogLevels snapshots.
+
 ## [1.1.2] - 2026-02-13
 
 ### Fixed

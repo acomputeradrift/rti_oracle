@@ -107,7 +107,19 @@ public static class LogLevelAckParser
                 return false;
             }
 
-            dName = type;
+            if (string.Equals(type, "DRIVER", StringComparison.OrdinalIgnoreCase))
+            {
+                if (!TryReadDriverId(value, out var driverId))
+                {
+                    return false;
+                }
+
+                dName = $"DRIVER//{driverId}";
+            }
+            else
+            {
+                dName = type;
+            }
             level = parsedLevel;
             return true;
         }
@@ -135,6 +147,27 @@ public static class LogLevelAckParser
         }
 
         if (levelElement.ValueKind == JsonValueKind.String && int.TryParse(levelElement.GetString(), out level))
+        {
+            return true;
+        }
+
+        return false;
+    }
+
+    private static bool TryReadDriverId(JsonElement value, out int driverId)
+    {
+        driverId = 0;
+        if (!value.TryGetProperty("driverId", out var driverIdElement))
+        {
+            return false;
+        }
+
+        if (driverIdElement.ValueKind == JsonValueKind.Number && driverIdElement.TryGetInt32(out driverId))
+        {
+            return true;
+        }
+
+        if (driverIdElement.ValueKind == JsonValueKind.String && int.TryParse(driverIdElement.GetString(), out driverId))
         {
             return true;
         }

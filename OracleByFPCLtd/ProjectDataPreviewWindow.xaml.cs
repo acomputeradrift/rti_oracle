@@ -143,7 +143,7 @@ public partial class ProjectDataPreviewWindow : Window
         }
         catch (Exception ex)
         {
-            MessageBox.Show(this, ex.Message, "Project Data Preview", MessageBoxButton.OK, MessageBoxImage.Error);
+            ReportStatus("FAIL", ex.Message);
             Close();
         }
     }
@@ -163,7 +163,7 @@ public partial class ProjectDataPreviewWindow : Window
     {
         if (DiagnosticsMapping.Count == 0)
         {
-            MessageBox.Show(this, "No diagnostics mapping rows available.", "Project Data Preview", MessageBoxButton.OK, MessageBoxImage.Information);
+            ReportStatus("INFO", "No diagnostics mapping rows available.");
             return;
         }
 
@@ -183,16 +183,24 @@ public partial class ProjectDataPreviewWindow : Window
         {
             if (_preload is null)
             {
-                MessageBox.Show(this, "Preload data not available.", "Project Data Preview", MessageBoxButton.OK, MessageBoxImage.Error);
+                ReportStatus("FAIL", "Preload data not available.");
                 return;
             }
 
             DiagnosticsMappingExporter.Export(dialog.FileName, DiagnosticsMapping, _preload);
-            MessageBox.Show(this, $"Saved to {Path.GetFileName(dialog.FileName)}", "Project Data Preview", MessageBoxButton.OK, MessageBoxImage.Information);
+            ReportStatus("INFO", $"Saved to {Path.GetFileName(dialog.FileName)}");
         }
         catch (Exception ex)
         {
-            MessageBox.Show(this, ex.Message, "Project Data Preview", MessageBoxButton.OK, MessageBoxImage.Error);
+            ReportStatus("FAIL", ex.Message);
+        }
+    }
+
+    private void ReportStatus(string level, string message)
+    {
+        if (Owner is MainWindow main)
+        {
+            main.AppendStatusFromChild(level, $"Project Data Preview: {message}");
         }
     }
 

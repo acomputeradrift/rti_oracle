@@ -12,6 +12,10 @@ public sealed class LogLevelAckParserTests
         "Diagnostics: Primary Processor - OnHTTPServerData() data.websocket = {\"type\":\"Subscribe\",\"resource\":\"LogLevel\",\"value\":{\"type\":\"DRIVER//1\",\"level\":\"3\"}}",
         "DRIVER//1",
         3)]
+    [InlineData(
+        "Diagnostics: Primary Processor - OnHTTPServerData() data.websocket = {\"type\":\"Subscribe\",\"resource\":\"LogLevel\",\"value\":{\"type\":\"DRIVER\",\"level\":\"1\",\"driverId\":\"4\"}}",
+        "DRIVER//4",
+        1)]
     public void ParsesLogLevelAckLines(string text, string expectedDName, int expectedLevel)
     {
         var parsed = LogLevelAckParser.TryParse(text, out var dName, out var level);

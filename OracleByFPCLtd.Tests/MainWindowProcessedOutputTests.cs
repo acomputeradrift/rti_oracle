@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Reflection;
 using System.Threading;
 using System.Threading.Tasks;
@@ -18,6 +19,43 @@ namespace OracleByFPCLtd.Tests;
 
 public sealed class MainWindowProcessedOutputTests
 {
+    [Fact]
+    public void LogLevelsSnapshotUsedOnlyForBaseline()
+    {
+        RunOnSta(() =>
+        {
+            var window = new MainWindow();
+            var first = "LogLevels {\"messageType\":\"LogLevels\",\"levels\":[{\"dName\":\"DRIVER//4\",\"logLevel\":2}]}";
+            var second = "LogLevels {\"messageType\":\"LogLevels\",\"levels\":[{\"dName\":\"DRIVER//4\",\"logLevel\":1}]}";
+
+            InvokeRawMessageReceived(window, first);
+            var driver = window.Drivers.First(entry => entry.DName == "DRIVER//4");
+            Assert.Equal(2, driver.SelectedLevel);
+
+            InvokeRawMessageReceived(window, second);
+            driver = window.Drivers.First(entry => entry.DName == "DRIVER//4");
+            Assert.Equal(2, driver.SelectedLevel);
+        });
+    }
+
+    [Fact]
+    public void LogLevelsBaselineEmitsStatusCounts()
+    {
+        RunOnSta(() =>
+        {
+            var window = new MainWindow();
+            SetProjectDriverNames(window, new[] { "DRIVER//12" });
+            var baseline = "LogLevels {\"messageType\":\"LogLevels\",\"levels\":[{\"dName\":\"EVENTS_INPUT\",\"logLevel\":3},{\"dName\":\"DRIVER//12\",\"logLevel\":2}]}";
+
+            InvokeRawMessageReceived(window, baseline);
+
+            var statusText = GetStatusText(window);
+            Assert.Contains("Initial status of drivers received.", statusText);
+            Assert.Contains("Updated status for 1 project drivers.", statusText);
+            Assert.Contains("Updated status for 1 system drivers.", statusText);
+        });
+    }
+
     [Fact]
     public void InitializeProcessingPopulatesProcessedLogTextBox()
     {
@@ -311,11 +349,30 @@ public sealed class MainWindowProcessedOutputTests
         return range.Text.Trim();
     }
 
+    private static string GetStatusText(MainWindow window)
+    {
+        var statusPanel = (OracleByFPCLtd.UI.Panels.StatusPanel)window.FindName("StatusPanel")!;
+        var range = new TextRange(statusPanel.StatusOutputTextBox.Document.ContentStart, statusPanel.StatusOutputTextBox.Document.ContentEnd);
+        return range.Text.Trim();
+    }
+
     private static void SetRichText(MainWindow window, string fieldName, string value)
     {
         var richText = GetRichTextBox(window, fieldName);
         richText.Document.Blocks.Clear();
         richText.Document.Blocks.Add(new Paragraph(new Run(value)));
+    }
+
+    private static void SetProjectDriverNames(MainWindow window, IEnumerable<string> dNames)
+    {
+        var field = typeof(MainWindow).GetField("_projectDriverDNames", BindingFlags.Instance | BindingFlags.NonPublic);
+        Assert.NotNull(field);
+        var set = (HashSet<string>)field!.GetValue(window)!;
+        set.Clear();
+        foreach (var dName in dNames)
+        {
+            set.Add(dName);
+        }
     }
 
     private static RichTextBox GetRichTextBox(MainWindow window, string fieldName)
@@ -376,6 +433,23 @@ public sealed class MainWindowProcessedOutputTests
         var method = typeof(MainWindow).GetMethod("SetProcessedOutput", BindingFlags.Instance | BindingFlags.NonPublic);
         Assert.NotNull(method);
         method!.Invoke(window, new object[] { lines, false });
+    }
+
+    private static void InvokeRawMessageReceived(MainWindow window, string raw)
+    {
+        var method = typeof(MainWindow).GetMethod("Transport_RawMessageReceived", BindingFlags.Instance | BindingFlags.NonPublic);
+        Assert.NotNull(method);
+        method!.Invoke(window, new object?[] { null, raw });
+    }
+
+    private static string InvokeFormatMessage(MainWindow window, string raw, out bool isLogLine)
+    {
+        var method = typeof(MainWindow).GetMethod("FormatMessage", BindingFlags.Instance | BindingFlags.NonPublic);
+        Assert.NotNull(method);
+        object?[] args = { raw, false };
+        var result = (string)method!.Invoke(window, args)!;
+        isLogLine = (bool)args[1]!;
+        return result;
     }
 
     private static void InvokeAppendLog(MainWindow window, string line)

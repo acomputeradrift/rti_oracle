@@ -107,17 +107,29 @@ public partial class MainWindow : Window
     private readonly Dictionary<string, string> _friendlyNames = new(StringComparer.OrdinalIgnoreCase);
     private readonly Dictionary<string, int> _deviceNameToId = new(StringComparer.OrdinalIgnoreCase);
     private readonly Dictionary<string, HashSet<string>> _noProfileMessages = new(StringComparer.OrdinalIgnoreCase);
+    private readonly HashSet<string> _projectDriverDNames = new(StringComparer.OrdinalIgnoreCase);
+    private readonly Dictionary<int, string> _projectDriverNamesById = new();
+    private bool _projectDriversLoaded;
+    private readonly HashSet<string> _missingDriverNameWarnings = new(StringComparer.OrdinalIgnoreCase);
+    private HashSet<string>? _lastBaselineNames;
+    private bool _baselineStatusReported;
     private ProcessingEngine.ProcessingEngine? _processingEngine;
     private AdditionalData? _lastAdditionalData;
     private IReadOnlyList<AdditionalInfoSheetSchema> _requiredAdditionalInfoSchemas = Array.Empty<AdditionalInfoSheetSchema>();
     private CancellationTokenSource? _reconnectCts;
     private readonly Dictionary<string, PendingLogLevelCommand> _pendingLogLevelCommands = new(StringComparer.OrdinalIgnoreCase);
+    private readonly HashSet<string> _hiddenLogLevelTargets = new(StringComparer.OrdinalIgnoreCase);
     private readonly FeatureHealthRegistry _featureHealthRegistry = new();
     private readonly IUserFailureNotifier _failureNotifier;
     private bool _isReconnecting;
     private int _reconnectAttempt;
     private bool _suppressReconnect;
     private string? _lastConnectedIp;
+    private bool _logLevelsBaselineCaptured;
+    private TaskCompletionSource<bool>? _logLevelsBaselineTcs;
+    private static readonly string DiagnosticsDriverOverrideDName = "DRIVER//4";
+    private static readonly string DiagnosticsPrimaryProcessorName = "Diagnostics: Primary Processor";
+    private ConnectionPhase _connectionPhase = ConnectionPhase.Disconnected;
     private static readonly string[] AnchorNames =
     {
         "EVENTS_INPUT",
@@ -131,6 +143,14 @@ public partial class MainWindow : Window
     };
 
     public ObservableCollection<DriverEntry> Drivers { get; } = new();
+
+    private enum ConnectionPhase
+    {
+        Disconnected,
+        Connecting,
+        BaselineAwait,
+        Ready
+    }
 
     private TextBox IpTextBox => ConnectionPanel.IpTextBox;
     private Button ConnectButton => ConnectionPanel.ConnectButton;
@@ -198,6 +218,7 @@ public partial class MainWindow : Window
         if (CollectionViewSource.GetDefaultView(Drivers) is ListCollectionView view)
         {
             view.CustomSort = new DriverEntryComparer();
+            view.Filter = FilterUiDriverList;
         }
 
         _transport = CreateWebSocketTransport();
@@ -1482,7 +1503,20 @@ public partial class MainWindow : Window
             return;
         }
 
+        if (TryHandleLogLevelsBaseline(raw))
+        {
+            return;
+        }
+
         var formattedLine = FormatMessage(raw, out var isLogLine);
+        if (string.Equals(formattedLine, "Echo Subscribe/LogLevel", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(formattedLine, "Echo Subscribe/MessageLog", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(formattedLine, "Echo Subscribe/Sysvar", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(formattedLine, "Echo Welcome to the RTI Diagnostics Websocket server!", StringComparison.OrdinalIgnoreCase)
+            || formattedLine.StartsWith("LogLevels (", StringComparison.OrdinalIgnoreCase))
+        {
+            return;
+        }
         if (isLogLine)
         {
             AppendLog($"{_rawLineNumber++} {formattedLine}");
@@ -1638,6 +1672,7 @@ public partial class MainWindow : Window
             return;
         }
 
+        ResetLogLevelSyncState();
         StopReconnectLoop();
         _suppressReconnect = false;
         if (!_apexUploaded)
@@ -1659,6 +1694,7 @@ public partial class MainWindow : Window
         }
 
         _isConnecting = true;
+        _connectionPhase = ConnectionPhase.Connecting;
         ConnectButton.IsEnabled = false;
         DiscoverButton.IsEnabled = false;
         SetConnectionStatus("Connecting...");
@@ -1681,15 +1717,20 @@ public partial class MainWindow : Window
             _useTcpCapture = useTcpCapture;
 
             await _transport.ConnectAsync(ip);
+            IReadOnlyList<DiagnosticsTransport.DriverInfo> drivers = Array.Empty<DiagnosticsTransport.DriverInfo>();
             if (!_useTcpCapture)
             {
-                await LoadDriversAsync(ip);
+                drivers = await LoadDriversAsync(ip);
+                _connectionPhase = ConnectionPhase.BaselineAwait;
+                await WaitForLogLevelsBaselineAsync();
+                await ForceProtectedLogLevelsAsync(drivers);
             }
             SetConnectionStatus("Ready");
             DisconnectButton.IsEnabled = true;
             ConnectButton.Content = "Connect";
             _lastConnectedIp = ip;
             UpdateAllLogLevelsVisibility();
+            _connectionPhase = ConnectionPhase.Ready;
             if (!string.IsNullOrWhiteSpace(_projectFilePath))
             {
                 _recentProjectService.RecordSuccessfulConnection(_settings, _projectFilePath, ip);
@@ -1724,6 +1765,8 @@ public partial class MainWindow : Window
         _rawLineNumber = 1;
         _messageFormatter.Reset(DateOnly.FromDateTime(DateTime.Today));
         _pendingLogLevelCommands.Clear();
+        ResetLogLevelSyncState();
+        _connectionPhase = ConnectionPhase.Disconnected;
         SetConnectionStatus("Disconnected");
         DisconnectButton.IsEnabled = false;
         ConnectButton.IsEnabled = true;
@@ -1739,9 +1782,11 @@ public partial class MainWindow : Window
             return;
         }
 
+        ResetLogLevelSyncState();
         _reconnectCts?.Cancel();
         _reconnectCts = new CancellationTokenSource();
         _isReconnecting = true;
+        _connectionPhase = ConnectionPhase.Connecting;
         _reconnectAttempt = 0;
         SetConnectionStatus("Attempting Reconnect...");
         DisconnectButton.IsEnabled = false;
@@ -1770,9 +1815,13 @@ public partial class MainWindow : Window
                     SetConnectionStatus($"Attempting Reconnect... {_reconnectAttempt}");
                     });
                     await _transport.ConnectAsync(ip);
+                    IReadOnlyList<DiagnosticsTransport.DriverInfo> drivers = Array.Empty<DiagnosticsTransport.DriverInfo>();
                     if (!_useTcpCapture)
                     {
-                        await LoadDriversAsync(ip);
+                        drivers = await LoadDriversAsync(ip);
+                        _connectionPhase = ConnectionPhase.BaselineAwait;
+                        await WaitForLogLevelsBaselineAsync();
+                        await ForceProtectedLogLevelsAsync(drivers);
                     }
 
                     Dispatcher.Invoke(() =>
@@ -1788,6 +1837,7 @@ public partial class MainWindow : Window
                     _lastConnectedIp = ip;
                     _isReconnecting = false;
                     _isConnecting = false;
+                    _connectionPhase = ConnectionPhase.Ready;
                     return;
                 }
                 catch (Exception ex)
@@ -2072,8 +2122,7 @@ public partial class MainWindow : Window
     {
         if (_requiredAdditionalInfoSchemas.Count == 0)
         {
-            MessageBox.Show(this, "No additional info template is required for this project.", "Download Additional Info Template",
-                MessageBoxButton.OK, MessageBoxImage.Warning);
+            AppendAppStatus("WARN", "No additional info template is required for this project.");
             return;
         }
 
@@ -2122,8 +2171,7 @@ public partial class MainWindow : Window
 
         if (profiles.Count == 0)
         {
-            MessageBox.Show(this, "No driver profiles are currently registered.", "Driver Profiles",
-                MessageBoxButton.OK, MessageBoxImage.Information);
+            AppendAppStatus("INFO", "No driver profiles are currently registered.");
             return;
         }
 
@@ -2213,26 +2261,9 @@ public partial class MainWindow : Window
     {
         try
         {
-            using var doc = JsonDocument.Parse(raw);
-            var root = doc.RootElement;
-            if (root.TryGetProperty("messageType", out var messageTypeElement))
+            if (TryHandleStructuredMessage(raw, out var formatted, out isLogLine))
             {
-                var messageType = messageTypeElement.GetString();
-                if (string.Equals(messageType, "LogLevels", StringComparison.OrdinalIgnoreCase))
-                {
-                    isLogLine = false;
-                    return HandleLogLevels(root);
-                }
-
-                if (string.Equals(messageType, "MessageLog", StringComparison.OrdinalIgnoreCase)
-                    && root.TryGetProperty("text", out var textElement))
-                {
-                    var text = textElement.GetString();
-                    if (LogLevelAckParser.TryParse(text, out var dName, out var level))
-                    {
-                        UpdateDriverFromLogLevel(dName, level);
-                    }
-                }
+                return formatted;
             }
         }
         catch (Exception)
@@ -2240,6 +2271,118 @@ public partial class MainWindow : Window
         }
 
         return _messageFormatter.Format(raw, out isLogLine);
+    }
+
+    private bool TryHandleStructuredMessage(string raw, out string formatted, out bool isLogLine)
+    {
+        formatted = string.Empty;
+        isLogLine = false;
+        if (TryParseJsonRoot(raw, out var root))
+        {
+            return TryHandleStructuredRoot(root, out formatted, out isLogLine);
+        }
+
+        return false;
+    }
+
+    private bool TryHandleStructuredRoot(JsonElement root, out string formatted, out bool isLogLine)
+    {
+        formatted = string.Empty;
+        isLogLine = false;
+        if (!root.TryGetProperty("messageType", out var messageTypeElement))
+        {
+            return false;
+        }
+
+        var messageType = messageTypeElement.GetString();
+        if (string.Equals(messageType, "LogLevels", StringComparison.OrdinalIgnoreCase))
+        {
+            isLogLine = false;
+            return true;
+        }
+
+        if (string.Equals(messageType, "MessageLog", StringComparison.OrdinalIgnoreCase)
+            && root.TryGetProperty("text", out var textElement))
+        {
+            var text = textElement.GetString();
+            if (LogLevelAckParser.TryParse(text, out var dName, out var level))
+            {
+                UpdateDriverFromLogLevel(dName, level);
+            }
+        }
+
+        return false;
+    }
+
+    private static bool TryParseJsonRoot(string raw, out JsonElement root)
+    {
+        root = default;
+        if (TryParseJsonRootFromText(raw, out root))
+        {
+            return true;
+        }
+
+        var jsonStart = raw.IndexOf('{');
+        if (jsonStart < 0)
+        {
+            return false;
+        }
+
+        var jsonText = raw.Substring(jsonStart);
+        return TryParseJsonRootFromText(jsonText, out root);
+    }
+
+    private static bool TryParseJsonRootFromText(string jsonText, out JsonElement root)
+    {
+        root = default;
+        try
+        {
+            using var doc = JsonDocument.Parse(jsonText);
+            root = doc.RootElement.Clone();
+            return true;
+        }
+        catch (JsonException)
+        {
+            return false;
+        }
+    }
+
+    private bool TryHandleLogLevelsBaseline(string raw)
+    {
+        if (_logLevelsBaselineCaptured)
+        {
+            return false;
+        }
+
+        if (!TryParseJsonRoot(raw, out var root))
+        {
+            return false;
+        }
+
+        if (!root.TryGetProperty("messageType", out var messageTypeElement))
+        {
+            return false;
+        }
+
+        var messageType = messageTypeElement.GetString();
+        if (!string.Equals(messageType, "LogLevels", StringComparison.OrdinalIgnoreCase))
+        {
+            return false;
+        }
+
+        Dispatcher.Invoke(() =>
+        {
+            if (_logLevelsBaselineCaptured)
+            {
+                return;
+            }
+
+            _logLevelsBaselineCaptured = true;
+            _logLevelsBaselineTcs?.TrySetResult(true);
+            AppendAppStatus("SUCCESS", "Initial status of drivers received.");
+            HandleLogLevels(root);
+        });
+        return true;
     }
 
     private string HandleLogLevels(JsonElement root)
@@ -2273,6 +2416,7 @@ public partial class MainWindow : Window
             return "LogLevels";
         }
 
+        ReportLogLevelBaselineStatus(uniqueNames);
         var summary = $"LogLevels ({uniqueNames.Count} total, {driverCount} drivers): ";
         return summary + string.Join(", ", updates);
     }
@@ -2299,12 +2443,19 @@ public partial class MainWindow : Window
     {
         Dispatcher.Invoke(() =>
         {
+            var resolvedName = ResolveProjectDriverName(dName);
+            if (!string.IsNullOrWhiteSpace(resolvedName))
+            {
+                _friendlyNames[dName] = resolvedName;
+            }
+
             var existing = Drivers.FirstOrDefault(d => d.DName.Equals(dName, StringComparison.OrdinalIgnoreCase));
             if (existing == null)
             {
                 var displayName = IsAnchorName(dName) ? dName : _friendlyNames.TryGetValue(dName, out var friendly) ? friendly : dName;
                 existing = new DriverEntry(ParseDriverId(dName), displayName, dName);
                 Drivers.Add(existing);
+                WarnMissingDriverNameIfNeeded(dName, displayName);
             }
             else
             {
@@ -2320,6 +2471,11 @@ public partial class MainWindow : Window
             TryResolvePendingLogLevelCommand(dName, level);
             RefreshDriverView();
         });
+    }
+
+    private static string ResolveProjectDriverName(string dName)
+    {
+        return string.Empty;
     }
 
     private async Task<bool> ApplyLogLevelCommandWithAckAsync(DriverEntry driver, int level)
@@ -2514,6 +2670,11 @@ public partial class MainWindow : Window
         AppStatusTextBox.ScrollToEnd();
     }
 
+    internal void AppendStatusFromChild(string level, string message)
+    {
+        AppendAppStatus(level, message);
+    }
+
     private void SetConnectionStatus(string status)
     {
         StatusText.Text = status;
@@ -2623,12 +2784,14 @@ public partial class MainWindow : Window
         UpdateDateTimePickerBounds();
     }
 
-    private async Task LoadDriversAsync(string ip)
+    private async Task<IReadOnlyList<DiagnosticsTransport.DriverInfo>> LoadDriversAsync(string ip)
     {
         try
         {
             _featureHealthRegistry.Update(new FeatureOperation("LoadDrivers", ip, "", OperationStatus.Pending, 0, null));
             var list = await _transport.LoadDriversAsync(ip);
+            CacheProjectDriverDNames(list);
+            UpdateHiddenLogLevelTargets(list);
 
             Dispatcher.Invoke(() =>
             {
@@ -2638,36 +2801,47 @@ public partial class MainWindow : Window
                     var existing = Drivers.FirstOrDefault(d => d.DName.Equals(entry.DName, StringComparison.OrdinalIgnoreCase));
                     if (existing == null)
                     {
-                        Drivers.Add(new DriverEntry(entry.Id, entry.Name, entry.DName));
+                        var driverEntry = new DriverEntry(entry.Id, entry.Name, entry.DName);
+                        Drivers.Add(driverEntry);
                     }
                     else
                     {
                         existing.UpdateName(entry.Name);
                     }
+
+                    WarnMissingDriverNameIfNeeded(entry.DName, entry.Name);
                 }
 
                 RefreshDriverView();
             });
 
             ReportDriverLoadBreakdown(ip, list);
-            await ForceDiagnosticsLogLevelAsync(list);
             _featureHealthRegistry.Update(new FeatureOperation("LoadDrivers", ip, "", OperationStatus.Confirmed, 0, null));
+            _projectDriversLoaded = true;
+            WarnMissingDriverNamesAfterLoad();
+            return list;
         }
         catch (Exception ex)
         {
             AppendAppStatus($"[error] Failed to load drivers: {ex.Message}");
             ReportFailure("LoadDrivers", FailureCodes.DriverLoadFailed, $"Failed to load drivers: {ex.Message}", ip);
+            return Array.Empty<DiagnosticsTransport.DriverInfo>();
         }
     }
 
-    private async Task ForceDiagnosticsLogLevelAsync(IReadOnlyList<DiagnosticsTransport.DriverInfo> drivers)
+    private async Task ForceProtectedLogLevelsAsync(IReadOnlyList<DiagnosticsTransport.DriverInfo> drivers)
     {
+        if (!_transport.IsConnected || _connectionPhase == ConnectionPhase.Disconnected)
+        {
+            return;
+        }
+
         if (drivers == null || drivers.Count == 0)
         {
             return;
         }
 
-        if (!DiagnosticsDriverSelector.TryGetDiagnosticsDriverDName(drivers, out var dName))
+        if (!DiagnosticsDriverSelector.TryGetDiagnosticsDriverDName(drivers, out var diagnosticsDName))
         {
             AppendAppStatus("[warn] Diagnostics driver not found; skipping log level pin.");
             return;
@@ -2675,19 +2849,42 @@ public partial class MainWindow : Window
 
         try
         {
-            var driver = Drivers.FirstOrDefault(d => d.DName.Equals(dName, StringComparison.OrdinalIgnoreCase));
-            if (driver == null)
+            var diagnosticsDriver = Drivers.FirstOrDefault(d => d.DName.Equals(diagnosticsDName, StringComparison.OrdinalIgnoreCase));
+            if (diagnosticsDriver == null)
             {
-                driver = new DriverEntry(ParseDriverId(dName), dName, dName);
-                Drivers.Add(driver);
+                diagnosticsDriver = new DriverEntry(ParseDriverId(diagnosticsDName), diagnosticsDName, diagnosticsDName)
+                {
+                    IsVisible = false
+                };
+                Drivers.Add(diagnosticsDriver);
             }
 
-            var acknowledged = await ApplyLogLevelCommandWithAckAsync(driver, 3);
-            ReportLogLevelBatchStatus("connect", acknowledged ? 1 : 0, 1);
+            var driver4 = Drivers.FirstOrDefault(d => d.DName.Equals(DiagnosticsDriverOverrideDName, StringComparison.OrdinalIgnoreCase));
+            if (driver4 == null)
+            {
+                driver4 = new DriverEntry(ParseDriverId(DiagnosticsDriverOverrideDName), DiagnosticsDriverOverrideDName, DiagnosticsDriverOverrideDName)
+                {
+                    IsVisible = false
+                };
+                Drivers.Add(driver4);
+            }
+
+            var acknowledged = 0;
+            if (await ApplyLogLevelCommandWithAckAsync(diagnosticsDriver, 0))
+            {
+                acknowledged++;
+            }
+
+            if (await ApplyLogLevelCommandWithAckAsync(driver4, 1))
+            {
+                acknowledged++;
+            }
+
+            ReportLogLevelBatchStatus("connect", acknowledged, 2);
         }
         catch (Exception ex)
         {
-            AppendAppStatus($"[warn] Failed to set {dName} to 3: {ex.Message}");
+            AppendAppStatus($"[warn] Failed to set protected log levels: {ex.Message}");
         }
     }
 
@@ -2699,29 +2896,78 @@ public partial class MainWindow : Window
             .Select(SanitizeContextValue)
             .ToList();
 
-        List<string> populatedSystemDrivers = new();
-        List<string> missingSystemDrivers = new();
-        Dispatcher.Invoke(() =>
-        {
-            foreach (var anchor in AnchorNames)
-            {
-                var existing = Drivers.FirstOrDefault(driver => driver.DName.Equals(anchor, StringComparison.OrdinalIgnoreCase));
-                if (existing == null)
-                {
-                    missingSystemDrivers.Add(anchor);
-                    continue;
-                }
-
-                populatedSystemDrivers.Add(SanitizeContextValue(string.IsNullOrWhiteSpace(existing.Name) ? anchor : existing.Name));
-            }
-        });
-
         var projectContext = $"ip={ip};count={projectDrivers.Count};drivers={JoinContextValues(projectNames)}";
-        ReportSuccess("DRIVER_LOAD_PROJECT_SUCCESS", $"Loaded {projectDrivers.Count} project drivers.", projectContext);
+        _failureNotifier.AppendOperationalResult("DRIVER_LOAD_PROJECT_SUCCESS", "INFO", "Found project drivers.", projectContext);
+    }
 
-        var systemContext =
-            $"ip={ip};count={populatedSystemDrivers.Count};drivers={JoinContextValues(populatedSystemDrivers)};missing={JoinContextValues(missingSystemDrivers)}";
-        ReportSuccess("DRIVER_LOAD_SYSTEM_SUCCESS", $"Loaded {populatedSystemDrivers.Count} system drivers.", systemContext);
+    private void CacheProjectDriverDNames(IReadOnlyList<DiagnosticsTransport.DriverInfo> projectDrivers)
+    {
+        _projectDriverDNames.Clear();
+        if (projectDrivers == null)
+        {
+            return;
+        }
+
+        foreach (var driver in projectDrivers)
+        {
+            if (driver == null || string.IsNullOrWhiteSpace(driver.DName))
+            {
+                continue;
+            }
+
+            _projectDriverDNames.Add(driver.DName);
+        }
+
+        if (_logLevelsBaselineCaptured && _lastBaselineNames != null)
+        {
+            ReportLogLevelBaselineStatus(_lastBaselineNames);
+        }
+    }
+
+    private void ReportLogLevelBaselineStatus(HashSet<string> uniqueNames)
+    {
+        if (uniqueNames.Count == 0)
+        {
+            return;
+        }
+
+        if (_baselineStatusReported)
+        {
+            return;
+        }
+
+        _lastBaselineNames = new HashSet<string>(uniqueNames, StringComparer.OrdinalIgnoreCase);
+        var projectCount = 0;
+        foreach (var dName in uniqueNames)
+        {
+            if (_projectDriverDNames.Contains(dName))
+            {
+                projectCount++;
+            }
+        }
+
+        var systemCount = 0;
+        foreach (var anchor in AnchorNames)
+        {
+            if (uniqueNames.Contains(anchor))
+            {
+                systemCount++;
+            }
+        }
+
+        if (_projectDriverDNames.Count == 0)
+        {
+            return;
+        }
+
+        _baselineStatusReported = true;
+        AppendAppStatus("SUCCESS", $"Updated status for {projectCount} project drivers.");
+        AppendAppStatus("SUCCESS", $"Updated status for {systemCount} system drivers.");
+    }
+
+    private Task WaitForLogLevelsBaselineAsync()
+    {
+        return _logLevelsBaselineTcs?.Task ?? Task.CompletedTask;
     }
 
     private static string JoinContextValues(IReadOnlyCollection<string> values)
@@ -2814,13 +3060,13 @@ public partial class MainWindow : Window
 
     private void ShowMessageOnUiThread(string message, string title, MessageBoxImage image)
     {
-        if (Dispatcher.CheckAccess())
+        var level = image switch
         {
-            MessageBox.Show(this, message, title, MessageBoxButton.OK, image);
-            return;
-        }
-
-        Dispatcher.Invoke(() => MessageBox.Show(this, message, title, MessageBoxButton.OK, image));
+            MessageBoxImage.Error => "FAIL",
+            MessageBoxImage.Warning => "WARN",
+            _ => "INFO"
+        };
+        AppendAppStatus(level, $"{title}: {message}");
     }
 
     private void AppendProcessedLineIfNumbered(string line)
@@ -3142,21 +3388,11 @@ public partial class MainWindow : Window
 
             var report = BuildNoProfileReport();
             var reportPath = WriteNoProfileReportToDesktop(report);
-            MessageBox.Show(
-                this,
-                $"Saved no-profile driver report to your Desktop:\n{reportPath}\n\nPlease email this file to feeny.jamie@gmail.com.",
-                "Beta Report",
-                MessageBoxButton.OK,
-                MessageBoxImage.Information);
+            AppendAppStatus("INFO", $"Saved no-profile driver report to your Desktop: {reportPath}");
         }
         catch (Exception ex)
         {
-            MessageBox.Show(
-                this,
-                $"Failed to write no-profile driver report: {ex.Message}",
-                "Beta Report",
-                MessageBoxButton.OK,
-                MessageBoxImage.Warning);
+            AppendAppStatus("WARN", $"Failed to write no-profile driver report: {ex.Message}");
         }
         finally
         {
@@ -3370,6 +3606,11 @@ public partial class MainWindow : Window
     {
         foreach (var driver in Drivers)
         {
+            if (IsHiddenLogLevelTarget(driver.DName))
+            {
+                continue;
+            }
+
             driver.SelectedLevel = 3;
             driver.IsEnabled = true;
         }
@@ -3382,13 +3623,18 @@ public partial class MainWindow : Window
         var ackCount = 0;
         foreach (var driver in Drivers)
         {
+            if (IsHiddenLogLevelTarget(driver.DName))
+            {
+                continue;
+            }
+
             if (await ApplyLogLevelCommandWithAckAsync(driver, 3))
             {
                 ackCount++;
             }
         }
 
-        ReportLogLevelBatchStatus("all", ackCount, Drivers.Count);
+        ReportLogLevelBatchStatus("all", ackCount, Drivers.Count(driver => !IsHiddenLogLevelTarget(driver.DName)));
     }
 
     private async void DriverSystemOnlyLogLevels_Click(object sender, RoutedEventArgs e)
@@ -3407,6 +3653,11 @@ public partial class MainWindow : Window
 
         foreach (var driver in Drivers)
         {
+            if (IsHiddenLogLevelTarget(driver.DName))
+            {
+                continue;
+            }
+
             if (targets.Contains(driver.DName))
             {
                 driver.SelectedLevel = 3;
@@ -3426,6 +3677,11 @@ public partial class MainWindow : Window
         var ackCount = 0;
         foreach (var driver in Drivers)
         {
+            if (IsHiddenLogLevelTarget(driver.DName))
+            {
+                continue;
+            }
+
             var level = targets.Contains(driver.DName) ? 3 : 0;
             if (await ApplyLogLevelCommandWithAckAsync(driver, level))
             {
@@ -3433,13 +3689,18 @@ public partial class MainWindow : Window
             }
         }
 
-        ReportLogLevelBatchStatus("system", ackCount, Drivers.Count);
+        ReportLogLevelBatchStatus("system", ackCount, Drivers.Count(driver => !IsHiddenLogLevelTarget(driver.DName)));
     }
 
     private async void DriverNoneLogLevels_Click(object sender, RoutedEventArgs e)
     {
         foreach (var driver in Drivers)
         {
+            if (IsHiddenLogLevelTarget(driver.DName))
+            {
+                continue;
+            }
+
             driver.IsEnabled = false;
         }
 
@@ -3451,13 +3712,18 @@ public partial class MainWindow : Window
         var ackCount = 0;
         foreach (var driver in Drivers)
         {
+            if (IsHiddenLogLevelTarget(driver.DName))
+            {
+                continue;
+            }
+
             if (await ApplyLogLevelCommandWithAckAsync(driver, 0))
             {
                 ackCount++;
             }
         }
 
-        ReportLogLevelBatchStatus("none", ackCount, Drivers.Count);
+        ReportLogLevelBatchStatus("none", ackCount, Drivers.Count(driver => !IsHiddenLogLevelTarget(driver.DName)));
     }
 
     private void ReportLogLevelBatchStatus(string mode, int acknowledgedCount, int totalCount)
@@ -3489,12 +3755,96 @@ public partial class MainWindow : Window
         }
     }
 
+    private void ResetLogLevelSyncState()
+    {
+        _logLevelsBaselineCaptured = false;
+        _logLevelsBaselineTcs = new TaskCompletionSource<bool>();
+        _lastBaselineNames = null;
+        _baselineStatusReported = false;
+        _projectDriversLoaded = false;
+        _hiddenLogLevelTargets.Clear();
+        _hiddenLogLevelTargets.Add(DiagnosticsDriverOverrideDName);
+        _hiddenLogLevelTargets.Add(DiagnosticsPrimaryProcessorName);
+    }
+
+    private void UpdateHiddenLogLevelTargets(IReadOnlyList<DiagnosticsTransport.DriverInfo> drivers)
+    {
+        _hiddenLogLevelTargets.Clear();
+        _hiddenLogLevelTargets.Add(DiagnosticsDriverOverrideDName);
+        _hiddenLogLevelTargets.Add(DiagnosticsPrimaryProcessorName);
+        if (DiagnosticsDriverSelector.TryGetDiagnosticsDriverDName(drivers, out var diagnosticsDName))
+        {
+            _hiddenLogLevelTargets.Add(diagnosticsDName);
+        }
+    }
+
+    private bool IsHiddenLogLevelTarget(string dName)
+    {
+        return _hiddenLogLevelTargets.Contains(dName);
+    }
+
+    private bool FilterUiDriverList(object? item)
+    {
+        if (item is not DriverEntry driver)
+        {
+            return false;
+        }
+
+        return !IsRestrictedDriverForUi(driver.DName);
+    }
+
+    private static bool IsRestrictedDriverForUi(string dName)
+    {
+        return string.Equals(dName, DiagnosticsPrimaryProcessorName, StringComparison.OrdinalIgnoreCase)
+            || string.Equals(dName, DiagnosticsDriverOverrideDName, StringComparison.OrdinalIgnoreCase);
+    }
+
+    private void WarnMissingDriverNameIfNeeded(string dName, string name)
+    {
+        if (!_projectDriversLoaded)
+        {
+            return;
+        }
+
+        if (!dName.StartsWith("DRIVER//", StringComparison.OrdinalIgnoreCase))
+        {
+            return;
+        }
+
+        if (IsRestrictedDriverForUi(dName))
+        {
+            return;
+        }
+
+        if (!string.IsNullOrWhiteSpace(name) && !string.Equals(name, dName, StringComparison.OrdinalIgnoreCase))
+        {
+            return;
+        }
+
+        if (_missingDriverNameWarnings.Add(dName))
+        {
+            AppendAppStatus("WARN", $"Missing driver name for {dName}.");
+        }
+    }
+
+    private void WarnMissingDriverNamesAfterLoad()
+    {
+        Dispatcher.Invoke(() =>
+        {
+            foreach (var driver in Drivers)
+            {
+                WarnMissingDriverNameIfNeeded(driver.DName, driver.Name);
+            }
+        });
+    }
+
     public class DriverEntry : INotifyPropertyChanged
     {
         private bool _isEnabled;
         private int _selectedLevel;
         private string _name;
         private OperationStatus _operationStatus;
+        private bool _isVisible = true;
 
         public DriverEntry(int id, string name, string dName)
         {
@@ -3560,6 +3910,21 @@ public partial class MainWindow : Window
 
                 _operationStatus = value;
                 OnPropertyChanged(nameof(OperationStatus));
+            }
+        }
+
+        public bool IsVisible
+        {
+            get => _isVisible;
+            set
+            {
+                if (_isVisible == value)
+                {
+                    return;
+                }
+
+                _isVisible = value;
+                OnPropertyChanged(nameof(IsVisible));
             }
         }
 

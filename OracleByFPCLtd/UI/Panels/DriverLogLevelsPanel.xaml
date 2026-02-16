@@ -83,7 +83,6 @@
                   <ColumnDefinition Width="Auto" />
                   <ColumnDefinition Width="Auto" />
                   <ColumnDefinition Width="Auto" />
-                  <ColumnDefinition Width="Auto" />
                 </Grid.ColumnDefinitions>
                 <ToggleButton Grid.Column="0" Content="{Binding Name}" Margin="0,0,4,0"
                               IsChecked="{Binding IsEnabled, Mode=TwoWay}" Click="DriverToggle_Click"
@@ -133,28 +132,6 @@
                     </Style>
                   </Button.Style>
                 </Button>
-                <TextBlock Grid.Column="4" Margin="6,0,0,0" VerticalAlignment="Center" FontWeight="SemiBold">
-                  <TextBlock.Style>
-                    <Style TargetType="TextBlock">
-                      <Setter Property="Text" Value="OK" />
-                      <Setter Property="Foreground" Value="#2F7D32" />
-                      <Style.Triggers>
-                        <DataTrigger Binding="{Binding OperationStatus}" Value="Pending">
-                          <Setter Property="Text" Value="..." />
-                          <Setter Property="Foreground" Value="#B26A00" />
-                        </DataTrigger>
-                        <DataTrigger Binding="{Binding OperationStatus}" Value="Failed">
-                          <Setter Property="Text" Value="ERR" />
-                          <Setter Property="Foreground" Value="#B00020" />
-                        </DataTrigger>
-                        <DataTrigger Binding="{Binding OperationStatus}" Value="Degraded">
-                          <Setter Property="Text" Value="WARN" />
-                          <Setter Property="Foreground" Value="#B26A00" />
-                        </DataTrigger>
-                      </Style.Triggers>
-                    </Style>
-                  </TextBlock.Style>
-                </TextBlock>
               </Grid>
             </DataTemplate>
           </ItemsControl.ItemTemplate>

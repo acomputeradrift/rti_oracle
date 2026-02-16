@@ -20,13 +20,7 @@ public sealed class MainWindowFailureNotifier : IUserFailureNotifier
 
     public void ShowBlockingFailure(string feature, OperationFailure failure)
     {
-        var body =
-            $"{failure.Message}\n\n" +
-            $"Impact: Related functionality is not confirmed and may be unavailable.\n" +
-            $"Code: {failure.Code}\n" +
-            $"Context: {failure.Context}\n" +
-            "Next: Check connection/firmware behavior and retry.";
-        MessageBox.Show(_owner, body, $"Feature Failed: {feature}", MessageBoxButton.OK, MessageBoxImage.Error);
+        // Popups are disabled; failures are logged through the status area and operational logs.
     }
 
     public void AppendOperationalLog(OperationFailure failure)
