@@ -8,6 +8,7 @@ using System.Xml.Linq;
 using Microsoft.Data.Sqlite;
 using OracleByFPCLtd.DriverProfiles.Catalog;
 using OracleByFPCLtd.DriverProfiles.Matching;
+using OracleByFPCLtd.Logging;
 
 namespace OracleByFPCLtd.ProjectData;
 
@@ -106,11 +107,24 @@ public static class ApexDiscoveryPreloadExtractor
     private static readonly Regex SourceNamePattern = new Regex("^SourceName(\\d+)$", RegexOptions.IgnoreCase | RegexOptions.Compiled);
     private static readonly Regex InputNamePattern = new Regex("^input(\\d+)name$", RegexOptions.IgnoreCase | RegexOptions.Compiled);
     private static readonly Regex OutputNamePattern = new Regex("^Output(\\d+)name$", RegexOptions.IgnoreCase | RegexOptions.Compiled);
+    private static readonly CentralLogger CentralLogger = new(new CentralLoggerOptions
+    {
+        LogFilePath = BuildStructuredLogPath()
+    });
 
     public static ApexDiscoveryPreloadResult Extract(string apexPath)
     {
         if (!File.Exists(apexPath))
         {
+            LogStructuredEvent(
+                SeverityLevel.Error,
+                "Extract",
+                "APEX file not found.",
+                new Dictionary<string, string>
+                {
+                    ["path"] = apexPath,
+                    ["error"] = "FileNotFoundException"
+                });
             throw new FileNotFoundException("APEX file not found.", apexPath);
         }
 
@@ -131,7 +145,55 @@ public static class ApexDiscoveryPreloadExtractor
         LoadSourceCatalog(connection, result.SourceCatalog);
         LoadDriverTemplateVariables(connection, result.DriverTemplateVariables);
 
+        LogStructuredEvent(
+            SeverityLevel.Info,
+            "Extract",
+            "APEX discovery preload completed.",
+            new Dictionary<string, string>
+            {
+                ["pageIndexMap"] = result.PageIndexMap.Count.ToString(CultureInfo.InvariantCulture),
+                ["driverConfigMap"] = result.DriverConfigMap.Count.ToString(CultureInfo.InvariantCulture),
+                ["sysVarRefMap"] = result.SysVarRefMap.Count.ToString(CultureInfo.InvariantCulture),
+                ["pageMappings"] = result.PageMappings.Count.ToString(CultureInfo.InvariantCulture),
+                ["relayPorts"] = result.RelayPorts.Count.ToString(CultureInfo.InvariantCulture),
+                ["mpioIrPorts"] = result.MpioIrPorts.Count.ToString(CultureInfo.InvariantCulture),
+                ["sensePorts"] = result.SensePorts.Count.ToString(CultureInfo.InvariantCulture),
+                ["triggerPorts"] = result.TriggerPorts.Count.ToString(CultureInfo.InvariantCulture),
+                ["rs232Ports"] = result.Rs232Ports.Count.ToString(CultureInfo.InvariantCulture),
+                ["roomMappings"] = result.RoomMappings.Count.ToString(CultureInfo.InvariantCulture),
+                ["sourceCatalog"] = result.SourceCatalog.Count.ToString(CultureInfo.InvariantCulture),
+                ["driverTemplateVariables"] = result.DriverTemplateVariables.Count.ToString(CultureInfo.InvariantCulture)
+            });
         return result;
+    }
+
+    private static void LogStructuredEvent(
+        SeverityLevel severity,
+        string phase,
+        string message,
+        IReadOnlyDictionary<string, string>? details = null)
+    {
+        CentralLogger.LogEvent(new LogEntry(
+            severity,
+            CreateCorrelationId(),
+            "ApexDiscoveryPreloadExtractor",
+            phase,
+            message,
+            details));
+    }
+
+    private static string CreateCorrelationId()
+    {
+        return Guid.NewGuid().ToString("N").Substring(0, 6);
+    }
+
+    private static string BuildStructuredLogPath()
+    {
+        var folder = Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+            "Oracle by FP&C",
+            "Logs");
+        return Path.Combine(folder, "oracle-structured.log");
     }
 
     private static void LoadPageIndexMap(SqliteConnection connection, Dictionary<string, string> map)

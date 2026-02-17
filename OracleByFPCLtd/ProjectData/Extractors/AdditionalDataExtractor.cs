@@ -5,6 +5,7 @@ using System.IO;
 using System.IO.Compression;
 using System.Linq;
 using System.Xml.Linq;
+using OracleByFPCLtd.Logging;
 using OracleByFPCLtd.DriverProfiles.Catalog;
 using OracleByFPCLtd.DriverProfiles.Models;
 using OracleByFPCLtd.ProjectData.Models;
@@ -16,6 +17,10 @@ public static class AdditionalDataExtractor
     private static readonly XNamespace WorkbookNamespace = "http://schemas.openxmlformats.org/spreadsheetml/2006/main";
     private static readonly XNamespace RelationshipNamespace = "http://schemas.openxmlformats.org/package/2006/relationships";
     private static readonly XNamespace DocumentRelationshipNamespace = "http://schemas.openxmlformats.org/officeDocument/2006/relationships";
+    private static readonly CentralLogger CentralLogger = new(new CentralLoggerOptions
+    {
+        LogFilePath = BuildStructuredLogPath()
+    });
 
     public static AdditionalData Extract(ProjectDataExtractionResult result)
     {
@@ -38,6 +43,12 @@ public static class AdditionalDataExtractor
         var workbookSheets = ReadWorkbookSheets(archive, data.Errors);
         if (workbookSheets.Count == 0)
         {
+            LogStructuredEvent(
+                SeverityLevel.Warn,
+                "AdditionalDataExtractor",
+                "ReadWorkbookSheets",
+                "Additional Info workbook has no sheets.",
+                new Dictionary<string, string> { ["path"] = filePath });
             return data;
         }
 
@@ -162,6 +173,12 @@ public static class AdditionalDataExtractor
         }
         catch (Exception ex)
         {
+            LogStructuredEvent(
+                SeverityLevel.Warn,
+                "AdditionalDataExtractor",
+                "ReadWorkbookSheets",
+                "Additional Info workbook read failed.",
+                exception: ex);
             errors.Add($"Additional Info workbook read failed: {ex.Message}");
             return new List<WorkbookSheet>();
         }
@@ -190,6 +207,12 @@ public static class AdditionalDataExtractor
         }
         catch (Exception ex)
         {
+            LogStructuredEvent(
+                SeverityLevel.Warn,
+                "AdditionalDataExtractor",
+                "ReadSharedStrings",
+                "Additional Info shared strings read failed.",
+                exception: ex);
             errors.Add($"Additional Info shared strings read failed: {ex.Message}");
             return new List<string>();
         }
@@ -260,9 +283,49 @@ public static class AdditionalDataExtractor
         }
         catch (Exception ex)
         {
+            LogStructuredEvent(
+                SeverityLevel.Warn,
+                "AdditionalDataExtractor",
+                "ReadSheetRows",
+                "Additional Info sheet read failed.",
+                new Dictionary<string, string> { ["path"] = sheetPath },
+                ex);
             errors.Add($"Additional Info sheet read failed: {ex.Message}");
             return new List<Dictionary<string, string>>();
         }
+    }
+
+    private static void LogStructuredEvent(
+        SeverityLevel severity,
+        string module,
+        string phase,
+        string message,
+        IReadOnlyDictionary<string, string>? details = null,
+        Exception? exception = null)
+    {
+        var correlationId = CreateCorrelationId();
+        CentralLogger.LogEvent(new LogEntry(
+            severity,
+            correlationId,
+            module,
+            phase,
+            message,
+            details,
+            exception));
+    }
+
+    private static string CreateCorrelationId()
+    {
+        return Guid.NewGuid().ToString("N").Substring(0, 6);
+    }
+
+    private static string BuildStructuredLogPath()
+    {
+        var folder = Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+            "Oracle by FP&C",
+            "Logs");
+        return Path.Combine(folder, "oracle-structured.log");
     }
 
     private static List<string> ReadHeaderRow(XElement row, IReadOnlyList<string> sharedStrings)

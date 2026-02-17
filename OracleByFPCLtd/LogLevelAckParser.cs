@@ -1,11 +1,18 @@
 using System;
+using System.Collections.Generic;
+using System.IO;
 using System.Text.Json;
 using System.Text.RegularExpressions;
+using OracleByFPCLtd.Logging;
 
 namespace OracleByFPCLtd;
 
 public static class LogLevelAckParser
 {
+    private static readonly CentralLogger CentralLogger = new(new CentralLoggerOptions
+    {
+        LogFilePath = BuildStructuredLogPath()
+    });
     private static readonly Regex DriverParenPattern = new(
         @"Setting LogLevel on DRIVER\s*\((\d+)\)\s*to\s*(\d+)",
         RegexOptions.IgnoreCase | RegexOptions.CultureInvariant | RegexOptions.Compiled);
@@ -25,6 +32,11 @@ public static class LogLevelAckParser
 
         if (string.IsNullOrWhiteSpace(text))
         {
+            LogStructuredEvent(
+                SeverityLevel.Warn,
+                "TryParse",
+                "Log level ack text missing.",
+                new Dictionary<string, string> { ["error"] = "ArgumentNullException" });
             return false;
         }
 
@@ -125,10 +137,20 @@ public static class LogLevelAckParser
         }
         catch (JsonException)
         {
+            LogStructuredEvent(
+                SeverityLevel.Warn,
+                "TryParseEmbeddedLogLevelJson",
+                "Log level JSON parse failed.",
+                new Dictionary<string, string> { ["payload"] = jsonText });
             return false;
         }
         catch (FormatException)
         {
+            LogStructuredEvent(
+                SeverityLevel.Warn,
+                "TryParseEmbeddedLogLevelJson",
+                "Log level JSON format failed.",
+                new Dictionary<string, string> { ["payload"] = jsonText });
             return false;
         }
     }
@@ -173,5 +195,34 @@ public static class LogLevelAckParser
         }
 
         return false;
+    }
+
+    private static void LogStructuredEvent(
+        SeverityLevel severity,
+        string phase,
+        string message,
+        IReadOnlyDictionary<string, string>? details = null)
+    {
+        CentralLogger.LogEvent(new LogEntry(
+            severity,
+            CreateCorrelationId(),
+            "LogLevelAckParser",
+            phase,
+            message,
+            details));
+    }
+
+    private static string CreateCorrelationId()
+    {
+        return Guid.NewGuid().ToString("N").Substring(0, 6);
+    }
+
+    private static string BuildStructuredLogPath()
+    {
+        var folder = Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+            "Oracle by FP&C",
+            "Logs");
+        return Path.Combine(folder, "oracle-structured.log");
     }
 }

@@ -1,5 +1,7 @@
 using System;
 using System.Collections.Generic;
+using System.IO;
+using OracleByFPCLtd.Logging;
 using OracleByFPCLtd.ProcessingEngine.Mapping;
 using OracleByFPCLtd.ProcessingEngine.Models;
 using OracleByFPCLtd.ProjectData;
@@ -19,6 +21,10 @@ public sealed class ProcessingEngine
     private readonly SystemMappingService _systemMappingService = new();
     private readonly DriverMappingService _driverMappingService = new();
     private readonly AdditionalDataMappingService _additionalDataMappingService = new();
+    private readonly CentralLogger _centralLogger = new(new CentralLoggerOptions
+    {
+        LogFilePath = BuildStructuredLogPath()
+    });
 
     public ProcessingEngine(ProcessingContext context)
     {
@@ -51,6 +57,18 @@ public sealed class ProcessingEngine
         }
 
         _ = _additionalDataMappingService.Map(evt, _bundle);
+        if (driverLine.IsUnresolved && systemLine.IsUnresolved)
+        {
+            LogStructuredEvent(
+                SeverityLevel.Warn,
+                "ProcessEvent",
+                "Unresolved diagnostic line.",
+                new Dictionary<string, string>
+                {
+                    ["rawLineNumber"] = evt.RawLineNumber.ToString(),
+                    ["rawText"] = evt.RawText
+                });
+        }
         return systemLine;
     }
 
@@ -82,5 +100,34 @@ public sealed class ProcessingEngine
         }
 
         return ProjectDataBundle.FromExtractionResult(result);
+    }
+
+    private void LogStructuredEvent(
+        SeverityLevel severity,
+        string phase,
+        string message,
+        IReadOnlyDictionary<string, string>? details = null)
+    {
+        _centralLogger.LogEvent(new LogEntry(
+            severity,
+            CreateCorrelationId(),
+            "ProcessingEngine",
+            phase,
+            message,
+            details));
+    }
+
+    private static string CreateCorrelationId()
+    {
+        return Guid.NewGuid().ToString("N").Substring(0, 6);
+    }
+
+    private static string BuildStructuredLogPath()
+    {
+        var folder = Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+            "Oracle by FP&C",
+            "Logs");
+        return Path.Combine(folder, "oracle-structured.log");
     }
 }

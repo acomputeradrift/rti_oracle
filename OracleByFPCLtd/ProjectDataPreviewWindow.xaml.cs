@@ -4,6 +4,7 @@ using System.IO;
 using System.Threading.Tasks;
 using System.Windows;
 using Microsoft.Win32;
+using OracleByFPCLtd.Logging;
 using OracleByFPCLtd.ProjectData;
 using OracleByFPCLtd.ProjectData.Models;
 
@@ -15,6 +16,10 @@ public partial class ProjectDataPreviewWindow : Window
     private readonly IProjectDataExtractor _extractor;
     private readonly AdditionalData? _additionalData;
     private ApexDiscoveryPreloadResult? _preload;
+    private readonly CentralLogger _centralLogger = new(new CentralLoggerOptions
+    {
+        LogFilePath = BuildStructuredLogPath()
+    });
 
     public ObservableCollection<DiagnosticsMappingEntry> DiagnosticsMapping { get; } = new();
     public ObservableCollection<DriverConfigMapEntry> DriverConfigEntries { get; } = new();
@@ -143,6 +148,13 @@ public partial class ProjectDataPreviewWindow : Window
         }
         catch (Exception ex)
         {
+            LogStructuredEvent(
+                SeverityLevel.Error,
+                "ProjectDataPreviewWindow",
+                "LoadAsync",
+                "Project data preview load failed.",
+                new Dictionary<string, string> { ["apexPath"] = _apexPath },
+                ex);
             ReportStatus("FAIL", ex.Message);
             Close();
         }
@@ -192,6 +204,13 @@ public partial class ProjectDataPreviewWindow : Window
         }
         catch (Exception ex)
         {
+            LogStructuredEvent(
+                SeverityLevel.Error,
+                "ProjectDataPreviewWindow",
+                "ExportDiagnosticsMapping",
+                "Export diagnostics mapping failed.",
+                new Dictionary<string, string> { ["path"] = dialog.FileName },
+                ex);
             ReportStatus("FAIL", ex.Message);
         }
     }
@@ -241,6 +260,39 @@ public partial class ProjectDataPreviewWindow : Window
         {
             AdditionalInfoErrors.Add(error);
         }
+    }
+
+    private void LogStructuredEvent(
+        SeverityLevel severity,
+        string module,
+        string phase,
+        string message,
+        IReadOnlyDictionary<string, string>? details = null,
+        Exception? exception = null)
+    {
+        var correlationId = CreateCorrelationId();
+        _centralLogger.LogEvent(new LogEntry(
+            severity,
+            correlationId,
+            module,
+            phase,
+            message,
+            details,
+            exception));
+    }
+
+    private static string CreateCorrelationId()
+    {
+        return Guid.NewGuid().ToString("N").Substring(0, 6);
+    }
+
+    private static string BuildStructuredLogPath()
+    {
+        var folder = Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+            "Oracle by FP&C",
+            "Logs");
+        return Path.Combine(folder, "oracle-structured.log");
     }
 
     public sealed record DriverConfigMapEntry(

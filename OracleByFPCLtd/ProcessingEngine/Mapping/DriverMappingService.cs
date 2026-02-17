@@ -1,4 +1,7 @@
 using System;
+using System.Collections.Generic;
+using System.IO;
+using OracleByFPCLtd.Logging;
 using OracleByFPCLtd.DriverProfiles.Catalog;
 using OracleByFPCLtd.DriverProfiles.Services;
 using OracleByFPCLtd.ProcessingEngine.Models;
@@ -8,6 +11,11 @@ namespace OracleByFPCLtd.ProcessingEngine.Mapping;
 
 public sealed class DriverMappingService
 {
+    private static readonly CentralLogger CentralLogger = new(new CentralLoggerOptions
+    {
+        LogFilePath = BuildStructuredLogPath()
+    });
+
     public ProcessedLine Map(DiagnosticEvent evt, ProjectDataBundle bundle)
     {
         if (evt is null)
@@ -58,10 +66,44 @@ public sealed class DriverMappingService
 
         if (IsDriverLine(rawText))
         {
+            LogStructuredEvent(
+                SeverityLevel.Warn,
+                "Map",
+                "Driver profile not found.",
+                new Dictionary<string, string> { ["rawText"] = rawText });
             return new ProcessedLine($"{evt.RawLineNumber} {rawText} [No Profile!]", true);
         }
 
         return new ProcessedLine($"{evt.RawLineNumber} {rawText}", false);
+    }
+
+    private static void LogStructuredEvent(
+        SeverityLevel severity,
+        string phase,
+        string message,
+        IReadOnlyDictionary<string, string>? details = null)
+    {
+        CentralLogger.LogEvent(new LogEntry(
+            severity,
+            CreateCorrelationId(),
+            "DriverMappingService",
+            phase,
+            message,
+            details));
+    }
+
+    private static string CreateCorrelationId()
+    {
+        return Guid.NewGuid().ToString("N").Substring(0, 6);
+    }
+
+    private static string BuildStructuredLogPath()
+    {
+        var folder = Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+            "Oracle by FP&C",
+            "Logs");
+        return Path.Combine(folder, "oracle-structured.log");
     }
 
     private static bool IsDriverLine(string text)

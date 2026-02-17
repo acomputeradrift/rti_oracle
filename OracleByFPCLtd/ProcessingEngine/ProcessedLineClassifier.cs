@@ -1,6 +1,9 @@
 using System;
 using System.Text.RegularExpressions;
 using System.Windows.Media;
+using System.Collections.Generic;
+using System.IO;
+using OracleByFPCLtd.Logging;
 
 namespace OracleByFPCLtd.ProcessingEngine;
 
@@ -19,11 +22,20 @@ public enum ProcessedLineCategory
 public static class ProcessedLineClassifier
 {
     private static readonly Regex NumberPrefix = new Regex("^\\s*\\d+\\s+", RegexOptions.Compiled);
+    private static readonly CentralLogger CentralLogger = new(new CentralLoggerOptions
+    {
+        LogFilePath = BuildStructuredLogPath()
+    });
 
     public static ProcessedLineCategory DetermineCategory(string line)
     {
         if (string.IsNullOrWhiteSpace(line))
         {
+            LogStructuredEvent(
+                SeverityLevel.Warn,
+                "DetermineCategory",
+                "Processed line is empty.",
+                new Dictionary<string, string> { ["line"] = line ?? "" });
             return ProcessedLineCategory.Default;
         }
 
@@ -65,6 +77,35 @@ public static class ProcessedLineClassifier
         }
 
         return ProcessedLineCategory.Default;
+    }
+
+    private static void LogStructuredEvent(
+        SeverityLevel severity,
+        string phase,
+        string message,
+        IReadOnlyDictionary<string, string>? details = null)
+    {
+        CentralLogger.LogEvent(new LogEntry(
+            severity,
+            CreateCorrelationId(),
+            "ProcessedLineClassifier",
+            phase,
+            message,
+            details));
+    }
+
+    private static string CreateCorrelationId()
+    {
+        return Guid.NewGuid().ToString("N").Substring(0, 6);
+    }
+
+    private static string BuildStructuredLogPath()
+    {
+        var folder = Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+            "Oracle by FP&C",
+            "Logs");
+        return Path.Combine(folder, "oracle-structured.log");
     }
 
     public static Brush GetBrush(ProcessedLineCategory category)

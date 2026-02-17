@@ -29,6 +29,7 @@ using OracleByFPCLtd.ExportProcessedLogs.Models;
 using OracleByFPCLtd.ExportProcessedLogs.Rendering;
 using OracleByFPCLtd.ExportProcessedLogs.Services;
 using OracleByFPCLtd.DriverProfiles.Models;
+using OracleByFPCLtd.Logging;
 using OracleByFPCLtd.ProjectData;
 using OracleByFPCLtd.ProjectData.Extractors;
 using OracleByFPCLtd.ProjectData.Models;
@@ -122,6 +123,7 @@ public partial class MainWindow : Window
     private readonly HashSet<string> _hiddenLogLevelTargets = new(StringComparer.OrdinalIgnoreCase);
     private readonly FeatureHealthRegistry _featureHealthRegistry = new();
     private readonly IUserFailureNotifier _failureNotifier;
+    private readonly CentralLogger _centralLogger;
     private bool _isReconnecting;
     private int _reconnectAttempt;
     private bool _suppressReconnect;
@@ -207,6 +209,10 @@ public partial class MainWindow : Window
         InitializeComponent();
         WindowIconLoader.TryApply(this);
         _failureNotifier = new MainWindowFailureNotifier(this, () => _lastProcessorTimestamp);
+        _centralLogger = new CentralLogger(new CentralLoggerOptions
+        {
+            LogFilePath = BuildStructuredLogPath()
+        });
         Title = $"Oracle by FP&C {AppVersion.CurrentLabel()}";
         WirePanelHandlers();
         ConfigureLogOutputBoxes();
@@ -1534,6 +1540,14 @@ public partial class MainWindow : Window
             return;
         }
 
+        if (!string.IsNullOrWhiteSpace(message)
+            && message.StartsWith("[success]", StringComparison.OrdinalIgnoreCase)
+            && message.Contains("Connected to WebSocket", StringComparison.OrdinalIgnoreCase))
+        {
+            ReportSuccess("CONNECT_SUCCESS", "Connection established.", _lastConnectedIp ?? "");
+            return;
+        }
+
         AppendAppStatus(message);
     }
 
@@ -1544,6 +1558,12 @@ public partial class MainWindow : Window
             return;
         }
 
+        LogStructuredEvent(
+            SeverityLevel.Error,
+            "DiagnosticsTransport",
+            "TransportError",
+            "Transport error received.",
+            new Dictionary<string, string> { ["message"] = message });
         AppendAppStatus(message);
         HandleTransportFailure(message);
     }
@@ -1652,6 +1672,13 @@ public partial class MainWindow : Window
         catch (Exception ex)
         {
             SetConnectionStatus("Discovery Failed");
+            LogStructuredEvent(
+                SeverityLevel.Error,
+                "MainWindow",
+                "Discover",
+                "Discovery failed.",
+                new Dictionary<string, string> { ["context"] = "discover" },
+                ex);
             AppendAppStatus($"[error] Discovery failed: {ex.Message}");
             ReportFailure("Discover", FailureCodes.DiscoveryFailed, $"Discovery failed: {ex.Message}", "discover");
         }
@@ -1740,11 +1767,18 @@ public partial class MainWindow : Window
                 UpdateRecentProjectList(_projectFilePath);
             }
             _featureHealthRegistry.Update(new FeatureOperation("Connect", ip, "", OperationStatus.Confirmed, 0, null));
-            ReportSuccess("CONNECT_SUCCESS", "Connection established.", ip);
+            AppendAppStatus("INFO", "Ready.");
         }
         catch (Exception ex)
         {
             SetConnectionStatus("Connect Failed");
+            LogStructuredEvent(
+                SeverityLevel.Error,
+                "MainWindow",
+                "Connect",
+                "Connect failed.",
+                new Dictionary<string, string> { ["ip"] = ip },
+                ex);
             AppendAppStatus($"[error] Connect failed: {ex.Message}");
             ReportFailure("Connect", FailureCodes.TransportNotConnected, $"Connect failed: {ex.Message}", ip);
             ConnectButton.IsEnabled = true;
@@ -1833,6 +1867,7 @@ public partial class MainWindow : Window
                         ConnectButton.IsEnabled = false;
                         ConnectButton.Content = "Connect";
                         UpdateAllLogLevelsVisibility();
+                        AppendAppStatus("INFO", "Ready.");
                     });
 
                     _lastConnectedIp = ip;
@@ -1843,6 +1878,17 @@ public partial class MainWindow : Window
                 }
                 catch (Exception ex)
                 {
+                    LogStructuredEvent(
+                        SeverityLevel.Warn,
+                        "MainWindow",
+                        "Reconnect",
+                        "Reconnect attempt failed.",
+                        new Dictionary<string, string>
+                        {
+                            ["ip"] = ip,
+                            ["attempt"] = _reconnectAttempt.ToString(CultureInfo.InvariantCulture)
+                        },
+                        ex);
                     AppendAppStatus($"[error] Reconnect failed: {ex.Message}");
                     _isConnecting = false;
                 }
@@ -1853,6 +1899,40 @@ public partial class MainWindow : Window
         catch (OperationCanceledException)
         {
         }
+    }
+
+    private static string BuildStructuredLogPath()
+    {
+        var folder = Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+            "Oracle by FP&C",
+            "Logs");
+        return Path.Combine(folder, "oracle-structured.log");
+    }
+
+    private void LogStructuredEvent(
+        SeverityLevel severity,
+        string module,
+        string phase,
+        string message,
+        IReadOnlyDictionary<string, string>? details = null,
+        Exception? exception = null,
+        string? correlationId = null)
+    {
+        var effectiveId = string.IsNullOrWhiteSpace(correlationId) ? CreateCorrelationId() : correlationId;
+        _centralLogger.LogEvent(new LogEntry(
+            severity,
+            effectiveId,
+            module,
+            phase,
+            message,
+            details,
+            exception));
+    }
+
+    private static string CreateCorrelationId()
+    {
+        return Guid.NewGuid().ToString("N", CultureInfo.InvariantCulture).Substring(0, 6);
     }
 
     private void StopReconnectLoop()
@@ -2660,13 +2740,25 @@ public partial class MainWindow : Window
         }
 
         var normalizedLevel = NormalizeStatusLevel(level);
+        var correlationId = normalizedLevel is "WARN" or "FAIL" ? CreateCorrelationId() : null;
+        var statusText = BuildStatusText(message, normalizedLevel, correlationId);
+        if (normalizedLevel is "WARN" or "FAIL")
+        {
+            LogStructuredEvent(
+                normalizedLevel == "WARN" ? SeverityLevel.Warn : SeverityLevel.Error,
+                "MainWindow",
+                "Status",
+                statusText,
+                new Dictionary<string, string> { ["originalMessage"] = message },
+                correlationId: correlationId);
+        }
         var badge = $"[{normalizedLevel}]";
         paragraph.Inlines.Add(new Run(badge)
         {
             FontWeight = FontWeights.SemiBold,
             Foreground = GetStatusBrush(normalizedLevel)
         });
-        paragraph.Inlines.Add(new Run($" {message}"));
+        paragraph.Inlines.Add(new Run($" {statusText}"));
         paragraph.Inlines.Add(new LineBreak());
         AppStatusTextBox.ScrollToEnd();
     }
@@ -2687,7 +2779,7 @@ public partial class MainWindow : Window
         {
             "SETTINGS_LOAD_SUCCESS" => "Settings loaded.",
             "PROJECT_PARSE_SUCCESS" => "Project data parsed.",
-            "CONNECT_SUCCESS" => "",
+            "CONNECT_SUCCESS" => "Connected to WebSocket.",
             _ => message.Replace(" successfully.", ".", StringComparison.OrdinalIgnoreCase)
         };
     }
@@ -2754,6 +2846,22 @@ public partial class MainWindow : Window
         };
     }
 
+    private static string BuildStatusText(string message, string level, string? correlationId)
+    {
+        var words = new List<string>(
+            (message ?? string.Empty)
+                .Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries));
+
+        const int maxWords = 7;
+
+        if (words.Count > maxWords)
+        {
+            words = words.Take(maxWords).ToList();
+        }
+
+        return string.Join(" ", words);
+    }
+
     private static Brush GetStatusBrush(string level)
     {
         return level switch
@@ -2773,6 +2881,7 @@ public partial class MainWindow : Window
         }
 
         _lastProcessorTimestamp = timestamp;
+        LogTimestampSource.UpdateProcessorTimestamp(timestamp);
         if (!_minRawLogTimestamp.HasValue || timestamp < _minRawLogTimestamp.Value)
         {
             _minRawLogTimestamp = timestamp;
@@ -2790,6 +2899,7 @@ public partial class MainWindow : Window
     {
         try
         {
+            AppendAppStatus("INFO", "Loading drivers...");
             _featureHealthRegistry.Update(new FeatureOperation("LoadDrivers", ip, "", OperationStatus.Pending, 0, null));
             var list = await _transport.LoadDriversAsync(ip);
             CacheProjectDriverDNames(list);
@@ -3611,6 +3721,13 @@ public partial class MainWindow : Window
 
     private async void DriverAllLogLevels_Click(object sender, RoutedEventArgs e)
     {
+        AppendAppStatus("INFO", "Applying log level preset \"All\".");
+        LogStructuredEvent(
+            SeverityLevel.Info,
+            "MainWindow",
+            "LogLevelPreset",
+            "Log level preset requested.",
+            new Dictionary<string, string> { ["mode"] = "all" });
         foreach (var driver in Drivers)
         {
             if (IsHiddenLogLevelTarget(driver.DName))
@@ -3646,6 +3763,13 @@ public partial class MainWindow : Window
 
     private async void DriverSystemOnlyLogLevels_Click(object sender, RoutedEventArgs e)
     {
+        AppendAppStatus("INFO", "Applying log level preset \"System Only\".");
+        LogStructuredEvent(
+            SeverityLevel.Info,
+            "MainWindow",
+            "LogLevelPreset",
+            "Log level preset requested.",
+            new Dictionary<string, string> { ["mode"] = "system" });
         var targets = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
         {
             "EVENTS_INPUT",
@@ -3701,6 +3825,13 @@ public partial class MainWindow : Window
 
     private async void DriverNoneLogLevels_Click(object sender, RoutedEventArgs e)
     {
+        AppendAppStatus("INFO", "Applying log level preset \"None\".");
+        LogStructuredEvent(
+            SeverityLevel.Info,
+            "MainWindow",
+            "LogLevelPreset",
+            "Log level preset requested.",
+            new Dictionary<string, string> { ["mode"] = "none" });
         foreach (var driver in Drivers)
         {
             if (IsHiddenLogLevelTarget(driver.DName))
@@ -3737,7 +3868,7 @@ public partial class MainWindow : Window
     {
         var safeTotal = Math.Max(totalCount, 0);
         var safeAck = Math.Clamp(acknowledgedCount, 0, safeTotal);
-        var message = $"Status of {safeAck}/{safeTotal} driver log levels acknowledged.";
+        var message = $"Status of {safeAck} driver log levels confirmed.";
         var context = $"mode={mode};ack={safeAck};total={safeTotal}";
 
         if (safeAck == safeTotal)
@@ -3840,7 +3971,12 @@ public partial class MainWindow : Window
 
         if (_missingDriverNameWarnings.Add(dName))
         {
-            AppendAppStatus("WARN", $"Missing driver name for {dName}.");
+            LogStructuredEvent(
+                SeverityLevel.Warn,
+                "MainWindow",
+                "DriverName",
+                "Missing driver name detected.",
+                new Dictionary<string, string> { ["dName"] = dName });
         }
     }
 

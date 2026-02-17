@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using Microsoft.Data.Sqlite;
+using OracleByFPCLtd.Logging;
 
 namespace OracleByFPCLtd.ProjectData;
 
@@ -64,16 +65,35 @@ public interface IProjectDataExtractor
 
 public sealed class ProjectDataExtractor : IProjectDataExtractor
 {
+    private static readonly CentralLogger CentralLogger = new(new CentralLoggerOptions
+    {
+        LogFilePath = BuildStructuredLogPath()
+    });
+
     public ProjectDataExtractionResult Extract(string apexPath, IProgress<ProjectDataExtractionProgress>? progress = null)
     {
         if (!File.Exists(apexPath))
         {
+            LogStructuredEvent(
+                SeverityLevel.Error,
+                "Extract",
+                "APEX file not found.",
+                new Dictionary<string, string>
+                {
+                    ["path"] = apexPath,
+                    ["error"] = "FileNotFoundException"
+                });
             throw new FileNotFoundException("APEX file not found.", apexPath);
         }
 
         if (ProjectDataCacheStore.TryLoad(apexPath, out var cached)
             && cached.ApexDiscoveryPreload.SourceCatalog.Count > 0)
         {
+            LogStructuredEvent(
+                SeverityLevel.Info,
+                "Extract",
+                "Project data loaded from cache.",
+                new Dictionary<string, string> { ["path"] = apexPath });
             return cached;
         }
 
@@ -295,6 +315,16 @@ public sealed class ProjectDataExtractor : IProjectDataExtractor
             Report(progress, "Complete", 100);
             result.ApexDiscoveryPreload = ApexDiscoveryPreloadExtractor.Extract(tempPath);
             ProjectDataCacheStore.Save(apexPath, result);
+            LogStructuredEvent(
+                SeverityLevel.Info,
+                "Extract",
+                "Project data extraction completed.",
+                new Dictionary<string, string>
+                {
+                    ["diagnosticsMapping"] = result.DiagnosticsMapping.Count.ToString(),
+                    ["projectReport"] = result.ProjectReport.Count.ToString(),
+                    ["projectTest"] = result.ProjectTest.Count.ToString()
+                });
             return result;
         }
         finally
@@ -316,6 +346,35 @@ public sealed class ProjectDataExtractor : IProjectDataExtractor
     private static void Report(IProgress<ProjectDataExtractionProgress>? progress, string stage, int percent)
     {
         progress?.Report(new ProjectDataExtractionProgress(stage, percent));
+    }
+
+    private static void LogStructuredEvent(
+        SeverityLevel severity,
+        string phase,
+        string message,
+        IReadOnlyDictionary<string, string>? details = null)
+    {
+        CentralLogger.LogEvent(new LogEntry(
+            severity,
+            CreateCorrelationId(),
+            "ProjectDataExtractor",
+            phase,
+            message,
+            details));
+    }
+
+    private static string CreateCorrelationId()
+    {
+        return Guid.NewGuid().ToString("N").Substring(0, 6);
+    }
+
+    private static string BuildStructuredLogPath()
+    {
+        var folder = Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+            "Oracle by FP&C",
+            "Logs");
+        return Path.Combine(folder, "oracle-structured.log");
     }
 
     private static List<DeviceRow> LoadDevices(SqliteConnection connection)

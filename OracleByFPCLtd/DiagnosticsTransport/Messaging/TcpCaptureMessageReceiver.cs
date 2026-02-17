@@ -1,11 +1,18 @@
 using System;
+using System.Collections.Generic;
+using System.IO;
 using OracleByFPCLtd.DiagnosticsTransport;
+using OracleByFPCLtd.Logging;
 
 namespace OracleByFPCLtd.DiagnosticsTransport.Messaging;
 
 public sealed class TcpCaptureMessageReceiver : IMessageReceiver
 {
     private readonly TcpCaptureDiagnosticsTransport _inner;
+    private readonly CentralLogger _centralLogger = new(new CentralLoggerOptions
+    {
+        LogFilePath = BuildStructuredLogPath()
+    });
 
     public TcpCaptureMessageReceiver(TcpCaptureDiagnosticsTransport inner)
     {
@@ -14,7 +21,52 @@ public sealed class TcpCaptureMessageReceiver : IMessageReceiver
 
     public event EventHandler<string>? RawMessageReceived
     {
-        add => _inner.RawMessageReceived += value;
-        remove => _inner.RawMessageReceived -= value;
+        add
+        {
+            LogStructuredEvent(
+                SeverityLevel.Info,
+                "RawMessageReceived",
+                "TCP capture receiver subscribed.",
+                new Dictionary<string, string> { ["action"] = "add" });
+            _inner.RawMessageReceived += value;
+        }
+        remove
+        {
+            LogStructuredEvent(
+                SeverityLevel.Info,
+                "RawMessageReceived",
+                "TCP capture receiver unsubscribed.",
+                new Dictionary<string, string> { ["action"] = "remove" });
+            _inner.RawMessageReceived -= value;
+        }
+    }
+
+    private void LogStructuredEvent(
+        SeverityLevel severity,
+        string phase,
+        string message,
+        IReadOnlyDictionary<string, string>? details = null)
+    {
+        _centralLogger.LogEvent(new LogEntry(
+            severity,
+            CreateCorrelationId(),
+            "TcpCaptureMessageReceiver",
+            phase,
+            message,
+            details));
+    }
+
+    private static string CreateCorrelationId()
+    {
+        return Guid.NewGuid().ToString("N").Substring(0, 6);
+    }
+
+    private static string BuildStructuredLogPath()
+    {
+        var folder = Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+            "Oracle by FP&C",
+            "Logs");
+        return Path.Combine(folder, "oracle-structured.log");
     }
 }

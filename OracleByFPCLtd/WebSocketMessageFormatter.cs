@@ -1,5 +1,8 @@
 using System;
+using System.Collections.Generic;
+using System.IO;
 using System.Text.Json;
+using OracleByFPCLtd.Logging;
 
 namespace OracleByFPCLtd;
 
@@ -27,6 +30,10 @@ public sealed class WebSocketMessageFormatter
 
     private DateOnly _currentDate;
     private TimeSpan? _lastMessageLogTime;
+    private readonly CentralLogger _centralLogger = new(new CentralLoggerOptions
+    {
+        LogFilePath = BuildStructuredLogPath()
+    });
 
     public WebSocketMessageFormatter(DateOnly? startDate = null)
     {
@@ -68,9 +75,19 @@ public sealed class WebSocketMessageFormatter
                         }
                         catch (JsonException)
                         {
+                            LogStructuredEvent(
+                                SeverityLevel.Warn,
+                                "Format",
+                                "WebSocket echo payload parse failed.",
+                                new Dictionary<string, string> { ["payload"] = msg });
                         }
                         catch (FormatException)
                         {
+                            LogStructuredEvent(
+                                SeverityLevel.Warn,
+                                "Format",
+                                "WebSocket echo payload format failed.",
+                                new Dictionary<string, string> { ["payload"] = msg });
                         }
                         return $"Echo {msg}";
                     }
@@ -104,9 +121,19 @@ public sealed class WebSocketMessageFormatter
         }
         catch (JsonException)
         {
+            LogStructuredEvent(
+                SeverityLevel.Warn,
+                "Format",
+                "WebSocket JSON parse failed.",
+                new Dictionary<string, string> { ["payload"] = raw });
         }
         catch (FormatException)
         {
+            LogStructuredEvent(
+                SeverityLevel.Warn,
+                "Format",
+                "WebSocket payload format failed.",
+                new Dictionary<string, string> { ["payload"] = raw });
         }
 
         return raw;
@@ -143,5 +170,34 @@ public sealed class WebSocketMessageFormatter
             System.Globalization.CultureInfo.InvariantCulture,
             System.Globalization.TimeSpanStyles.None,
             out timeOfDay);
+    }
+
+    private void LogStructuredEvent(
+        SeverityLevel severity,
+        string phase,
+        string message,
+        IReadOnlyDictionary<string, string>? details = null)
+    {
+        _centralLogger.LogEvent(new LogEntry(
+            severity,
+            CreateCorrelationId(),
+            "WebSocketMessageFormatter",
+            phase,
+            message,
+            details));
+    }
+
+    private static string CreateCorrelationId()
+    {
+        return Guid.NewGuid().ToString("N").Substring(0, 6);
+    }
+
+    private static string BuildStructuredLogPath()
+    {
+        var folder = Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+            "Oracle by FP&C",
+            "Logs");
+        return Path.Combine(folder, "oracle-structured.log");
     }
 }

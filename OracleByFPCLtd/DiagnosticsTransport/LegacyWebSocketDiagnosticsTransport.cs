@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using System.Net;
 using System.Net.Http;
@@ -10,6 +11,7 @@ using System.Text;
 using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
+using OracleByFPCLtd.Logging;
 using OracleByFPCLtd.Reliability;
 namespace OracleByFPCLtd.DiagnosticsTransport;
 
@@ -18,6 +20,10 @@ public sealed class LegacyWebSocketDiagnosticsTransport : IDiagnosticsTransport
 {
     private ClientWebSocket? _socket;
     private CancellationTokenSource? _socketCts;
+    private readonly CentralLogger _centralLogger = new(new CentralLoggerOptions
+    {
+        LogFilePath = BuildStructuredLogPath()
+    });
 
     public event EventHandler<string>? RawMessageReceived;
     public event EventHandler<string>? TransportInfo;
@@ -443,11 +449,57 @@ public sealed class LegacyWebSocketDiagnosticsTransport : IDiagnosticsTransport
 
     private void EmitInfo(string message)
     {
+        var severity = MapSeverity(message, SeverityLevel.Info);
+        LogStructuredEvent(severity, "TransportInfo", message);
         TransportInfo?.Invoke(this, message);
     }
 
     private void EmitError(string message)
     {
+        var severity = MapSeverity(message, SeverityLevel.Error);
+        LogStructuredEvent(severity, "TransportError", message);
         TransportError?.Invoke(this, message);
+    }
+
+    private void LogStructuredEvent(SeverityLevel severity, string phase, string message)
+    {
+        var correlationId = CreateCorrelationId();
+        _centralLogger.LogEvent(new LogEntry(
+            severity,
+            correlationId,
+            "LegacyWebSocketDiagnosticsTransport",
+            phase,
+            message,
+            new Dictionary<string, string> { ["message"] = message }));
+    }
+
+    private static SeverityLevel MapSeverity(string message, SeverityLevel fallback)
+    {
+        if (string.IsNullOrWhiteSpace(message))
+        {
+            return fallback;
+        }
+
+        return message.StartsWith("[warn]", StringComparison.OrdinalIgnoreCase)
+            ? SeverityLevel.Warn
+            : message.StartsWith("[error]", StringComparison.OrdinalIgnoreCase)
+                ? SeverityLevel.Error
+                : message.StartsWith("[success]", StringComparison.OrdinalIgnoreCase)
+                    ? SeverityLevel.Success
+                : fallback;
+    }
+
+    private static string CreateCorrelationId()
+    {
+        return Guid.NewGuid().ToString("N").Substring(0, 6);
+    }
+
+    private static string BuildStructuredLogPath()
+    {
+        var folder = Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+            "Oracle by FP&C",
+            "Logs");
+        return Path.Combine(folder, "oracle-structured.log");
     }
 }

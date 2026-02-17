@@ -5,19 +5,35 @@ using System.IO.Compression;
 using System.Linq;
 using System.Security;
 using System.Text;
+using OracleByFPCLtd.Logging;
 
 namespace OracleByFPCLtd.ProjectData;
 
 public static class DiagnosticsMappingExporter
 {
+    private static readonly CentralLogger CentralLogger = new(new CentralLoggerOptions
+    {
+        LogFilePath = BuildStructuredLogPath()
+    });
+
     public static void Export(string outputPath, IEnumerable<DiagnosticsMappingEntry> rows, ApexDiscoveryPreloadResult preload)
     {
         if (string.IsNullOrWhiteSpace(outputPath))
         {
+            LogStructuredEvent(
+                SeverityLevel.Error,
+                "Export",
+                "Diagnostics mapping export path missing.",
+                new Dictionary<string, string> { ["error"] = "ArgumentException" });
             throw new ArgumentException("Output path is required.", nameof(outputPath));
         }
         if (preload is null)
         {
+            LogStructuredEvent(
+                SeverityLevel.Error,
+                "Export",
+                "Diagnostics mapping export preload missing.",
+                new Dictionary<string, string> { ["error"] = "ArgumentNullException" });
             throw new ArgumentNullException(nameof(preload));
         }
 
@@ -37,6 +53,44 @@ public static class DiagnosticsMappingExporter
         WriteEntry(archive, "xl/worksheets/sheet1.xml", BuildSheet(rows));
         WriteEntry(archive, "xl/worksheets/sheet2.xml", BuildDriverConfigSheet(preload));
         WriteEntry(archive, "xl/worksheets/sheet3.xml", BuildSysVarSheet(preload));
+        LogStructuredEvent(
+            SeverityLevel.Info,
+            "Export",
+            "Diagnostics mapping export completed.",
+            new Dictionary<string, string>
+            {
+                ["path"] = outputPath,
+                ["sheetCount"] = "3"
+            });
+    }
+
+    private static void LogStructuredEvent(
+        SeverityLevel severity,
+        string phase,
+        string message,
+        IReadOnlyDictionary<string, string>? details = null)
+    {
+        CentralLogger.LogEvent(new LogEntry(
+            severity,
+            CreateCorrelationId(),
+            "DiagnosticsMappingExporter",
+            phase,
+            message,
+            details));
+    }
+
+    private static string CreateCorrelationId()
+    {
+        return Guid.NewGuid().ToString("N").Substring(0, 6);
+    }
+
+    private static string BuildStructuredLogPath()
+    {
+        var folder = Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+            "Oracle by FP&C",
+            "Logs");
+        return Path.Combine(folder, "oracle-structured.log");
     }
 
     private static void WriteEntry(ZipArchive archive, string name, string content)

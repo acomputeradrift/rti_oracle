@@ -5,21 +5,37 @@ using System.IO.Compression;
 using System.Linq;
 using System.Security;
 using System.Text;
+using OracleByFPCLtd.Logging;
 using OracleByFPCLtd.DriverProfiles.Models;
 
 namespace OracleByFPCLtd.ProjectData;
 
 public static class AdditionalInfoTemplateBuilder
 {
+    private static readonly CentralLogger CentralLogger = new(new CentralLoggerOptions
+    {
+        LogFilePath = BuildStructuredLogPath()
+    });
+
     public static void Create(string outputPath, IReadOnlyList<AdditionalInfoSheetSchema> schemas)
     {
         if (string.IsNullOrWhiteSpace(outputPath))
         {
+            LogStructuredEvent(
+                SeverityLevel.Error,
+                "Create",
+                "Additional info template output path missing.",
+                new Dictionary<string, string> { ["error"] = "ArgumentException" });
             throw new ArgumentException("Output path is required.", nameof(outputPath));
         }
 
         if (schemas == null || schemas.Count == 0)
         {
+            LogStructuredEvent(
+                SeverityLevel.Error,
+                "Create",
+                "Additional info template schemas missing.",
+                new Dictionary<string, string> { ["error"] = "ArgumentException" });
             throw new ArgumentException("At least one schema is required.", nameof(schemas));
         }
 
@@ -44,6 +60,45 @@ public static class AdditionalInfoTemplateBuilder
             var rows = new List<string[]> { headers.ToArray() };
             WriteEntry(archive, sheetName, BuildWorksheet(rows));
         }
+
+        LogStructuredEvent(
+            SeverityLevel.Info,
+            "Create",
+            "Additional info template created.",
+            new Dictionary<string, string>
+            {
+                ["path"] = outputPath,
+                ["sheets"] = schemas.Count.ToString()
+            });
+    }
+
+    private static void LogStructuredEvent(
+        SeverityLevel severity,
+        string phase,
+        string message,
+        IReadOnlyDictionary<string, string>? details = null)
+    {
+        CentralLogger.LogEvent(new LogEntry(
+            severity,
+            CreateCorrelationId(),
+            "AdditionalInfoTemplateBuilder",
+            phase,
+            message,
+            details));
+    }
+
+    private static string CreateCorrelationId()
+    {
+        return Guid.NewGuid().ToString("N").Substring(0, 6);
+    }
+
+    private static string BuildStructuredLogPath()
+    {
+        var folder = Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+            "Oracle by FP&C",
+            "Logs");
+        return Path.Combine(folder, "oracle-structured.log");
     }
 
     private static void WriteEntry(ZipArchive archive, string name, string content)

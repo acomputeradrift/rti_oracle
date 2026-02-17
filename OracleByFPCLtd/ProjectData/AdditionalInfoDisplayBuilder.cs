@@ -1,15 +1,27 @@
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
+using OracleByFPCLtd.Logging;
 using OracleByFPCLtd.ProjectData.Models;
 
 namespace OracleByFPCLtd.ProjectData;
 
 public static class AdditionalInfoDisplayBuilder
 {
+    private static readonly CentralLogger CentralLogger = new(new CentralLoggerOptions
+    {
+        LogFilePath = BuildStructuredLogPath()
+    });
+
     public static IEnumerable<AdditionalInfoDisplayEntry> Build(AdditionalData data)
     {
         if (data is null)
         {
+            LogStructuredEvent(
+                SeverityLevel.Warn,
+                "Build",
+                "Additional info display data missing.",
+                new Dictionary<string, string> { ["error"] = "ArgumentNullException" });
             yield break;
         }
 
@@ -76,6 +88,35 @@ public static class AdditionalInfoDisplayBuilder
         }
 
         return $"{entry.GroupName} {entry.ZoneName}";
+    }
+
+    private static void LogStructuredEvent(
+        SeverityLevel severity,
+        string phase,
+        string message,
+        IReadOnlyDictionary<string, string>? details = null)
+    {
+        CentralLogger.LogEvent(new LogEntry(
+            severity,
+            CreateCorrelationId(),
+            "AdditionalInfoDisplayBuilder",
+            phase,
+            message,
+            details));
+    }
+
+    private static string CreateCorrelationId()
+    {
+        return System.Guid.NewGuid().ToString("N").Substring(0, 6);
+    }
+
+    private static string BuildStructuredLogPath()
+    {
+        var folder = Path.Combine(
+            System.Environment.GetFolderPath(System.Environment.SpecialFolder.LocalApplicationData),
+            "Oracle by FP&C",
+            "Logs");
+        return Path.Combine(folder, "oracle-structured.log");
     }
 }
 

@@ -4,6 +4,7 @@ using System.IO;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
+using OracleByFPCLtd.Logging;
 using OracleByFPCLtd.Reliability;
 
 namespace OracleByFPCLtd.ProjectData;
@@ -14,6 +15,10 @@ public static class ProjectDataCacheStore
     {
         WriteIndented = true
     };
+    private static readonly CentralLogger CentralLogger = new(new CentralLoggerOptions
+    {
+        LogFilePath = BuildStructuredLogPath()
+    });
 
     public static string GetCachePath(string apexPath)
     {
@@ -47,6 +52,13 @@ public static class ProjectDataCacheStore
         }
         catch (Exception ex)
         {
+            LogStructuredEvent(
+                SeverityLevel.Warn,
+                "ProjectDataCacheStore",
+                "TryLoad",
+                "Project cache load failed.",
+                new Dictionary<string, string> { ["path"] = cachePath },
+                ex);
             onFailure?.Invoke(new OperationFailure(
                 FailureCodes.ProjectParseFailed,
                 $"Project cache load failed, cache ignored: {ex.Message}",
@@ -99,6 +111,39 @@ public static class ProjectDataCacheStore
         var normalized = Path.GetFullPath(apexPath).ToLowerInvariant();
         var bytes = SHA256.HashData(Encoding.UTF8.GetBytes(normalized));
         return Convert.ToHexString(bytes);
+    }
+
+    private static void LogStructuredEvent(
+        SeverityLevel severity,
+        string module,
+        string phase,
+        string message,
+        IReadOnlyDictionary<string, string>? details = null,
+        Exception? exception = null)
+    {
+        var correlationId = CreateCorrelationId();
+        CentralLogger.LogEvent(new LogEntry(
+            severity,
+            correlationId,
+            module,
+            phase,
+            message,
+            details,
+            exception));
+    }
+
+    private static string CreateCorrelationId()
+    {
+        return Guid.NewGuid().ToString("N").Substring(0, 6);
+    }
+
+    private static string BuildStructuredLogPath()
+    {
+        var folder = Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+            "Oracle by FP&C",
+            "Logs");
+        return Path.Combine(folder, "oracle-structured.log");
     }
 
     private sealed class ProjectDataCacheFile
