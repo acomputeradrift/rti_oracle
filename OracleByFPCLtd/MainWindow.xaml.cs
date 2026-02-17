@@ -127,8 +127,8 @@ public partial class MainWindow : Window
     private string? _lastConnectedIp;
     private bool _logLevelsBaselineCaptured;
     private TaskCompletionSource<bool>? _logLevelsBaselineTcs;
-    private static readonly string DiagnosticsDriverOverrideDName = "DRIVER//4";
     private static readonly string DiagnosticsPrimaryProcessorName = "Diagnostics: Primary Processor";
+    private string? _diagnosticsDriverDName;
     private ConnectionPhase _connectionPhase = ConnectionPhase.Disconnected;
     private static readonly string[] AnchorNames =
     {
@@ -2859,23 +2859,23 @@ public partial class MainWindow : Window
                 Drivers.Add(diagnosticsDriver);
             }
 
-            var driver4 = Drivers.FirstOrDefault(d => d.DName.Equals(DiagnosticsDriverOverrideDName, StringComparison.OrdinalIgnoreCase));
-            if (driver4 == null)
+            var primaryChannel = Drivers.FirstOrDefault(d => d.DName.Equals(DiagnosticsPrimaryProcessorName, StringComparison.OrdinalIgnoreCase));
+            if (primaryChannel == null)
             {
-                driver4 = new DriverEntry(ParseDriverId(DiagnosticsDriverOverrideDName), DiagnosticsDriverOverrideDName, DiagnosticsDriverOverrideDName)
+                primaryChannel = new DriverEntry(0, DiagnosticsPrimaryProcessorName, DiagnosticsPrimaryProcessorName)
                 {
                     IsVisible = false
                 };
-                Drivers.Add(driver4);
+                Drivers.Add(primaryChannel);
             }
 
             var acknowledged = 0;
-            if (await ApplyLogLevelCommandWithAckAsync(diagnosticsDriver, 0))
+            if (await ApplyLogLevelCommandWithAckAsync(primaryChannel, 0))
             {
                 acknowledged++;
             }
 
-            if (await ApplyLogLevelCommandWithAckAsync(driver4, 1))
+            if (await ApplyLogLevelCommandWithAckAsync(diagnosticsDriver, 1))
             {
                 acknowledged++;
             }
@@ -3763,17 +3763,17 @@ public partial class MainWindow : Window
         _baselineStatusReported = false;
         _projectDriversLoaded = false;
         _hiddenLogLevelTargets.Clear();
-        _hiddenLogLevelTargets.Add(DiagnosticsDriverOverrideDName);
         _hiddenLogLevelTargets.Add(DiagnosticsPrimaryProcessorName);
+        _diagnosticsDriverDName = null;
     }
 
     private void UpdateHiddenLogLevelTargets(IReadOnlyList<DiagnosticsTransport.DriverInfo> drivers)
     {
         _hiddenLogLevelTargets.Clear();
-        _hiddenLogLevelTargets.Add(DiagnosticsDriverOverrideDName);
         _hiddenLogLevelTargets.Add(DiagnosticsPrimaryProcessorName);
         if (DiagnosticsDriverSelector.TryGetDiagnosticsDriverDName(drivers, out var diagnosticsDName))
         {
+            _diagnosticsDriverDName = diagnosticsDName;
             _hiddenLogLevelTargets.Add(diagnosticsDName);
         }
     }
@@ -3793,10 +3793,20 @@ public partial class MainWindow : Window
         return !IsRestrictedDriverForUi(driver.DName);
     }
 
-    private static bool IsRestrictedDriverForUi(string dName)
+    private bool IsRestrictedDriverForUi(string dName)
     {
-        return string.Equals(dName, DiagnosticsPrimaryProcessorName, StringComparison.OrdinalIgnoreCase)
-            || string.Equals(dName, DiagnosticsDriverOverrideDName, StringComparison.OrdinalIgnoreCase);
+        if (string.Equals(dName, DiagnosticsPrimaryProcessorName, StringComparison.OrdinalIgnoreCase))
+        {
+            return true;
+        }
+
+        if (!string.IsNullOrWhiteSpace(_diagnosticsDriverDName)
+            && string.Equals(dName, _diagnosticsDriverDName, StringComparison.OrdinalIgnoreCase))
+        {
+            return true;
+        }
+
+        return false;
     }
 
     private void WarnMissingDriverNameIfNeeded(string dName, string name)

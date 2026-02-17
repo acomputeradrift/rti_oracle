@@ -1,5 +1,21 @@
 # Changelog
 
+## [1.1.4] - 2026-02-16
+
+### Added
+- Status area now reports initial driver baseline reception and updated status counts.
+- Missing driver name warnings are surfaced in the status area.
+
+### Changed
+- Connection flow now waits for the first LogLevels baseline before forcing protected log levels.
+- Driver log level presets never touch the protected diagnostics drivers.
+- Restricted diagnostics drivers are removed from the driver log level UI list.
+
+### Fixed
+- LogLevels baseline parsing handles prefixed payloads from the websocket feed.
+- Websocket echo and LogLevels summary noise suppressed from raw log display.
+- Blocking error popups replaced with status area reporting.
+
 ## [1.1.3] - 2026-02-13
 
 ### Added
