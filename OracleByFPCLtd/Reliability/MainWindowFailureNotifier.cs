@@ -9,12 +9,14 @@ public sealed class MainWindowFailureNotifier : IUserFailureNotifier
     private readonly Window _owner;
     private readonly string _plainLogPath;
     private readonly string _htmlLogPath;
+    private readonly Func<DateTime?>? _timestampProvider;
 
-    public MainWindowFailureNotifier(Window owner)
+    public MainWindowFailureNotifier(Window owner, Func<DateTime?>? timestampProvider = null)
     {
         _owner = owner;
         _plainLogPath = BuildLogPath("oracle.log");
         _htmlLogPath = BuildLogPath("oracle-log.html");
+        _timestampProvider = timestampProvider;
         EnsureLogFileExists();
     }
 
@@ -38,9 +40,10 @@ public sealed class MainWindowFailureNotifier : IUserFailureNotifier
         try
         {
             var normalizedStatus = NormalizeStatus(status);
-            var entry = $"{timestampUtc:O} [result][{normalizedStatus}][{code}] {message} | context={context}{Environment.NewLine}";
+            var effectiveTimestamp = _timestampProvider?.Invoke() ?? timestampUtc;
+            var entry = $"{effectiveTimestamp:O} [result][{normalizedStatus}][{code}] {message} | context={context}{Environment.NewLine}";
             File.AppendAllText(_plainLogPath, entry);
-            AppendToHtmlLog(timestampUtc, code, normalizedStatus, message, context);
+            AppendToHtmlLog(effectiveTimestamp, code, normalizedStatus, message, context);
         }
         catch (Exception)
         {

@@ -110,6 +110,7 @@ public partial class MainWindow : Window
     private readonly HashSet<string> _projectDriverDNames = new(StringComparer.OrdinalIgnoreCase);
     private readonly Dictionary<int, string> _projectDriverNamesById = new();
     private bool _projectDriversLoaded;
+    private DateTime? _lastProcessorTimestamp;
     private readonly HashSet<string> _missingDriverNameWarnings = new(StringComparer.OrdinalIgnoreCase);
     private HashSet<string>? _lastBaselineNames;
     private bool _baselineStatusReported;
@@ -205,7 +206,7 @@ public partial class MainWindow : Window
     {
         InitializeComponent();
         WindowIconLoader.TryApply(this);
-        _failureNotifier = new MainWindowFailureNotifier(this);
+        _failureNotifier = new MainWindowFailureNotifier(this, () => _lastProcessorTimestamp);
         Title = $"Oracle by FP&C {AppVersion.CurrentLabel()}";
         WirePanelHandlers();
         ConfigureLogOutputBoxes();
@@ -2771,6 +2772,7 @@ public partial class MainWindow : Window
             return;
         }
 
+        _lastProcessorTimestamp = timestamp;
         if (!_minRawLogTimestamp.HasValue || timestamp < _minRawLogTimestamp.Value)
         {
             _minRawLogTimestamp = timestamp;
@@ -2849,33 +2851,38 @@ public partial class MainWindow : Window
 
         try
         {
-            var diagnosticsDriver = Drivers.FirstOrDefault(d => d.DName.Equals(diagnosticsDName, StringComparison.OrdinalIgnoreCase));
-            if (diagnosticsDriver == null)
+            DriverEntry? diagnosticsDriver = null;
+            DriverEntry? primaryChannel = null;
+            Dispatcher.Invoke(() =>
             {
-                diagnosticsDriver = new DriverEntry(ParseDriverId(diagnosticsDName), diagnosticsDName, diagnosticsDName)
+                diagnosticsDriver = Drivers.FirstOrDefault(d => d.DName.Equals(diagnosticsDName, StringComparison.OrdinalIgnoreCase));
+                if (diagnosticsDriver == null)
                 {
-                    IsVisible = false
-                };
-                Drivers.Add(diagnosticsDriver);
-            }
+                    diagnosticsDriver = new DriverEntry(ParseDriverId(diagnosticsDName), diagnosticsDName, diagnosticsDName)
+                    {
+                        IsVisible = false
+                    };
+                    Drivers.Add(diagnosticsDriver);
+                }
 
-            var primaryChannel = Drivers.FirstOrDefault(d => d.DName.Equals(DiagnosticsPrimaryProcessorName, StringComparison.OrdinalIgnoreCase));
-            if (primaryChannel == null)
-            {
-                primaryChannel = new DriverEntry(0, DiagnosticsPrimaryProcessorName, DiagnosticsPrimaryProcessorName)
+                primaryChannel = Drivers.FirstOrDefault(d => d.DName.Equals(DiagnosticsPrimaryProcessorName, StringComparison.OrdinalIgnoreCase));
+                if (primaryChannel == null)
                 {
-                    IsVisible = false
-                };
-                Drivers.Add(primaryChannel);
-            }
+                    primaryChannel = new DriverEntry(0, DiagnosticsPrimaryProcessorName, DiagnosticsPrimaryProcessorName)
+                    {
+                        IsVisible = false
+                    };
+                    Drivers.Add(primaryChannel);
+                }
+            });
 
             var acknowledged = 0;
-            if (await ApplyLogLevelCommandWithAckAsync(primaryChannel, 0))
+            if (primaryChannel != null && await ApplyLogLevelCommandWithAckAsync(primaryChannel, 0))
             {
                 acknowledged++;
             }
 
-            if (await ApplyLogLevelCommandWithAckAsync(diagnosticsDriver, 1))
+            if (diagnosticsDriver != null && await ApplyLogLevelCommandWithAckAsync(diagnosticsDriver, 1))
             {
                 acknowledged++;
             }
