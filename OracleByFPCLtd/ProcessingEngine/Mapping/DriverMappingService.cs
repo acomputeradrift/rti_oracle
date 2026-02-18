@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Text.RegularExpressions;
 using OracleByFPCLtd.Logging;
 using OracleByFPCLtd.DriverProfiles.Catalog;
 using OracleByFPCLtd.DriverProfiles.Services;
@@ -11,6 +12,9 @@ namespace OracleByFPCLtd.ProcessingEngine.Mapping;
 
 public sealed class DriverMappingService
 {
+    private static readonly Regex CommandCapturePattern = new(
+        "Driver - Command:\\s*'(?<command>[^']+)'",
+        RegexOptions.IgnoreCase | RegexOptions.Compiled);
     private static readonly CentralLogger CentralLogger = new(new CentralLoggerOptions
     {
         LogFilePath = BuildStructuredLogPath()
@@ -60,6 +64,16 @@ public sealed class DriverMappingService
             {
                 mappedText += " [UNRESOLVED]";
             }
+
+            LogStructuredEvent(
+                SeverityLevel.Success,
+                "Processing:Mapping",
+                BuildApexMappingMessage(rawText, mappedText),
+                new Dictionary<string, string>
+                {
+                    ["driver"] = profile.DeviceName,
+                    ["line"] = evt.RawLineNumber.ToString()
+                });
 
             if (HasAdditionalInfoData(bundle, profile.DeviceName))
             {
@@ -158,5 +172,76 @@ public sealed class DriverMappingService
             || additional.CbusGroups.Count > 0
             || additional.CbusHvacZones.Count > 0
             || additional.CbusScenes.Count > 0;
+    }
+
+    private static string BuildApexMappingMessage(string rawText, string mappedText)
+    {
+        if (TryExtractMappingTransition(rawText, mappedText, out var transition))
+        {
+            return $"Processed log line mapped to Apex file ({transition})";
+        }
+
+        return "Processed log line mapped to Apex file";
+    }
+
+    private static bool TryExtractMappingTransition(string rawText, string mappedText, out string transition)
+    {
+        transition = "";
+        if (!TryExtractCommandArgs(rawText, out var rawArgs) || !TryExtractCommandArgs(mappedText, out var mappedArgs))
+        {
+            return false;
+        }
+
+        var count = Math.Min(rawArgs.Count, mappedArgs.Count);
+        for (var i = 0; i < count; i++)
+        {
+            var rawArg = rawArgs[i].Trim();
+            var mappedArg = mappedArgs[i].Trim();
+            if (string.Equals(rawArg, mappedArg, StringComparison.Ordinal))
+            {
+                continue;
+            }
+
+            transition = $"{rawArg} -> {mappedArg}";
+            return true;
+        }
+
+        return false;
+    }
+
+    private static bool TryExtractCommandArgs(string text, out List<string> args)
+    {
+        args = new List<string>();
+        if (string.IsNullOrWhiteSpace(text))
+        {
+            return false;
+        }
+
+        var commandMatch = CommandCapturePattern.Match(text);
+        if (!commandMatch.Success)
+        {
+            return false;
+        }
+
+        var command = commandMatch.Groups["command"].Value;
+        var tailIndex = command.LastIndexOf('\\');
+        var tail = tailIndex >= 0 ? command[(tailIndex + 1)..] : command;
+        var open = tail.LastIndexOf('(');
+        var close = tail.LastIndexOf(')');
+        if (open <= 0 || close <= open)
+        {
+            return false;
+        }
+
+        var argsText = tail.Substring(open + 1, close - open - 1);
+        foreach (var arg in argsText.Split(',', StringSplitOptions.TrimEntries))
+        {
+            if (!string.IsNullOrWhiteSpace(arg))
+            {
+                args.Add(arg);
+            }
+        }
+
+        return args.Count > 0;
     }
 }

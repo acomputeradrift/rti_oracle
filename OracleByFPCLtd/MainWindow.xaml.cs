@@ -1791,6 +1791,18 @@ public partial class MainWindow : Window
                 await ForceProtectedLogLevelsAsync(drivers);
             }
             SetConnectionStatus("Ready");
+            EmitPhaseStatus(
+                "Connection",
+                "INFO",
+                "Ready",
+                "ready",
+                new Dictionary<string, string> { ["ip"] = ip });
+            LogStructuredEvent(
+                SeverityLevel.Info,
+                "MainWindow",
+                "Connection",
+                "----- Initial setup complete; mapping starts -----",
+                new Dictionary<string, string> { ["op"] = "ready_separator" });
             DisconnectButton.IsEnabled = true;
             ConnectButton.Content = "Connect";
             _lastConnectedIp = ip;
@@ -1925,6 +1937,26 @@ public partial class MainWindow : Window
                     Dispatcher.Invoke(() =>
                     {
                         SetConnectionStatus("Ready");
+                        EmitPhaseStatus(
+                            "Connection",
+                            "INFO",
+                            "Ready",
+                            "ready",
+                            new Dictionary<string, string>
+                            {
+                                ["ip"] = ip,
+                                ["attempt"] = _reconnectAttempt.ToString(CultureInfo.InvariantCulture)
+                            });
+                        LogStructuredEvent(
+                            SeverityLevel.Info,
+                            "MainWindow",
+                            "Connection",
+                            "----- Initial setup complete; mapping starts -----",
+                            new Dictionary<string, string>
+                            {
+                                ["op"] = "ready_separator",
+                                ["attempt"] = _reconnectAttempt.ToString(CultureInfo.InvariantCulture)
+                            });
                         DisconnectButton.IsEnabled = true;
                         DiscoverButton.IsEnabled = true;
                         ConnectButton.IsEnabled = false;
