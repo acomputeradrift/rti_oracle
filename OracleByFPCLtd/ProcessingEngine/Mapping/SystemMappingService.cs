@@ -47,7 +47,7 @@ public sealed class SystemMappingService
         {
             LogStructuredEvent(
                 SeverityLevel.Warn,
-                "Map",
+                "Processing:Mapping",
                 "Page number parse failed.",
                 new Dictionary<string, string>
                 {
@@ -62,7 +62,7 @@ public sealed class SystemMappingService
         {
             LogStructuredEvent(
                 SeverityLevel.Warn,
-                "Map",
+                "Processing:Mapping",
                 "Device mapping not found.",
                 new Dictionary<string, string> { ["device"] = deviceName });
             return new ProcessedLine($"{evt.RawLineNumber} {evt.RawText} [UNRESOLVED]", true);
@@ -74,7 +74,7 @@ public sealed class SystemMappingService
         {
             LogStructuredEvent(
                 SeverityLevel.Warn,
-                "Map",
+                "Processing:Mapping",
                 "Page index mapping not found.",
                 new Dictionary<string, string>
                 {
@@ -85,6 +85,15 @@ public sealed class SystemMappingService
         }
 
         var resolved = $"{match.Groups["prefix"].Value}\"{pageName}\"{match.Groups["suffix"].Value}";
+        LogStructuredEvent(
+            SeverityLevel.Success,
+            "Processing:Mapping",
+            $"Processed log line mapped to Apex file (Page {pageNumber} -> {pageName})",
+            new Dictionary<string, string>
+            {
+                ["line"] = evt.RawLineNumber.ToString(),
+                ["device"] = deviceName
+            });
         return new ProcessedLine($"{evt.RawLineNumber} {resolved}", false);
     }
 

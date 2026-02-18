@@ -33,18 +33,27 @@ public static class ProcessingEngineRunner
                 continue;
             }
 
+            LogStructuredEvent(
+                SeverityLevel.Info,
+                "Processing:Formatting",
+                "Raw log line formatted (line number, date/time stamp)",
+                new Dictionary<string, string>
+                {
+                    ["line"] = evt.RawLineNumber.ToString()
+                });
+
             var processed = engine.ProcessEvent(evt);
             results.Add(ProcessedLineFormatter.Format(processed));
-        }
 
-        LogStructuredEvent(
-            SeverityLevel.Info,
-            "ProcessNumberedLines",
-            "Processed numbered log lines.",
-            new Dictionary<string, string>
-            {
-                ["count"] = results.Count.ToString()
-            });
+            LogStructuredEvent(
+                SeverityLevel.Info,
+                "Processing:Formatting",
+                "Processed log line formatted (line number, date/time stamp, readablility)",
+                new Dictionary<string, string>
+                {
+                    ["line"] = evt.RawLineNumber.ToString()
+                });
+        }
 
         return results;
     }

@@ -20,7 +20,7 @@ public sealed class AdditionalDataMappingService
         {
             LogStructuredEvent(
                 SeverityLevel.Error,
-                "Map",
+                "Processing:Mapping",
                 "Additional data mapping received null event.",
                 new Dictionary<string, string> { ["error"] = "ArgumentNullException" });
             throw new System.ArgumentNullException(nameof(evt));

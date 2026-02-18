@@ -19,7 +19,7 @@ public static class ProcessedLineFormatter
         {
             LogStructuredEvent(
                 SeverityLevel.Error,
-                "Format",
+                "Processing:Formatting",
                 "Processed line formatter received null.",
                 new Dictionary<string, string> { ["error"] = "ArgumentNullException" });
             throw new ArgumentNullException(nameof(line));

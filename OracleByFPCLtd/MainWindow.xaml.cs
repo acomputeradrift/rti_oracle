@@ -53,6 +53,7 @@ public partial class MainWindow : Window
     private const int ReconnectInitialDelaySeconds = 3;
     private const int LogLevelAckTimeoutMilliseconds = 3000;
     private const int LogLevelAckMaxRetryCount = 1;
+    private const int LogLevelsBaselineTimeoutMilliseconds = 3000;
     private const double ProcessedWidthPadding = 12;
     private const double RawWidthPadding = 12;
     private static readonly TimeSpan FindDebounceInterval = TimeSpan.FromMilliseconds(200);
@@ -471,17 +472,43 @@ public partial class MainWindow : Window
         if (!TryParseKeywordFilter(FilterKeywordTextBox.Text, out var include, out var exclude, out _)
             || !TryParseDateRange(FilterStartTextBox.Text, FilterEndTextBox.Text, out var start, out var end, out _))
         {
+            EmitPhaseStatus(
+                "Filtering",
+                "WARN",
+                "Filter invalid",
+                "apply_invalid",
+                BuildFilterLogDetails(Array.Empty<string>(), Array.Empty<string>(), null, null));
             UpdateFilterApplyState();
             return;
         }
 
-        _filterIncludeTerms = include;
-        _filterExcludeTerms = exclude;
-        _filterStart = start;
-        _filterEnd = end;
-        _filterActive = _filterIncludeTerms.Count > 0 || _filterExcludeTerms.Count > 0 || _filterStart.HasValue || _filterEnd.HasValue;
+        try
+        {
+            _filterIncludeTerms = include;
+            _filterExcludeTerms = exclude;
+            _filterStart = start;
+            _filterEnd = end;
+            _filterActive = _filterIncludeTerms.Count > 0 || _filterExcludeTerms.Count > 0 || _filterStart.HasValue || _filterEnd.HasValue;
 
-        ApplyCurrentFilter();
+            ApplyCurrentFilter();
+            EmitPhaseStatus(
+                "Filtering",
+                "SUCCESS",
+                "Filter applied",
+                "apply_success",
+                BuildFilterLogDetails(include, exclude, start, end));
+        }
+        catch (Exception ex)
+        {
+            EmitPhaseStatus(
+                "Filtering",
+                "FAIL",
+                "Filter failed",
+                "apply_error",
+                BuildFilterLogDetails(include, exclude, start, end, ex.Message),
+                ex);
+            throw;
+        }
     }
 
     private void FilterClearButton_Click(object sender, RoutedEventArgs e)
@@ -1544,11 +1571,8 @@ public partial class MainWindow : Window
             && message.StartsWith("[success]", StringComparison.OrdinalIgnoreCase)
             && message.Contains("Connected to WebSocket", StringComparison.OrdinalIgnoreCase))
         {
-            ReportSuccess("CONNECT_SUCCESS", "Connected to WebSocket.", _lastConnectedIp ?? "");
             return;
         }
-
-        AppendAppStatus(message);
     }
 
     private void Transport_TransportError(object? sender, string message)
@@ -1564,7 +1588,6 @@ public partial class MainWindow : Window
             "TransportError",
             "Transport error received.",
             new Dictionary<string, string> { ["message"] = message });
-        AppendAppStatus(message);
         HandleTransportFailure(message);
     }
 
@@ -1667,7 +1690,15 @@ public partial class MainWindow : Window
                 }
             }
             SetConnectionStatus(sorted.Count == 0 ? "No Devices Found" : $"Found {sorted.Count}");
-            ReportSuccess("DISCOVERY_SUCCESS", $"Discovery completed with {sorted.Count} result(s).", "discover");
+            LogStructuredEvent(
+                SeverityLevel.Info,
+                "MainWindow",
+                "Connection",
+                "Discovery completed.",
+                new Dictionary<string, string>
+                {
+                    ["count"] = sorted.Count.ToString(CultureInfo.InvariantCulture)
+                });
         }
         catch (Exception ex)
         {
@@ -1679,8 +1710,6 @@ public partial class MainWindow : Window
                 "Discovery failed.",
                 new Dictionary<string, string> { ["context"] = "discover" },
                 ex);
-            AppendAppStatus($"[error] Discovery failed: {ex.Message}");
-            ReportFailure("Discover", FailureCodes.DiscoveryFailed, $"Discovery failed: {ex.Message}", "discover");
         }
         finally
         {
@@ -1745,12 +1774,20 @@ public partial class MainWindow : Window
             _useTcpCapture = useTcpCapture;
 
             await _transport.ConnectAsync(ip);
+            if (!_useTcpCapture)
+            {
+                EmitPhaseStatus(
+                    "Connection",
+                    "SUCCESS",
+                    "Connected to Websocket",
+                    "connect_success",
+                    new Dictionary<string, string> { ["ip"] = ip });
+            }
             IReadOnlyList<DiagnosticsTransport.DriverInfo> drivers = Array.Empty<DiagnosticsTransport.DriverInfo>();
             if (!_useTcpCapture)
             {
                 drivers = await LoadDriversAsync(ip);
                 _connectionPhase = ConnectionPhase.BaselineAwait;
-                await WaitForLogLevelsBaselineAsync();
                 await ForceProtectedLogLevelsAsync(drivers);
             }
             SetConnectionStatus("Ready");
@@ -1767,7 +1804,6 @@ public partial class MainWindow : Window
                 UpdateRecentProjectList(_projectFilePath);
             }
             _featureHealthRegistry.Update(new FeatureOperation("Connect", ip, "", OperationStatus.Confirmed, 0, null));
-            AppendAppStatus("INFO", "Ready.");
         }
         catch (Exception ex)
         {
@@ -1779,8 +1815,17 @@ public partial class MainWindow : Window
                 "Connect failed.",
                 new Dictionary<string, string> { ["ip"] = ip },
                 ex);
-            AppendAppStatus($"[error] Connect failed: {ex.Message}");
-            ReportFailure("Connect", FailureCodes.TransportNotConnected, $"Connect failed: {ex.Message}", ip);
+            EmitPhaseStatus(
+                "Connection",
+                "FAIL",
+                "Connection failed",
+                "connect_error",
+                new Dictionary<string, string>
+                {
+                    ["ip"] = ip,
+                    ["error"] = ex.Message
+                },
+                ex);
             ConnectButton.IsEnabled = true;
             DiscoverButton.IsEnabled = true;
             ConnectButton.Content = "Connect";
@@ -1824,6 +1869,12 @@ public partial class MainWindow : Window
         _connectionPhase = ConnectionPhase.Connecting;
         _reconnectAttempt = 0;
         SetConnectionStatus("Attempting Reconnect...");
+        EmitPhaseStatus(
+            "Connection",
+            "INFO",
+            "Reconnecting…",
+            "reconnect_start",
+            new Dictionary<string, string> { ["ip"] = ip });
         DisconnectButton.IsEnabled = false;
         DiscoverButton.IsEnabled = false;
         ConnectButton.IsEnabled = true;
@@ -1850,12 +1901,24 @@ public partial class MainWindow : Window
                     SetConnectionStatus($"Attempting Reconnect... {_reconnectAttempt}");
                     });
                     await _transport.ConnectAsync(ip);
+                    if (!_useTcpCapture)
+                    {
+                        EmitPhaseStatus(
+                            "Connection",
+                            "SUCCESS",
+                            "Connected to Websocket",
+                            "reconnect_success",
+                            new Dictionary<string, string>
+                            {
+                                ["ip"] = ip,
+                                ["attempt"] = _reconnectAttempt.ToString(CultureInfo.InvariantCulture)
+                            });
+                    }
                     IReadOnlyList<DiagnosticsTransport.DriverInfo> drivers = Array.Empty<DiagnosticsTransport.DriverInfo>();
                     if (!_useTcpCapture)
                     {
                         drivers = await LoadDriversAsync(ip);
                         _connectionPhase = ConnectionPhase.BaselineAwait;
-                        await WaitForLogLevelsBaselineAsync();
                         await ForceProtectedLogLevelsAsync(drivers);
                     }
 
@@ -1867,7 +1930,6 @@ public partial class MainWindow : Window
                         ConnectButton.IsEnabled = false;
                         ConnectButton.Content = "Connect";
                         UpdateAllLogLevelsVisibility();
-                        AppendAppStatus("INFO", "Ready.");
                     });
 
                     _lastConnectedIp = ip;
@@ -1889,7 +1951,18 @@ public partial class MainWindow : Window
                             ["attempt"] = _reconnectAttempt.ToString(CultureInfo.InvariantCulture)
                         },
                         ex);
-                    AppendAppStatus($"[error] Reconnect failed: {ex.Message}");
+                    EmitPhaseStatus(
+                        "Connection",
+                        "FAIL",
+                        "Reconnect failed",
+                        "reconnect_error",
+                        new Dictionary<string, string>
+                        {
+                            ["ip"] = ip,
+                            ["attempt"] = _reconnectAttempt.ToString(CultureInfo.InvariantCulture),
+                            ["error"] = ex.Message
+                        },
+                        ex);
                     _isConnecting = false;
                 }
 
@@ -2068,6 +2141,7 @@ public partial class MainWindow : Window
 
     private async Task LoadProjectDataForProcessingAsync(string filePath)
     {
+        var startedUtc = DateTime.UtcNow;
         try
         {
             var extractor = new ProjectDataExtractor();
@@ -2077,12 +2151,33 @@ public partial class MainWindow : Window
                 InitializeProcessing(result);
                 UpdateAdditionalInfoTemplateAvailability(result);
             });
-            ReportSuccess("PROJECT_PARSE_SUCCESS", "Project data parsed successfully.", filePath);
+            var durationMs = ((long)(DateTime.UtcNow - startedUtc).TotalMilliseconds).ToString(CultureInfo.InvariantCulture);
+            EmitPhaseStatus(
+                "ProjectData:Apex",
+                "SUCCESS",
+                "Apex parse complete",
+                "parse_complete",
+                new Dictionary<string, string>
+                {
+                    ["path"] = filePath,
+                    ["durationMs"] = durationMs
+                });
         }
         catch (Exception ex)
         {
-            ShowMessageOnUiThread(ex.Message, "Project Data", MessageBoxImage.Error);
-            ReportFailure("ProjectData", FailureCodes.ProjectParseFailed, $"Project data parse failed: {ex.Message}", filePath);
+            var durationMs = ((long)(DateTime.UtcNow - startedUtc).TotalMilliseconds).ToString(CultureInfo.InvariantCulture);
+            EmitPhaseStatus(
+                "ProjectData:Apex",
+                "FAIL",
+                "Apex parse failed",
+                "parse_error",
+                new Dictionary<string, string>
+                {
+                    ["path"] = filePath,
+                    ["durationMs"] = durationMs,
+                    ["error"] = ex.Message
+                },
+                ex);
         }
     }
 
@@ -2190,17 +2285,44 @@ public partial class MainWindow : Window
             return;
         }
 
+        var startedUtc = DateTime.UtcNow;
+        EmitPhaseStatus(
+            "Exporting:ProcessedLogs",
+            "INFO",
+            "Processed Logs Export started",
+            "export_start",
+            new Dictionary<string, string> { ["path"] = dialog.FileName });
         try
         {
             _featureHealthRegistry.Update(new FeatureOperation("Export", dialog.FileName, "", OperationStatus.Pending, 0, null));
             var request = BuildExportRequest();
             _exportService.Export(request, dialog.FileName);
             _featureHealthRegistry.Update(new FeatureOperation("Export", dialog.FileName, "", OperationStatus.Confirmed, 0, null));
-            ReportSuccess("EXPORT_SUCCESS", "Export completed successfully.", dialog.FileName);
+            EmitPhaseStatus(
+                "Exporting:ProcessedLogs",
+                "SUCCESS",
+                "Processed Logs Export complete",
+                "export_complete",
+                new Dictionary<string, string>
+                {
+                    ["path"] = dialog.FileName,
+                    ["durationMs"] = ((long)(DateTime.UtcNow - startedUtc).TotalMilliseconds).ToString(CultureInfo.InvariantCulture)
+                });
         }
         catch (Exception ex)
         {
-            ReportFailure("Export", FailureCodes.ExportFailed, $"Export failed: {ex.Message}", dialog.FileName);
+            EmitPhaseStatus(
+                "Exporting:ProcessedLogs",
+                "FAIL",
+                "Processed Logs Export failed",
+                "export_error",
+                new Dictionary<string, string>
+                {
+                    ["path"] = dialog.FileName,
+                    ["durationMs"] = ((long)(DateTime.UtcNow - startedUtc).TotalMilliseconds).ToString(CultureInfo.InvariantCulture),
+                    ["error"] = ex.Message
+                },
+                ex);
         }
     }
 
@@ -2208,7 +2330,11 @@ public partial class MainWindow : Window
     {
         if (_requiredAdditionalInfoSchemas.Count == 0)
         {
-            AppendAppStatus("WARN", "No additional info template is required for this project.");
+            EmitPhaseStatus(
+                "Exporting:AdditionalInfoTemplate",
+                "WARN",
+                "Template not required",
+                "template_not_required");
             return;
         }
 
@@ -2223,7 +2349,51 @@ public partial class MainWindow : Window
             return;
         }
 
-        AdditionalInfoTemplateBuilder.Create(dialog.FileName, _requiredAdditionalInfoSchemas);
+        try
+        {
+            AdditionalInfoTemplateBuilder.Create(dialog.FileName, _requiredAdditionalInfoSchemas);
+            EmitPhaseStatus(
+                "Exporting:AdditionalInfoTemplate",
+                "SUCCESS",
+                "Template export complete",
+                "template_complete",
+                new Dictionary<string, string>
+                {
+                    ["path"] = dialog.FileName,
+                    ["schemaCount"] = _requiredAdditionalInfoSchemas.Count.ToString(CultureInfo.InvariantCulture)
+                });
+            EmitPhaseStatus(
+                "ProjectData:Apex",
+                "SUCCESS",
+                "Additional Info template complete",
+                "template_complete",
+                new Dictionary<string, string> { ["path"] = dialog.FileName });
+        }
+        catch (Exception ex)
+        {
+            EmitPhaseStatus(
+                "Exporting:AdditionalInfoTemplate",
+                "FAIL",
+                "Template export failed",
+                "template_error",
+                new Dictionary<string, string>
+                {
+                    ["path"] = dialog.FileName,
+                    ["error"] = ex.Message
+                },
+                ex);
+            EmitPhaseStatus(
+                "ProjectData:Apex",
+                "FAIL",
+                "Additional Info template failed",
+                "template_error",
+                new Dictionary<string, string>
+                {
+                    ["path"] = dialog.FileName,
+                    ["error"] = ex.Message
+                },
+                ex);
+        }
     }
 
     private void AutoscrollMenuItem_Click(object sender, RoutedEventArgs e)
@@ -2465,7 +2635,11 @@ public partial class MainWindow : Window
 
             _logLevelsBaselineCaptured = true;
             _logLevelsBaselineTcs?.TrySetResult(true);
-            AppendAppStatus("SUCCESS", "Initial status of drivers received.");
+            EmitPhaseStatus(
+                "LogLevels:Status",
+                "INFO",
+                "Log levels baseline received",
+                "baseline_received");
             HandleLogLevels(root);
         });
         return true;
@@ -2598,6 +2772,17 @@ public partial class MainWindow : Window
                         dispatchResult.Failure));
                 }
 
+                EmitPhaseStatus(
+                    "LogLevels:Status",
+                    "FAIL",
+                    "Log level status failed",
+                    "dispatch_failed",
+                    new Dictionary<string, string>
+                    {
+                        ["dName"] = driver.DName,
+                        ["level"] = level.ToString(CultureInfo.InvariantCulture),
+                        ["retryCount"] = retryCount.ToString(CultureInfo.InvariantCulture)
+                    });
                 return false;
             }
 
@@ -2626,7 +2811,25 @@ public partial class MainWindow : Window
                     $"Log level for {driver.DName} did not acknowledge level {level} after retry.",
                     $"dName={driver.DName};level={level}",
                     DateTime.UtcNow);
-                ReportFailure("LogLevel", failure, retryCount);
+                EmitPhaseStatus(
+                    "LogLevels:Status",
+                    "FAIL",
+                    "Log level status failed",
+                    "ack_timeout",
+                    new Dictionary<string, string>
+                    {
+                        ["dName"] = driver.DName,
+                        ["level"] = level.ToString(CultureInfo.InvariantCulture),
+                        ["retryCount"] = retryCount.ToString(CultureInfo.InvariantCulture)
+                    });
+                _featureHealthRegistry.Update(new FeatureOperation(
+                    "LogLevel",
+                    driver.DName,
+                    level.ToString(CultureInfo.InvariantCulture),
+                    OperationStatus.Failed,
+                    retryCount,
+                    failure));
+                _failureNotifier.AppendOperationalLog(failure);
                 return false;
             }
 
@@ -2741,15 +2944,22 @@ public partial class MainWindow : Window
             var trimmed = line.Trim();
             if (TryParseStatusLine(trimmed, out var level, out var message))
             {
-                AppendAppStatus(level, message);
+                AppendAppStatus(level, message, logToFile: false);
                 return;
             }
 
-            AppendAppStatus("INFO", trimmed);
+            AppendAppStatus("INFO", trimmed, logToFile: false);
         });
     }
 
-    private void AppendAppStatus(string level, string message, IReadOnlyDictionary<string, string>? details = null)
+    private void AppendAppStatus(
+        string level,
+        string message,
+        IReadOnlyDictionary<string, string>? details = null,
+        bool logToFile = true,
+        string phase = "Status",
+        string op = "status",
+        Exception? exception = null)
     {
         var paragraph = AppStatusTextBox.Document.Blocks.OfType<Paragraph>().FirstOrDefault();
         if (paragraph == null)
@@ -2759,23 +2969,30 @@ public partial class MainWindow : Window
         }
 
         var normalizedLevel = NormalizeStatusLevel(level);
-        var correlationId = normalizedLevel is "WARN" or "FAIL" ? CreateCorrelationId() : null;
-        var statusText = BuildStatusText(message, normalizedLevel, correlationId);
-        if (normalizedLevel is "SUCCESS" or "WARN" or "FAIL")
+        var statusText = BuildStatusText(message);
+        if (logToFile)
         {
-            var logDetails = details ?? new Dictionary<string, string> { ["originalMessage"] = message };
-            LogStructuredEvent(
-                normalizedLevel switch
+            var logDetails = new Dictionary<string, string>(StringComparer.Ordinal)
+            {
+                ["statusLevel"] = normalizedLevel,
+                ["statusMessage"] = statusText,
+                ["op"] = op
+            };
+            if (details != null)
+            {
+                foreach (var pair in details)
                 {
-                    "WARN" => SeverityLevel.Warn,
-                    "FAIL" => SeverityLevel.Error,
-                    _ => SeverityLevel.Success
-                },
+                    logDetails[pair.Key] = pair.Value;
+                }
+            }
+
+            LogStructuredEvent(
+                MapStatusSeverity(normalizedLevel),
                 "MainWindow",
-                "Status",
+                phase,
                 statusText,
                 logDetails,
-                correlationId: correlationId);
+                exception: exception);
         }
         var badge = $"[{normalizedLevel}]";
         paragraph.Inlines.Add(new Run(badge)
@@ -2790,7 +3007,29 @@ public partial class MainWindow : Window
 
     internal void AppendStatusFromChild(string level, string message)
     {
-        AppendAppStatus(level, message);
+        AppendAppStatus(level, message, logToFile: false);
+    }
+
+    private void EmitPhaseStatus(
+        string phase,
+        string level,
+        string message,
+        string op,
+        IReadOnlyDictionary<string, string>? details = null,
+        Exception? exception = null)
+    {
+        AppendAppStatus(level, message, details, logToFile: true, phase: phase, op: op, exception: exception);
+    }
+
+    private static SeverityLevel MapStatusSeverity(string level)
+    {
+        return level switch
+        {
+            "SUCCESS" => SeverityLevel.Success,
+            "WARN" => SeverityLevel.Warn,
+            "FAIL" => SeverityLevel.Error,
+            _ => SeverityLevel.Info
+        };
     }
 
     private void SetConnectionStatus(string status)
@@ -2802,10 +3041,10 @@ public partial class MainWindow : Window
     {
         return code switch
         {
-            "SETTINGS_LOAD_SUCCESS" => "Settings loaded.",
-            "PROJECT_PARSE_SUCCESS" => "Project data parsed.",
-            "CONNECT_SUCCESS" => "Connected to WebSocket.",
-            _ => message.Replace(" successfully.", ".", StringComparison.OrdinalIgnoreCase)
+            "SETTINGS_LOAD_SUCCESS" => "Settings loaded",
+            "PROJECT_PARSE_SUCCESS" => "Project data parsed",
+            "CONNECT_SUCCESS" => "Connected to WebSocket",
+            _ => message.Replace(" successfully.", "", StringComparison.OrdinalIgnoreCase).TrimEnd('.')
         };
     }
 
@@ -2871,7 +3110,7 @@ public partial class MainWindow : Window
         };
     }
 
-    private static string BuildStatusText(string message, string level, string? correlationId)
+    private static string BuildStatusText(string message)
     {
         var words = new List<string>(
             (message ?? string.Empty)
@@ -2884,7 +3123,7 @@ public partial class MainWindow : Window
             words = words.Take(maxWords).ToList();
         }
 
-        return string.Join(" ", words);
+        return string.Join(" ", words).TrimEnd('.');
     }
 
     private static Brush GetStatusBrush(string level)
@@ -2922,9 +3161,15 @@ public partial class MainWindow : Window
 
     private async Task<IReadOnlyList<DiagnosticsTransport.DriverInfo>> LoadDriversAsync(string ip)
     {
+        var startedUtc = DateTime.UtcNow;
+        EmitPhaseStatus(
+            "LogLevels:LoadDriverNames",
+            "INFO",
+            "Loading drivers…",
+            "load_start",
+            new Dictionary<string, string> { ["ip"] = ip });
         try
         {
-            AppendAppStatus("INFO", "Loading drivers...");
             _featureHealthRegistry.Update(new FeatureOperation("LoadDrivers", ip, "", OperationStatus.Pending, 0, null));
             var list = await _transport.LoadDriversAsync(ip);
             CacheProjectDriverDNames(list);
@@ -2956,12 +3201,51 @@ public partial class MainWindow : Window
             _featureHealthRegistry.Update(new FeatureOperation("LoadDrivers", ip, "", OperationStatus.Confirmed, 0, null));
             _projectDriversLoaded = true;
             WarnMissingDriverNamesAfterLoad();
+            var durationMs = ((long)(DateTime.UtcNow - startedUtc).TotalMilliseconds).ToString(CultureInfo.InvariantCulture);
+            if (list.Count == 0)
+            {
+                EmitPhaseStatus(
+                    "LogLevels:LoadDriverNames",
+                    "WARN",
+                    "Driver names empty",
+                    "load_empty",
+                    new Dictionary<string, string>
+                    {
+                        ["ip"] = ip,
+                        ["durationMs"] = durationMs
+                    });
+            }
+            else
+            {
+                EmitPhaseStatus(
+                    "LogLevels:LoadDriverNames",
+                    "SUCCESS",
+                    "Driver names loaded",
+                    "load_complete",
+                    new Dictionary<string, string>
+                    {
+                        ["ip"] = ip,
+                        ["count"] = list.Count.ToString(CultureInfo.InvariantCulture),
+                        ["durationMs"] = durationMs
+                    });
+            }
             return list;
         }
         catch (Exception ex)
         {
-            AppendAppStatus($"[error] Failed to load drivers: {ex.Message}");
-            ReportFailure("LoadDrivers", FailureCodes.DriverLoadFailed, $"Failed to load drivers: {ex.Message}", ip);
+            var durationMs = ((long)(DateTime.UtcNow - startedUtc).TotalMilliseconds).ToString(CultureInfo.InvariantCulture);
+            EmitPhaseStatus(
+                "LogLevels:LoadDriverNames",
+                "FAIL",
+                "Driver names loading failed",
+                "load_error",
+                new Dictionary<string, string>
+                {
+                    ["ip"] = ip,
+                    ["durationMs"] = durationMs,
+                    ["error"] = ex.Message
+                },
+                ex);
             return Array.Empty<DiagnosticsTransport.DriverInfo>();
         }
     }
@@ -2973,8 +3257,8 @@ public partial class MainWindow : Window
             return;
         }
 
-        await WaitForLogLevelsBaselineAsync();
-        if (!_logLevelsBaselineCaptured)
+        var baselineReceived = await WaitForLogLevelsBaselineAsync(_lastConnectedIp ?? IpTextBox.Text.Trim());
+        if (!baselineReceived || !_logLevelsBaselineCaptured)
         {
             return;
         }
@@ -2986,7 +3270,11 @@ public partial class MainWindow : Window
 
         if (!DiagnosticsDriverSelector.TryGetDiagnosticsDriverDName(drivers, out var diagnosticsDName))
         {
-            AppendAppStatus("[warn] Diagnostics driver not found; skipping log level pin.");
+            EmitPhaseStatus(
+                "LogLevels:Status",
+                "FAIL",
+                "Log level status failed",
+                "protected_driver_missing");
             return;
         }
 
@@ -3044,7 +3332,13 @@ public partial class MainWindow : Window
         }
         catch (Exception ex)
         {
-            AppendAppStatus($"[warn] Failed to set protected log levels: {ex.Message}");
+            EmitPhaseStatus(
+                "LogLevels:Status",
+                "FAIL",
+                "Log level status failed",
+                "protected_set_error",
+                new Dictionary<string, string> { ["error"] = ex.Message },
+                ex);
         }
     }
 
@@ -3121,13 +3415,40 @@ public partial class MainWindow : Window
         }
 
         _baselineStatusReported = true;
-        AppendAppStatus("SUCCESS", $"Updated status for {projectCount} project drivers.");
-        AppendAppStatus("SUCCESS", $"Updated status for {systemCount} system drivers.");
+        LogStructuredEvent(
+            SeverityLevel.Info,
+            "MainWindow",
+            "LogLevels:Status",
+            "Log levels baseline counts recorded.",
+            new Dictionary<string, string>
+            {
+                ["projectCount"] = projectCount.ToString(CultureInfo.InvariantCulture),
+                ["systemCount"] = systemCount.ToString(CultureInfo.InvariantCulture)
+            });
     }
 
-    private Task WaitForLogLevelsBaselineAsync()
+    private async Task<bool> WaitForLogLevelsBaselineAsync(string ip)
     {
-        return _logLevelsBaselineTcs?.Task ?? Task.CompletedTask;
+        var baselineTask = _logLevelsBaselineTcs?.Task ?? Task.CompletedTask;
+        var completed = await Task.WhenAny(
+            baselineTask,
+            Task.Delay(LogLevelsBaselineTimeoutMilliseconds));
+        if (completed == baselineTask)
+        {
+            return true;
+        }
+
+        EmitPhaseStatus(
+            "LogLevels:Status",
+            "WARN",
+            "Log levels baseline not received",
+            "baseline_timeout",
+            new Dictionary<string, string>
+            {
+                ["ip"] = ip,
+                ["timeoutMs"] = LogLevelsBaselineTimeoutMilliseconds.ToString(CultureInfo.InvariantCulture)
+            });
+        return false;
     }
 
     private static string JoinContextValues(IReadOnlyCollection<string> values)
@@ -3141,6 +3462,24 @@ public partial class MainWindow : Window
             .Replace(";", ":", StringComparison.Ordinal)
             .Replace("|", "/", StringComparison.Ordinal)
             .Trim();
+    }
+
+    private static IReadOnlyDictionary<string, string> BuildFilterLogDetails(
+        IReadOnlyList<string> include,
+        IReadOnlyList<string> exclude,
+        DateTime? start,
+        DateTime? end,
+        string error = "")
+    {
+        return new Dictionary<string, string>
+        {
+            ["includeTerms"] = string.Join(",", include),
+            ["excludeTerms"] = string.Join(",", exclude),
+            ["startDateTime"] = start?.ToString("yyyy-MM-dd HH:mm", CultureInfo.InvariantCulture) ?? "",
+            ["endDateTime"] = end?.ToString("yyyy-MM-dd HH:mm", CultureInfo.InvariantCulture) ?? "",
+            ["rawFilterText"] = string.Join(",", include.Concat(exclude.Select(term => $"-{term}"))),
+            ["error"] = error
+        };
     }
 
     public void InitializeProcessing(ProjectDataExtractionResult result)
@@ -3170,7 +3509,92 @@ public partial class MainWindow : Window
         };
         _processingEngine = new ProcessingEngine.ProcessingEngine(bundle);
 
-        var processed = ProcessingEngineRunner.ProcessNumberedLines(_rawLogLines, _processingEngine);
+        List<string> processed;
+        try
+        {
+            processed = ProcessingEngineRunner.ProcessNumberedLines(_rawLogLines, _processingEngine);
+        }
+        catch (Exception ex)
+        {
+            EmitPhaseStatus(
+                "Processing:Formatting",
+                "FAIL",
+                "Formatting failed",
+                "formatting_error",
+                new Dictionary<string, string> { ["error"] = ex.Message },
+                ex);
+            EmitPhaseStatus(
+                "Processing:Mapping",
+                "FAIL",
+                "Mapping failed",
+                "mapping_error",
+                new Dictionary<string, string> { ["error"] = ex.Message },
+                ex);
+            throw;
+        }
+
+        if (_rawLogLines.Count == 0 || processed.Count == 0)
+        {
+            LogStructuredEvent(
+                SeverityLevel.Info,
+                "MainWindow",
+                "Processing:Formatting",
+                "Formatting skipped because no log lines were available",
+                new Dictionary<string, string>
+                {
+                    ["rawCount"] = _rawLogLines.Count.ToString(CultureInfo.InvariantCulture),
+                    ["processedCount"] = processed.Count.ToString(CultureInfo.InvariantCulture)
+                });
+        }
+        else
+        {
+            EmitPhaseStatus(
+                "Processing:Formatting",
+                "SUCCESS",
+                "Formatting complete",
+                "formatting_complete",
+                new Dictionary<string, string>
+                {
+                    ["rawCount"] = _rawLogLines.Count.ToString(CultureInfo.InvariantCulture),
+                    ["processedCount"] = processed.Count.ToString(CultureInfo.InvariantCulture)
+                });
+            LogStructuredEvent(
+                SeverityLevel.Info,
+                "MainWindow",
+                "Processing:Formatting",
+                "Raw log line formatted (line number, date/time stamp)",
+                new Dictionary<string, string>
+                {
+                    ["rawCount"] = _rawLogLines.Count.ToString(CultureInfo.InvariantCulture)
+                });
+            LogStructuredEvent(
+                SeverityLevel.Info,
+                "MainWindow",
+                "Processing:Formatting",
+                "Processed log line formatted (line number, date/time stamp, readablility)",
+                new Dictionary<string, string>
+                {
+                    ["processedCount"] = processed.Count.ToString(CultureInfo.InvariantCulture)
+                });
+        }
+
+        var unresolvedCount = processed.Count(line =>
+            line.Contains("[UNRESOLVED]", StringComparison.Ordinal)
+            || line.Contains("[No Map!]", StringComparison.Ordinal)
+            || line.Contains("[No Profile!]", StringComparison.Ordinal));
+        if (processed.Count > 0)
+        {
+            EmitPhaseStatus(
+                "Processing:Mapping",
+                "SUCCESS",
+                "Mapping complete",
+                unresolvedCount > 0 ? "mapping_complete_with_unresolved" : "mapping_complete",
+                new Dictionary<string, string>
+                {
+                    ["processedCount"] = processed.Count.ToString(CultureInfo.InvariantCulture),
+                    ["unresolvedCount"] = unresolvedCount.ToString(CultureInfo.InvariantCulture)
+                });
+        }
 
         _processedLogLines.Clear();
         _processedLogLines.AddRange(processed);
@@ -3201,21 +3625,62 @@ public partial class MainWindow : Window
         }
 
         var key = new AdditionalInfoCacheKey(_projectFilePath, projectLastWrite, _additionalInfoPath, additionalLastWrite);
-        return _additionalInfoCache.GetOrLoad(key, () =>
+        try
         {
-            var driverNames = result.ApexDiscoveryPreload.DriverConfigMap.Values
-                .Select(entry => entry.DeviceName)
-                .Where(name => !string.IsNullOrWhiteSpace(name))
-                .Distinct(StringComparer.Ordinal);
+            var data = _additionalInfoCache.GetOrLoad(key, () =>
+            {
+                var driverNames = result.ApexDiscoveryPreload.DriverConfigMap.Values
+                    .Select(entry => entry.DeviceName)
+                    .Where(name => !string.IsNullOrWhiteSpace(name))
+                    .Distinct(StringComparer.Ordinal);
 
-            var data = AdditionalDataExtractor.Extract(_additionalInfoPath, driverNames);
+                return AdditionalDataExtractor.Extract(_additionalInfoPath, driverNames);
+            });
+
             if (data.Errors.Count > 0)
             {
-                ShowMessageOnUiThread(string.Join(Environment.NewLine, data.Errors), "Additional Info", MessageBoxImage.Warning);
+                EmitPhaseStatus(
+                    "ProjectData:AdditionalInfo",
+                    "FAIL",
+                    "Additional info parse failed",
+                    "parse_error",
+                    new Dictionary<string, string>
+                    {
+                        ["path"] = _additionalInfoPath ?? "",
+                        ["errorCount"] = data.Errors.Count.ToString(CultureInfo.InvariantCulture)
+                    });
+            }
+            else if (!string.IsNullOrWhiteSpace(_additionalInfoPath))
+            {
+                EmitPhaseStatus(
+                    "ProjectData:AdditionalInfo",
+                    "SUCCESS",
+                    "Additional info parse complete",
+                    "parse_complete",
+                    new Dictionary<string, string>
+                    {
+                        ["path"] = _additionalInfoPath,
+                        ["driverCount"] = data.Drivers.Count.ToString(CultureInfo.InvariantCulture)
+                    });
             }
 
             return data;
-        });
+        }
+        catch (Exception ex)
+        {
+            EmitPhaseStatus(
+                "ProjectData:AdditionalInfo",
+                "FAIL",
+                "Additional info parse failed",
+                "parse_error",
+                new Dictionary<string, string>
+                {
+                    ["path"] = _additionalInfoPath ?? "",
+                    ["error"] = ex.Message
+                },
+                ex);
+            throw;
+        }
     }
 
     private void ShowMessageOnUiThread(string message, string title, MessageBoxImage image)
@@ -3764,7 +4229,6 @@ public partial class MainWindow : Window
 
     private async void DriverAllLogLevels_Click(object sender, RoutedEventArgs e)
     {
-        AppendAppStatus("INFO", "Applying log level preset \"All\".");
         LogStructuredEvent(
             SeverityLevel.Info,
             "MainWindow",
@@ -3806,7 +4270,6 @@ public partial class MainWindow : Window
 
     private async void DriverSystemOnlyLogLevels_Click(object sender, RoutedEventArgs e)
     {
-        AppendAppStatus("INFO", "Applying log level preset \"System Only\".");
         LogStructuredEvent(
             SeverityLevel.Info,
             "MainWindow",
@@ -3868,7 +4331,6 @@ public partial class MainWindow : Window
 
     private async void DriverNoneLogLevels_Click(object sender, RoutedEventArgs e)
     {
-        AppendAppStatus("INFO", "Applying log level preset \"None\".");
         LogStructuredEvent(
             SeverityLevel.Info,
             "MainWindow",
@@ -3911,17 +4373,35 @@ public partial class MainWindow : Window
     {
         var safeTotal = Math.Max(totalCount, 0);
         var safeAck = Math.Clamp(acknowledgedCount, 0, safeTotal);
-        var message = $"Status of {safeAck} driver log levels confirmed.";
-        var context = $"mode={mode};ack={safeAck};total={safeTotal}";
+        var context = new Dictionary<string, string>
+        {
+            ["mode"] = mode,
+            ["ack"] = safeAck.ToString(CultureInfo.InvariantCulture),
+            ["total"] = safeTotal.ToString(CultureInfo.InvariantCulture)
+        };
 
         if (safeAck == safeTotal)
         {
-            ReportSuccess("LOGLEVEL_BATCH_CONFIRM_SUCCESS", message, context);
+            EmitPhaseStatus(
+                "LogLevels:Status",
+                "SUCCESS",
+                "Log levels status confirmed",
+                "batch_confirmed",
+                context);
             return;
         }
 
-        AppendAppStatus("WARN", message);
-        _failureNotifier.AppendOperationalResult("LOGLEVEL_BATCH_CONFIRM_WARN", "WARN", message, context);
+        EmitPhaseStatus(
+            "LogLevels:Status",
+            "FAIL",
+            "Log level status failed",
+            "batch_failed",
+            context);
+        _failureNotifier.AppendOperationalResult(
+            "LOGLEVEL_BATCH_CONFIRM_WARN",
+            "WARN",
+            "Log level status failed",
+            $"mode={mode};ack={safeAck};total={safeTotal}");
     }
 
     private void UpdateAllLogLevelsVisibility()

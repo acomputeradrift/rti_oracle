@@ -50,9 +50,7 @@ public sealed class MainWindowProcessedOutputTests
             InvokeRawMessageReceived(window, baseline);
 
             var statusText = GetStatusText(window);
-            Assert.Contains("Initial status of drivers received.", statusText);
-            Assert.Contains("Updated status for 1 project drivers.", statusText);
-            Assert.Contains("Updated status for 1 system drivers.", statusText);
+            Assert.Contains("Log levels baseline received", statusText);
         });
     }
 

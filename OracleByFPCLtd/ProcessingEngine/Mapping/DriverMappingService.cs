@@ -61,6 +61,19 @@ public sealed class DriverMappingService
                 mappedText += " [UNRESOLVED]";
             }
 
+            if (HasAdditionalInfoData(bundle, profile.DeviceName))
+            {
+                LogStructuredEvent(
+                    SeverityLevel.Success,
+                    "Processing:Mapping",
+                    "Processed log line mapped to Additional Info file (<Driver>:<id> -> <name>)",
+                    new Dictionary<string, string>
+                    {
+                        ["driver"] = profile.DeviceName,
+                        ["line"] = evt.RawLineNumber.ToString()
+                    });
+            }
+
             return new ProcessedLine($"{evt.RawLineNumber} {mappedText}", unresolved);
         }
 
@@ -68,7 +81,7 @@ public sealed class DriverMappingService
         {
             LogStructuredEvent(
                 SeverityLevel.Warn,
-                "Map",
+                "Processing:Mapping",
                 "Driver profile not found.",
                 new Dictionary<string, string> { ["rawText"] = rawText });
             return new ProcessedLine($"{evt.RawLineNumber} {rawText} [No Profile!]", true);
@@ -131,5 +144,19 @@ public sealed class DriverMappingService
             && !text.Contains("[No Map!]", StringComparison.Ordinal)
             && !text.Contains("[Unknown State!]", StringComparison.Ordinal)
             && !text.Contains("[No Profile!]", StringComparison.Ordinal);
+    }
+
+    private static bool HasAdditionalInfoData(ProjectDataBundle bundle, string driverName)
+    {
+        if (!bundle.Additional.Drivers.TryGetValue(driverName, out var additional))
+        {
+            return false;
+        }
+
+        return additional.InputNames.Count > 0
+            || additional.OutputNames.Count > 0
+            || additional.CbusGroups.Count > 0
+            || additional.CbusHvacZones.Count > 0
+            || additional.CbusScenes.Count > 0;
     }
 }
