@@ -31,10 +31,15 @@ public sealed class LogLevelController : ILogLevelController
 
     public Task<CommandDispatchResult> SendLogLevelCommandAsync(string type, string level, CancellationToken token = default)
     {
+        var isBaseline = LogLevelCommandContext.GetLabel() == "Baseline";
+        var isResend = LogLevelCommandContext.IsResend();
+        var message = isResend
+            ? (isBaseline ? "Baseline Log level command resent." : "Log level command resent.")
+            : (isBaseline ? "Baseline Log level command sent." : "Log level command sent.");
         LogStructuredEvent(
             SeverityLevel.Info,
             "SendLogLevelCommandAsync",
-            "Log level command sent.",
+            message,
             new Dictionary<string, string>
             {
                 ["type"] = type,

@@ -1544,7 +1544,7 @@ public partial class MainWindow : Window
             && message.StartsWith("[success]", StringComparison.OrdinalIgnoreCase)
             && message.Contains("Connected to WebSocket", StringComparison.OrdinalIgnoreCase))
         {
-            ReportSuccess("CONNECT_SUCCESS", "Connection established.", _lastConnectedIp ?? "");
+            ReportSuccess("CONNECT_SUCCESS", "Connected to WebSocket.", _lastConnectedIp ?? "");
             return;
         }
 
@@ -1978,10 +1978,15 @@ public partial class MainWindow : Window
         var statusMessage = BuildStatusMessage(code, message, context);
         if (!string.IsNullOrWhiteSpace(statusMessage))
         {
-            AppendAppStatus("SUCCESS", statusMessage);
+            AppendAppStatus(
+                "SUCCESS",
+                statusMessage,
+                new Dictionary<string, string>
+                {
+                    ["code"] = code,
+                    ["context"] = context
+                });
         }
-
-        _failureNotifier.AppendOperationalResult(code, "SUCCESS", message, context);
     }
 
     private void DiscoveredCombo_SelectionChanged(object sender, SelectionChangedEventArgs e)
@@ -2567,7 +2572,18 @@ public partial class MainWindow : Window
         while (true)
         {
             _featureHealthRegistry.Update(new FeatureOperation("LogLevel", driver.DName, level.ToString(CultureInfo.InvariantCulture), OperationStatus.Pending, retryCount, null));
-            var dispatchResult = await _transport.SendLogLevelCommandAsync(driver.DName, level.ToString(CultureInfo.InvariantCulture));
+            CommandDispatchResult dispatchResult;
+            if (retryCount > 0)
+            {
+                using (LogLevelCommandContext.BeginResend())
+                {
+                    dispatchResult = await _transport.SendLogLevelCommandAsync(driver.DName, level.ToString(CultureInfo.InvariantCulture));
+                }
+            }
+            else
+            {
+                dispatchResult = await _transport.SendLogLevelCommandAsync(driver.DName, level.ToString(CultureInfo.InvariantCulture));
+            }
             if (!dispatchResult.Dispatched)
             {
                 driver.OperationStatus = OperationStatus.Failed;
@@ -2591,10 +2607,13 @@ public partial class MainWindow : Window
                 driver.OperationStatus = OperationStatus.Confirmed;
                 _featureHealthRegistry.Update(new FeatureOperation("LogLevel", driver.DName, level.ToString(CultureInfo.InvariantCulture), OperationStatus.Confirmed, retryCount, null));
                 var driverName = string.IsNullOrWhiteSpace(driver.Name) ? driver.DName : driver.Name;
+                var driverLabel = driverName.Equals(driver.DName, StringComparison.OrdinalIgnoreCase)
+                    ? driverName
+                    : $"{driverName} ({driver.DName})";
                 _failureNotifier.AppendOperationalResult(
                     "LOGLEVEL_ACK_INFO",
                     "INFO",
-                    $"{driverName} Log level acknowledged at {level}.",
+                    $"{driverLabel} Log level acknowledged at {level}.",
                     BuildLogLevelSuccessContext(driver, level, retryCount));
                 return true;
             }
@@ -2730,7 +2749,7 @@ public partial class MainWindow : Window
         });
     }
 
-    private void AppendAppStatus(string level, string message)
+    private void AppendAppStatus(string level, string message, IReadOnlyDictionary<string, string>? details = null)
     {
         var paragraph = AppStatusTextBox.Document.Blocks.OfType<Paragraph>().FirstOrDefault();
         if (paragraph == null)
@@ -2742,14 +2761,20 @@ public partial class MainWindow : Window
         var normalizedLevel = NormalizeStatusLevel(level);
         var correlationId = normalizedLevel is "WARN" or "FAIL" ? CreateCorrelationId() : null;
         var statusText = BuildStatusText(message, normalizedLevel, correlationId);
-        if (normalizedLevel is "WARN" or "FAIL")
+        if (normalizedLevel is "SUCCESS" or "WARN" or "FAIL")
         {
+            var logDetails = details ?? new Dictionary<string, string> { ["originalMessage"] = message };
             LogStructuredEvent(
-                normalizedLevel == "WARN" ? SeverityLevel.Warn : SeverityLevel.Error,
+                normalizedLevel switch
+                {
+                    "WARN" => SeverityLevel.Warn,
+                    "FAIL" => SeverityLevel.Error,
+                    _ => SeverityLevel.Success
+                },
                 "MainWindow",
                 "Status",
                 statusText,
-                new Dictionary<string, string> { ["originalMessage"] = message },
+                logDetails,
                 correlationId: correlationId);
         }
         var badge = $"[{normalizedLevel}]";
@@ -2948,6 +2973,12 @@ public partial class MainWindow : Window
             return;
         }
 
+        await WaitForLogLevelsBaselineAsync();
+        if (!_logLevelsBaselineCaptured)
+        {
+            return;
+        }
+
         if (drivers == null || drivers.Count == 0)
         {
             return;
@@ -2987,14 +3018,26 @@ public partial class MainWindow : Window
             });
 
             var acknowledged = 0;
-            if (primaryChannel != null && await ApplyLogLevelCommandWithAckAsync(primaryChannel, 0))
+            if (primaryChannel != null)
             {
-                acknowledged++;
+                using (LogLevelCommandContext.BeginBaseline())
+                {
+                    if (await ApplyLogLevelCommandWithAckAsync(primaryChannel, 0))
+                    {
+                        acknowledged++;
+                    }
+                }
             }
 
-            if (diagnosticsDriver != null && await ApplyLogLevelCommandWithAckAsync(diagnosticsDriver, 1))
+            if (diagnosticsDriver != null)
             {
-                acknowledged++;
+                using (LogLevelCommandContext.BeginBaseline())
+                {
+                    if (await ApplyLogLevelCommandWithAckAsync(diagnosticsDriver, 1))
+                    {
+                        acknowledged++;
+                    }
+                }
             }
 
             ReportLogLevelBatchStatus("connect", acknowledged, 2);

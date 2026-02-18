@@ -450,7 +450,10 @@ public sealed class LegacyWebSocketDiagnosticsTransport : IDiagnosticsTransport
     private void EmitInfo(string message)
     {
         var severity = MapSeverity(message, SeverityLevel.Info);
-        LogStructuredEvent(severity, "TransportInfo", message);
+        if (!IsConnectedSuccessMessage(message))
+        {
+            LogStructuredEvent(severity, "TransportInfo", message);
+        }
         TransportInfo?.Invoke(this, message);
     }
 
@@ -487,6 +490,12 @@ public sealed class LegacyWebSocketDiagnosticsTransport : IDiagnosticsTransport
                 : message.StartsWith("[success]", StringComparison.OrdinalIgnoreCase)
                     ? SeverityLevel.Success
                 : fallback;
+    }
+
+    private static bool IsConnectedSuccessMessage(string message)
+    {
+        return message.StartsWith("[success]", StringComparison.OrdinalIgnoreCase)
+            && message.Contains("Connected to WebSocket", StringComparison.OrdinalIgnoreCase);
     }
 
     private static string CreateCorrelationId()

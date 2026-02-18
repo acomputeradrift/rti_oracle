@@ -35,7 +35,10 @@ public sealed class DiagnosticsTransportFacade : IDiagnosticsTransport
 
         _connection.TransportInfo += (_, message) =>
         {
-            LogStructuredEvent(SeverityLevel.Info, "TransportInfo", message);
+            if (!IsConnectedSuccessMessage(message))
+            {
+                LogStructuredEvent(SeverityLevel.Info, "TransportInfo", message);
+            }
             TransportInfo?.Invoke(this, message);
         };
         _connection.TransportError += (_, message) =>
@@ -77,6 +80,13 @@ public sealed class DiagnosticsTransportFacade : IDiagnosticsTransport
             phase,
             message,
             new Dictionary<string, string> { ["message"] = message }));
+    }
+
+    private static bool IsConnectedSuccessMessage(string message)
+    {
+        return !string.IsNullOrWhiteSpace(message)
+            && message.StartsWith("[success]", StringComparison.OrdinalIgnoreCase)
+            && message.Contains("Connected to WebSocket", StringComparison.OrdinalIgnoreCase);
     }
 
     private static string CreateCorrelationId()
