@@ -214,6 +214,91 @@ public sealed class MainWindowProcessedOutputTests
     }
 
     [Fact]
+    public void DiagnosticsDriverAckResolvesPendingPrimaryProcessorAlias()
+    {
+        RunOnSta(() =>
+        {
+            var window = new MainWindow();
+            SetPrivateField(window, "_diagnosticsDriverDName", "DRIVER//6");
+
+            var timeoutSource = new CancellationTokenSource();
+            SetPendingAck(window, "Diagnostics: Primary Processor", 0, timeoutSource);
+
+            InvokeTryResolvePendingLogLevel(window, "DRIVER//6", 0);
+
+            Assert.True(timeoutSource.IsCancellationRequested);
+            Assert.False(HasPendingAck(window, "Diagnostics: Primary Processor"));
+        });
+    }
+
+    [Fact]
+    public void PrimaryProcessorAckResolvesPendingDiagnosticsDriverAlias()
+    {
+        RunOnSta(() =>
+        {
+            var window = new MainWindow();
+            SetPrivateField(window, "_diagnosticsDriverDName", "DRIVER//6");
+
+            var timeoutSource = new CancellationTokenSource();
+            SetPendingAck(window, "DRIVER//6", 1, timeoutSource);
+
+            InvokeTryResolvePendingLogLevel(window, "Diagnostics: Primary Processor", 1);
+
+            Assert.True(timeoutSource.IsCancellationRequested);
+            Assert.False(HasPendingAck(window, "DRIVER//6"));
+        });
+    }
+
+    [Fact]
+    public void EmitPhaseStatusFromBackgroundThreadDoesNotThrow()
+    {
+        RunOnSta(() =>
+        {
+            var window = new MainWindow();
+            Exception? backgroundFailure = null;
+            using var done = new ManualResetEvent(false);
+
+            _ = Task.Run(() =>
+            {
+                try
+                {
+                    InvokeEmitPhaseStatus(
+                        window,
+                        "Connection",
+                        "INFO",
+                        "Reconnecting...",
+                        "reconnect_start",
+                        new Dictionary<string, string> { ["ip"] = "192.168.1.143" },
+                        null);
+                }
+                catch (Exception ex)
+                {
+                    backgroundFailure = ex;
+                }
+                finally
+                {
+                    done.Set();
+                }
+            });
+
+            var deadline = DateTime.UtcNow + TimeSpan.FromSeconds(5);
+            while (!done.WaitOne(25))
+            {
+                DoEvents();
+                if (DateTime.UtcNow >= deadline)
+                {
+                    break;
+                }
+            }
+
+            Assert.True(done.WaitOne(0));
+            DoEvents();
+            Assert.Null(backgroundFailure);
+            Assert.Contains("Reconnecting", GetStatusText(window));
+        });
+    }
+
+    [Fact]
     public void ProcessedLogKeepsWidthWhenResizingPane()
     {
         RunOnSta(() =>
@@ -516,6 +601,63 @@ public sealed class MainWindowProcessedOutputTests
     private static void SetIpAddress(MainWindow window, string ip)
     {
         GetConnectionPanel(window).IpTextBox.Text = ip;
+    }
+
+    private static void SetPendingAck(MainWindow window, string dName, int level, CancellationTokenSource timeoutSource)
+    {
+        var pendingField = typeof(MainWindow).GetField("_pendingLogLevelCommands", BindingFlags.Instance | BindingFlags.NonPublic);
+        Assert.NotNull(pendingField);
+        var pendingMap = pendingField!.GetValue(window)!;
+
+        var nestedType = typeof(MainWindow).GetNestedType("PendingLogLevelCommand", BindingFlags.NonPublic);
+        Assert.NotNull(nestedType);
+        var ctor = nestedType!.GetConstructor(
+            BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public,
+            binder: null,
+            new[] { typeof(int), typeof(int), typeof(CancellationTokenSource) },
+            modifiers: null);
+        Assert.NotNull(ctor);
+
+        var pending = ctor!.Invoke(new object[] { level, 0, timeoutSource });
+        var key = BuildLogLevelAckKey(dName);
+        pendingMap.GetType().GetMethod("Add")!.Invoke(pendingMap, new[] { (object)key, pending });
+    }
+
+    private static bool HasPendingAck(MainWindow window, string dName)
+    {
+        var pendingField = typeof(MainWindow).GetField("_pendingLogLevelCommands", BindingFlags.Instance | BindingFlags.NonPublic);
+        Assert.NotNull(pendingField);
+        var pendingMap = pendingField!.GetValue(window)!;
+        var key = BuildLogLevelAckKey(dName);
+        return (bool)pendingMap.GetType().GetMethod("ContainsKey")!.Invoke(pendingMap, new object[] { key })!;
+    }
+
+    private static void InvokeTryResolvePendingLogLevel(MainWindow window, string dName, int level)
+    {
+        var method = typeof(MainWindow).GetMethod("TryResolvePendingLogLevelCommand", BindingFlags.Instance | BindingFlags.NonPublic);
+        Assert.NotNull(method);
+        method!.Invoke(window, new object[] { dName, level });
+    }
+
+    private static void InvokeEmitPhaseStatus(
+        MainWindow window,
+        string phase,
+        string level,
+        string message,
+        string op,
+        IReadOnlyDictionary<string, string>? details,
+        Exception? exception)
+    {
+        var method = typeof(MainWindow).GetMethod("EmitPhaseStatus", BindingFlags.Instance | BindingFlags.NonPublic);
+        Assert.NotNull(method);
+        method!.Invoke(window, new object?[] { phase, level, message, op, details, exception });
+    }
+
+    private static string BuildLogLevelAckKey(string dName)
+    {
+        var method = typeof(MainWindow).GetMethod("BuildLogLevelAckKey", BindingFlags.Static | BindingFlags.NonPublic);
+        Assert.NotNull(method);
+        return (string)method!.Invoke(null, new object[] { dName })!;
     }
 
     private static ConnectionPanel GetConnectionPanel(MainWindow window)

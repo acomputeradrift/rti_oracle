@@ -2906,19 +2906,43 @@ public partial class MainWindow : Window
 
     private void TryResolvePendingLogLevelCommand(string dName, int level)
     {
-        var key = BuildLogLevelAckKey(dName);
-        if (!_pendingLogLevelCommands.TryGetValue(key, out var pending))
+        foreach (var key in GetLogLevelAckCandidateKeys(dName))
         {
+            if (!_pendingLogLevelCommands.TryGetValue(key, out var pending))
+            {
+                continue;
+            }
+
+            if (pending.RequestedLevel != level)
+            {
+                continue;
+            }
+
+            _pendingLogLevelCommands.Remove(key);
+            pending.TimeoutSource.Cancel();
             return;
         }
+    }
 
-        if (pending.RequestedLevel != level)
+    private IEnumerable<string> GetLogLevelAckCandidateKeys(string dName)
+    {
+        yield return BuildLogLevelAckKey(dName);
+
+        if (string.IsNullOrWhiteSpace(_diagnosticsDriverDName))
         {
-            return;
+            yield break;
         }
 
-        _pendingLogLevelCommands.Remove(key);
-        pending.TimeoutSource.Cancel();
+        if (string.Equals(dName, DiagnosticsPrimaryProcessorName, StringComparison.OrdinalIgnoreCase))
+        {
+            yield return BuildLogLevelAckKey(_diagnosticsDriverDName);
+            yield break;
+        }
+
+        if (string.Equals(dName, _diagnosticsDriverDName, StringComparison.OrdinalIgnoreCase))
+        {
+            yield return BuildLogLevelAckKey(DiagnosticsPrimaryProcessorName);
+        }
     }
 
     private static string BuildLogLevelAckKey(string dName)
@@ -2986,6 +3010,13 @@ public partial class MainWindow : Window
         string op = "status",
         Exception? exception = null)
     {
+        if (!Dispatcher.CheckAccess())
+        {
+            Dispatcher.Invoke(() =>
+                AppendAppStatus(level, message, details, logToFile, phase, op, exception));
+            return;
+        }
+
         var paragraph = AppStatusTextBox.Document.Blocks.OfType<Paragraph>().FirstOrDefault();
         if (paragraph == null)
         {
