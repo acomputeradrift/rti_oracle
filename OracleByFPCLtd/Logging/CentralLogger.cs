@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
 using System.Linq;
+using System.Threading;
 
 namespace OracleByFPCLtd.Logging;
 
@@ -99,7 +100,14 @@ public sealed class CentralLogger
             payload["exception"] = entry.Exception.ToString();
         }
 
-        WriteHtmlLine(payload);
+        try
+        {
+            WriteHtmlLine(payload);
+        }
+        catch (Exception ex) when (IsNonFatalFileException(ex))
+        {
+            // Best-effort logging only; never fail caller workflows due to log file locks.
+        }
     }
 
     public void EmitStatus(string level, string message, string correlationId)
@@ -126,17 +134,27 @@ public sealed class CentralLogger
             return;
         }
 
-        EnsureHtmlLogFileExists(_htmlLogPath);
-        var html = File.ReadAllText(_htmlLogPath);
-        var marker = "</pre>";
-        var index = html.IndexOf(marker, StringComparison.OrdinalIgnoreCase);
-        if (index < 0)
+        try
         {
-            return;
-        }
+            EnsureHtmlLogFileExists(_htmlLogPath);
+            ExecuteFileIoWithRetry(() =>
+            {
+                var html = File.ReadAllText(_htmlLogPath);
+                var marker = "</pre>";
+                var index = html.IndexOf(marker, StringComparison.OrdinalIgnoreCase);
+                if (index < 0)
+                {
+                    return;
+                }
 
-        html = html.Insert(index, EscapeHtml(line) + Environment.NewLine);
-        File.WriteAllText(_htmlLogPath, html);
+                html = html.Insert(index, EscapeHtml(line) + Environment.NewLine);
+                File.WriteAllText(_htmlLogPath, html);
+            });
+        }
+        catch (Exception ex) when (IsNonFatalFileException(ex))
+        {
+            // Best-effort logging only; never fail caller workflows due to log file locks.
+        }
     }
 
     private void WriteHtmlLine(Dictionary<string, object?> payload)
@@ -196,16 +214,19 @@ public sealed class CentralLogger
             line += $" | exception={EscapeHtml(exception)}";
         }
 
-        var html = File.ReadAllText(_htmlLogPath);
-        var marker = "</pre>";
-        var index = html.IndexOf(marker, StringComparison.OrdinalIgnoreCase);
-        if (index < 0)
+        ExecuteFileIoWithRetry(() =>
         {
-            return;
-        }
+            var html = File.ReadAllText(_htmlLogPath);
+            var marker = "</pre>";
+            var index = html.IndexOf(marker, StringComparison.OrdinalIgnoreCase);
+            if (index < 0)
+            {
+                return;
+            }
 
-        html = html.Insert(index, line + Environment.NewLine);
-        File.WriteAllText(_htmlLogPath, html);
+            html = html.Insert(index, line + Environment.NewLine);
+            File.WriteAllText(_htmlLogPath, html);
+        });
     }
 
     private static void EnsureHtmlLogFileExists(string path)
@@ -258,8 +279,45 @@ public sealed class CentralLogger
 
     private static string BuildDefaultHtmlPath()
     {
-        var desktop = Environment.GetFolderPath(Environment.SpecialFolder.DesktopDirectory);
-        return Path.Combine(desktop, "oracle-log.html");
+        var folder = Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+            "Oracle by FP&C",
+            "Logs");
+        return Path.Combine(folder, "oracle-log.html");
     }
 
+    private static bool IsNonFatalFileException(Exception ex)
+    {
+        return ex is IOException || ex is UnauthorizedAccessException;
+    }
+
+    private static void ExecuteFileIoWithRetry(Action action)
+    {
+        var delayMs = 40;
+        Exception? last = null;
+        for (var attempt = 0; attempt < 3; attempt++)
+        {
+            try
+            {
+                action();
+                return;
+            }
+            catch (Exception ex) when (attempt < 2 && IsNonFatalFileException(ex))
+            {
+                last = ex;
+                Thread.Sleep(delayMs);
+                delayMs *= 2;
+            }
+            catch (Exception ex)
+            {
+                last = ex;
+                break;
+            }
+        }
+
+        if (last != null)
+        {
+            throw last;
+        }
+    }
 }

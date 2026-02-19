@@ -155,3 +155,4 @@ Y:\Desktop\Development\Oracle\OracleByFPCLtd\obj\Debug\net8.0-windows\refint\Ora
 Y:\Desktop\Development\Oracle\OracleByFPCLtd\obj\Debug\net8.0-windows\OracleByFPCLtd.pdb
 Y:\Desktop\Development\Oracle\OracleByFPCLtd\obj\Debug\net8.0-windows\OracleByFPCLtd.genruntimeconfig.cache
 Y:\Desktop\Development\Oracle\OracleByFPCLtd\obj\Debug\net8.0-windows\ref\OracleByFPCLtd.dll
+Y:\Desktop\Development\Oracle\OracleByFPCLtd\obj\Debug\net8.0-windows\GeneratedInternalTypeHelper.g.cs

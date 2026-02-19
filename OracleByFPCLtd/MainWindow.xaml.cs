@@ -52,6 +52,7 @@ public partial class MainWindow : Window
     private const int ReconnectDelaySeconds = 3;
     private const int ReconnectInitialDelaySeconds = 3;
     private const int LogLevelAckTimeoutMilliseconds = 3000;
+    private const int BaselineDiagnosticsAckTimeoutMilliseconds = 7000;
     private const int LogLevelAckMaxRetryCount = 1;
     private const int LogLevelsBaselineTimeoutMilliseconds = 3000;
     private const double ProcessedWidthPadding = 12;
@@ -1782,6 +1783,14 @@ public partial class MainWindow : Window
                     "Connected to Websocket",
                     "connect_success",
                     new Dictionary<string, string> { ["ip"] = ip });
+
+                if (!string.IsNullOrWhiteSpace(_projectFilePath))
+                {
+                    _recentProjectService.RecordSuccessfulConnection(_settings, _projectFilePath, ip);
+                    _recentIpService.RecordRecentIp(_settings, ip);
+                    _settingsStore.Save(_settings);
+                    UpdateRecentProjectList(_projectFilePath);
+                }
             }
             IReadOnlyList<DiagnosticsTransport.DriverInfo> drivers = Array.Empty<DiagnosticsTransport.DriverInfo>();
             if (!_useTcpCapture)
@@ -1804,13 +1813,6 @@ public partial class MainWindow : Window
             _lastConnectedIp = ip;
             UpdateAllLogLevelsVisibility();
             _connectionPhase = ConnectionPhase.Ready;
-            if (!string.IsNullOrWhiteSpace(_projectFilePath))
-            {
-                _recentProjectService.RecordSuccessfulConnection(_settings, _projectFilePath, ip);
-                _recentIpService.RecordRecentIp(_settings, ip);
-                _settingsStore.Save(_settings);
-                UpdateRecentProjectList(_projectFilePath);
-            }
             _featureHealthRegistry.Update(new FeatureOperation("Connect", ip, "", OperationStatus.Confirmed, 0, null));
         }
         catch (Exception ex)
@@ -2578,6 +2580,12 @@ public partial class MainWindow : Window
         var messageType = messageTypeElement.GetString();
         if (string.Equals(messageType, "LogLevels", StringComparison.OrdinalIgnoreCase))
         {
+            // Important: do NOT use LogLevels snapshots to resolve pending acks.
+            // Current understanding is these snapshots can be stale/persistent and are
+            // not a reliable confirmation source for command acknowledgements.
+            // Operationally, they appear to represent boot-time state and do not
+            // reflect runtime log-level changes after commands are sent, even if a
+            // fresh LogLevels snapshot is requested again during operation.
             isLogLine = false;
             return true;
         }
@@ -2658,6 +2666,11 @@ public partial class MainWindow : Window
                 return;
             }
 
+            // Baseline snapshot is used to initialize displayed state/counters only.
+            // Ack confirmation remains MessageLog-driven (see LogLevelAckParser path).
+            // This snapshot is treated as boot-time state; runtime level updates are
+            // not considered trustworthy from subsequent LogLevels snapshots, even
+            // when an additional snapshot is explicitly requested.
             _logLevelsBaselineCaptured = true;
             _logLevelsBaselineTcs?.TrySetResult(true);
             EmitPhaseStatus(
@@ -2763,7 +2776,10 @@ public partial class MainWindow : Window
         return string.Empty;
     }
 
-    private async Task<bool> ApplyLogLevelCommandWithAckAsync(DriverEntry driver, int level)
+    private async Task<bool> ApplyLogLevelCommandWithAckAsync(
+        DriverEntry driver,
+        int level,
+        int ackTimeoutMilliseconds = LogLevelAckTimeoutMilliseconds)
     {
         driver.OperationStatus = OperationStatus.Pending;
         var retryCount = 0;
@@ -2811,7 +2827,7 @@ public partial class MainWindow : Window
                 return false;
             }
 
-            var acknowledged = await WaitForLogLevelAckAsync(driver.DName, level, retryCount);
+            var acknowledged = await WaitForLogLevelAckAsync(driver.DName, level, retryCount, ackTimeoutMilliseconds);
             if (acknowledged)
             {
                 driver.OperationStatus = OperationStatus.Confirmed;
@@ -2845,7 +2861,8 @@ public partial class MainWindow : Window
                     {
                         ["dName"] = driver.DName,
                         ["level"] = level.ToString(CultureInfo.InvariantCulture),
-                        ["retryCount"] = retryCount.ToString(CultureInfo.InvariantCulture)
+                        ["retryCount"] = retryCount.ToString(CultureInfo.InvariantCulture),
+                        ["timeoutMs"] = ackTimeoutMilliseconds.ToString(CultureInfo.InvariantCulture)
                     });
                 _featureHealthRegistry.Update(new FeatureOperation(
                     "LogLevel",
@@ -2862,10 +2879,10 @@ public partial class MainWindow : Window
         }
     }
 
-    private async Task<bool> WaitForLogLevelAckAsync(string dName, int level, int retryCount)
+    private async Task<bool> WaitForLogLevelAckAsync(string dName, int level, int retryCount, int ackTimeoutMilliseconds)
     {
         var key = BuildLogLevelAckKey(dName);
-        var timeoutSource = new CancellationTokenSource(TimeSpan.FromMilliseconds(LogLevelAckTimeoutMilliseconds));
+        var timeoutSource = new CancellationTokenSource(TimeSpan.FromMilliseconds(ackTimeoutMilliseconds));
         _pendingLogLevelCommands[key] = new PendingLogLevelCommand(level, retryCount, timeoutSource);
         try
         {
@@ -3254,6 +3271,16 @@ public partial class MainWindow : Window
             });
 
             ReportDriverLoadBreakdown(ip, list);
+            LogStructuredEvent(
+                SeverityLevel.Info,
+                "MainWindow",
+                "LogLevels:DiagnosticsSelection",
+                "Project driver inventory loaded.",
+                new Dictionary<string, string>
+                {
+                    ["count"] = list.Count.ToString(CultureInfo.InvariantCulture),
+                    ["drivers"] = BuildDriverInventoryValue(list)
+                });
             _featureHealthRegistry.Update(new FeatureOperation("LoadDrivers", ip, "", OperationStatus.Confirmed, 0, null));
             _projectDriversLoaded = true;
             WarnMissingDriverNamesAfterLoad();
@@ -3331,8 +3358,23 @@ public partial class MainWindow : Window
                 "FAIL",
                 "Log level status failed",
                 "protected_driver_missing");
+            LogStructuredEvent(
+                SeverityLevel.Error,
+                "MainWindow",
+                "LogLevels:DiagnosticsSelection",
+                "Diagnostics driver selection failed.",
+                new Dictionary<string, string>
+                {
+                    ["reason"] = "no_match",
+                    ["candidateDiagnostics"] = BuildDiagnosticsDriverCandidateValue(drivers),
+                    ["drivers"] = BuildDriverInventoryValue(drivers)
+                });
             return;
         }
+
+        var selectedDiagnosticsName = drivers
+            .FirstOrDefault(driver => string.Equals(driver.DName, diagnosticsDName, StringComparison.OrdinalIgnoreCase))
+            ?.Name ?? diagnosticsDName;
 
         try
         {
@@ -3366,7 +3408,7 @@ public partial class MainWindow : Window
             {
                 using (LogLevelCommandContext.BeginBaseline())
                 {
-                    if (await ApplyLogLevelCommandWithAckAsync(primaryChannel, 0))
+                    if (await ApplyLogLevelCommandWithAckAsync(primaryChannel, 0, BaselineDiagnosticsAckTimeoutMilliseconds))
                     {
                         acknowledged++;
                     }
@@ -3377,11 +3419,47 @@ public partial class MainWindow : Window
             {
                 using (LogLevelCommandContext.BeginBaseline())
                 {
-                    if (await ApplyLogLevelCommandWithAckAsync(diagnosticsDriver, 1))
+                    if (await ApplyLogLevelCommandWithAckAsync(diagnosticsDriver, 1, BaselineDiagnosticsAckTimeoutMilliseconds))
                     {
                         acknowledged++;
                     }
                 }
+            }
+
+            if (acknowledged == 2)
+            {
+                LogStructuredEvent(
+                    SeverityLevel.Success,
+                    "MainWindow",
+                    "LogLevels:DiagnosticsSelection",
+                    "Diagnostics baseline targets confirmed.",
+                    new Dictionary<string, string>
+                    {
+                        ["systemTarget"] = DiagnosticsPrimaryProcessorName,
+                        ["systemLevel"] = "0",
+                        ["projectTarget"] = diagnosticsDName,
+                        ["projectLevel"] = "1"
+                    });
+            }
+            else
+            {
+                LogStructuredEvent(
+                    SeverityLevel.Error,
+                    "MainWindow",
+                    "LogLevels:DiagnosticsSelection",
+                    "Diagnostics baseline targets not fully confirmed.",
+                    new Dictionary<string, string>
+                    {
+                        ["acknowledged"] = acknowledged.ToString(CultureInfo.InvariantCulture),
+                        ["expected"] = "2",
+                        ["systemTarget"] = DiagnosticsPrimaryProcessorName,
+                        ["systemLevel"] = "0",
+                        ["projectTargetName"] = SanitizeContextValue(selectedDiagnosticsName),
+                        ["projectTarget"] = diagnosticsDName,
+                        ["projectLevel"] = "1",
+                        ["candidateDiagnostics"] = BuildDiagnosticsDriverCandidateValue(drivers),
+                        ["drivers"] = BuildDriverInventoryValue(drivers)
+                    });
             }
 
             ReportLogLevelBatchStatus("connect", acknowledged, 2);
@@ -3394,6 +3472,23 @@ public partial class MainWindow : Window
                 "Log level status failed",
                 "protected_set_error",
                 new Dictionary<string, string> { ["error"] = ex.Message },
+                ex);
+            LogStructuredEvent(
+                SeverityLevel.Error,
+                "MainWindow",
+                "LogLevels:DiagnosticsSelection",
+                "Diagnostics baseline application failed.",
+                new Dictionary<string, string>
+                {
+                    ["systemTarget"] = DiagnosticsPrimaryProcessorName,
+                    ["systemLevel"] = "0",
+                    ["projectTargetName"] = SanitizeContextValue(selectedDiagnosticsName),
+                    ["projectTarget"] = diagnosticsDName,
+                    ["projectLevel"] = "1",
+                    ["candidateDiagnostics"] = BuildDiagnosticsDriverCandidateValue(drivers),
+                    ["drivers"] = BuildDriverInventoryValue(drivers),
+                    ["error"] = ex.Message
+                },
                 ex);
         }
     }
@@ -3510,6 +3605,36 @@ public partial class MainWindow : Window
     private static string JoinContextValues(IReadOnlyCollection<string> values)
     {
         return values.Count == 0 ? "(none)" : string.Join(",", values);
+    }
+
+    private static string BuildDriverInventoryValue(IReadOnlyList<DiagnosticsTransport.DriverInfo> drivers)
+    {
+        if (drivers == null || drivers.Count == 0)
+        {
+            return "(none)";
+        }
+
+        return string.Join("|", drivers
+            .OrderBy(driver => driver.Id)
+            .Select(driver => $"{driver.Id}:{SanitizeContextValue(string.IsNullOrWhiteSpace(driver.Name) ? driver.DName : driver.Name)}:{driver.DName}"));
+    }
+
+    private static string BuildDiagnosticsDriverCandidateValue(IReadOnlyList<DiagnosticsTransport.DriverInfo> drivers)
+    {
+        if (drivers == null || drivers.Count == 0)
+        {
+            return "(none)";
+        }
+
+        var candidates = drivers
+            .Where(driver => driver != null
+                && !string.IsNullOrWhiteSpace(driver.Name)
+                && driver.Name.StartsWith("Diagnostics:", StringComparison.OrdinalIgnoreCase))
+            .OrderBy(driver => driver.Id)
+            .Select(driver => $"{driver.Id}:{SanitizeContextValue(driver.Name)}:{driver.DName}")
+            .ToList();
+
+        return candidates.Count == 0 ? "(none)" : string.Join("|", candidates);
     }
 
     private static string SanitizeContextValue(string value)
@@ -4291,13 +4416,9 @@ public partial class MainWindow : Window
             "LogLevelPreset",
             "Log level preset requested.",
             new Dictionary<string, string> { ["mode"] = "all" });
-        foreach (var driver in Drivers)
+        var targets = GetVisibleLogLevelDriversSnapshot();
+        foreach (var driver in targets)
         {
-            if (IsHiddenLogLevelTarget(driver.DName))
-            {
-                continue;
-            }
-
             driver.SelectedLevel = 3;
             driver.IsEnabled = true;
         }
@@ -4308,20 +4429,15 @@ public partial class MainWindow : Window
         }
 
         var ackCount = 0;
-        foreach (var driver in Drivers)
+        foreach (var driver in targets)
         {
-            if (IsHiddenLogLevelTarget(driver.DName))
-            {
-                continue;
-            }
-
             if (await ApplyLogLevelCommandWithAckAsync(driver, 3))
             {
                 ackCount++;
             }
         }
 
-        ReportLogLevelBatchStatus("all", ackCount, Drivers.Count(driver => !IsHiddenLogLevelTarget(driver.DName)));
+        ReportLogLevelBatchStatus("all", ackCount, targets.Count);
     }
 
     private async void DriverSystemOnlyLogLevels_Click(object sender, RoutedEventArgs e)
@@ -4344,13 +4460,9 @@ public partial class MainWindow : Window
             "USER_GENERAL"
         };
 
-        foreach (var driver in Drivers)
+        var candidates = GetVisibleLogLevelDriversSnapshot();
+        foreach (var driver in candidates)
         {
-            if (IsHiddenLogLevelTarget(driver.DName))
-            {
-                continue;
-            }
-
             if (targets.Contains(driver.DName))
             {
                 driver.SelectedLevel = 3;
@@ -4368,13 +4480,8 @@ public partial class MainWindow : Window
         }
 
         var ackCount = 0;
-        foreach (var driver in Drivers)
+        foreach (var driver in candidates)
         {
-            if (IsHiddenLogLevelTarget(driver.DName))
-            {
-                continue;
-            }
-
             var level = targets.Contains(driver.DName) ? 3 : 0;
             if (await ApplyLogLevelCommandWithAckAsync(driver, level))
             {
@@ -4382,7 +4489,7 @@ public partial class MainWindow : Window
             }
         }
 
-        ReportLogLevelBatchStatus("system", ackCount, Drivers.Count(driver => !IsHiddenLogLevelTarget(driver.DName)));
+        ReportLogLevelBatchStatus("system", ackCount, candidates.Count);
     }
 
     private async void DriverNoneLogLevels_Click(object sender, RoutedEventArgs e)
@@ -4393,13 +4500,9 @@ public partial class MainWindow : Window
             "LogLevelPreset",
             "Log level preset requested.",
             new Dictionary<string, string> { ["mode"] = "none" });
-        foreach (var driver in Drivers)
+        var targets = GetVisibleLogLevelDriversSnapshot();
+        foreach (var driver in targets)
         {
-            if (IsHiddenLogLevelTarget(driver.DName))
-            {
-                continue;
-            }
-
             driver.IsEnabled = false;
         }
 
@@ -4409,20 +4512,20 @@ public partial class MainWindow : Window
         }
 
         var ackCount = 0;
-        foreach (var driver in Drivers)
+        foreach (var driver in targets)
         {
-            if (IsHiddenLogLevelTarget(driver.DName))
-            {
-                continue;
-            }
-
             if (await ApplyLogLevelCommandWithAckAsync(driver, 0))
             {
                 ackCount++;
             }
         }
 
-        ReportLogLevelBatchStatus("none", ackCount, Drivers.Count(driver => !IsHiddenLogLevelTarget(driver.DName)));
+        ReportLogLevelBatchStatus("none", ackCount, targets.Count);
+    }
+
+    private IReadOnlyList<DriverEntry> GetVisibleLogLevelDriversSnapshot()
+    {
+        return Drivers.Where(driver => !IsHiddenLogLevelTarget(driver.DName)).ToList();
     }
 
     private void ReportLogLevelBatchStatus(string mode, int acknowledgedCount, int totalCount)

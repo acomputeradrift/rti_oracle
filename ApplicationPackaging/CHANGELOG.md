@@ -1,5 +1,16 @@
 # Changelog
 
+## [1.1.5] - 2026-02-19
+
+### Changed
+- Mapping start separator now writes as a plain line (`----- MAPPING START ... -----`) without structured log prefix fields.
+- Apex mapping success message now prefixes source transitions (`Source <from> -> <to>`).
+
+### Fixed
+- Driver mapping transition extraction now handles nested command arguments correctly, preventing malformed mapped transition details.
+- Log level ack resolution now handles `Diagnostics: Primary Processor` and `DRIVER//N` alias pairing to avoid false baseline ack timeouts.
+- Reconnect/status logging is now UI-thread safe, preventing cross-thread dispatcher exceptions during reconnect attempts.
+
 ## [1.1.4] - 2026-02-16
 
 ### Added

@@ -299,6 +299,65 @@ public sealed class MainWindowProcessedOutputTests
     }
 
     [Fact]
+    public void VisibleLogLevelDriversSnapshotIsStableAfterCollectionMutation()
+    {
+        RunOnSta(() =>
+        {
+            var window = new MainWindow();
+            window.Drivers.Add(new MainWindow.DriverEntry(1, "A", "DRIVER//1"));
+            window.Drivers.Add(new MainWindow.DriverEntry(2, "B", "DRIVER//2"));
+
+            var snapshot = InvokeVisibleLogLevelDriversSnapshot(window);
+            window.Drivers.Add(new MainWindow.DriverEntry(3, "C", "DRIVER//3"));
+
+            Assert.Equal(2, snapshot.Count);
+        });
+    }
+
+    [Fact]
+    public void DriverInventoryValueIncludesIdNameAndDName()
+    {
+        var value = InvokeBuildDriverInventoryValue(new List<DriverInfo>
+        {
+            new(47, "Diagnostics: Primary Processor", "DRIVER//47"),
+            new(12, "Jandy iAquaLink", "DRIVER//12")
+        });
+
+        Assert.Contains("47:Diagnostics: Primary Processor:DRIVER//47", value, StringComparison.Ordinal);
+        Assert.Contains("12:Jandy iAquaLink:DRIVER//12", value, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void DiagnosticsDriverCandidateValueIncludesDiagnosticsOnly()
+    {
+        var value = InvokeBuildDiagnosticsDriverCandidateValue(new List<DriverInfo>
+        {
+            new(47, "Diagnostics: Primary Processor", "DRIVER//47"),
+            new(12, "Jandy iAquaLink", "DRIVER//12"),
+            new(49, "Diagnostics: Secondary Processor", "DRIVER//49")
+        });
+
+        Assert.Contains("47:Diagnostics: Primary Processor:DRIVER//47", value, StringComparison.Ordinal);
+        Assert.Contains("49:Diagnostics: Secondary Processor:DRIVER//49", value, StringComparison.Ordinal);
+        Assert.DoesNotContain("12:Jandy iAquaLink:DRIVER//12", value, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void WaitForLogLevelAckHonorsProvidedTimeout()
+    {
+        RunOnSta(() =>
+        {
+            var window = new MainWindow();
+            var started = DateTime.UtcNow;
+            var acknowledged = Task.Run(() => InvokeWaitForLogLevelAck(window, "DRIVER//99", 1, 0, 50)).GetAwaiter().GetResult();
+            var elapsed = DateTime.UtcNow - started;
+
+            Assert.False(acknowledged);
+            Assert.InRange(elapsed.TotalMilliseconds, 25, 800);
+        });
+    }
+
+    [Fact]
     public void ProcessedLogKeepsWidthWhenResizingPane()
     {
         RunOnSta(() =>
@@ -653,11 +712,39 @@ public sealed class MainWindowProcessedOutputTests
         method!.Invoke(window, new object?[] { phase, level, message, op, details, exception });
     }
 
+    private static IReadOnlyList<MainWindow.DriverEntry> InvokeVisibleLogLevelDriversSnapshot(MainWindow window)
+    {
+        var method = typeof(MainWindow).GetMethod("GetVisibleLogLevelDriversSnapshot", BindingFlags.Instance | BindingFlags.NonPublic);
+        Assert.NotNull(method);
+        return (IReadOnlyList<MainWindow.DriverEntry>)method!.Invoke(window, Array.Empty<object>())!;
+    }
+
+    private static string InvokeBuildDriverInventoryValue(IReadOnlyList<DriverInfo> drivers)
+    {
+        var method = typeof(MainWindow).GetMethod("BuildDriverInventoryValue", BindingFlags.Static | BindingFlags.NonPublic);
+        Assert.NotNull(method);
+        return (string)method!.Invoke(null, new object[] { drivers })!;
+    }
+
+    private static string InvokeBuildDiagnosticsDriverCandidateValue(IReadOnlyList<DriverInfo> drivers)
+    {
+        var method = typeof(MainWindow).GetMethod("BuildDiagnosticsDriverCandidateValue", BindingFlags.Static | BindingFlags.NonPublic);
+        Assert.NotNull(method);
+        return (string)method!.Invoke(null, new object[] { drivers })!;
+    }
+
     private static string BuildLogLevelAckKey(string dName)
     {
         var method = typeof(MainWindow).GetMethod("BuildLogLevelAckKey", BindingFlags.Static | BindingFlags.NonPublic);
         Assert.NotNull(method);
         return (string)method!.Invoke(null, new object[] { dName })!;
+    }
+
+    private static Task<bool> InvokeWaitForLogLevelAck(MainWindow window, string dName, int level, int retryCount, int timeoutMs)
+    {
+        var method = typeof(MainWindow).GetMethod("WaitForLogLevelAckAsync", BindingFlags.Instance | BindingFlags.NonPublic);
+        Assert.NotNull(method);
+        return (Task<bool>)method!.Invoke(window, new object[] { dName, level, retryCount, timeoutMs })!;
     }
 
     private static ConnectionPanel GetConnectionPanel(MainWindow window)

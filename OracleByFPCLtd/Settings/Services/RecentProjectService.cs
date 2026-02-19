@@ -22,22 +22,8 @@ public sealed class RecentProjectService
             return;
         }
 
+        UpsertRecentProject(settings, filePath);
         var fileName = Path.GetFileName(filePath);
-        var existing = settings.RecentProjects.FirstOrDefault(entry =>
-            string.Equals(entry.FileName, fileName, StringComparison.OrdinalIgnoreCase));
-        var lastIp = existing?.LastSuccessfulIp;
-        var lastConnected = existing?.LastConnectedAt;
-
-        settings.RecentProjects.RemoveAll(entry =>
-            string.Equals(entry.FileName, fileName, StringComparison.OrdinalIgnoreCase));
-        settings.RecentProjects.Insert(0, new RecentProjectEntry
-        {
-            FilePath = filePath,
-            LastSuccessfulIp = lastIp,
-            LastConnectedAt = lastConnected
-        });
-
-        Trim(settings.RecentProjects);
         LogStructuredEvent(
             SeverityLevel.Info,
             "RecordProjectSelection",
@@ -56,7 +42,7 @@ public sealed class RecentProjectService
             return;
         }
 
-        RecordProjectSelection(settings, filePath);
+        UpsertRecentProject(settings, filePath);
         settings.RecentProjects[0].LastSuccessfulIp = ip;
         settings.RecentProjects[0].LastConnectedAt = DateTime.Now;
         LogStructuredEvent(
@@ -68,6 +54,26 @@ public sealed class RecentProjectService
                 ["path"] = filePath,
                 ["ip"] = ip
             });
+    }
+
+    private static void UpsertRecentProject(OracleSettings settings, string filePath)
+    {
+        var fileName = Path.GetFileName(filePath);
+        var existing = settings.RecentProjects.FirstOrDefault(entry =>
+            string.Equals(entry.FileName, fileName, StringComparison.OrdinalIgnoreCase));
+        var lastIp = existing?.LastSuccessfulIp;
+        var lastConnected = existing?.LastConnectedAt;
+
+        settings.RecentProjects.RemoveAll(entry =>
+            string.Equals(entry.FileName, fileName, StringComparison.OrdinalIgnoreCase));
+        settings.RecentProjects.Insert(0, new RecentProjectEntry
+        {
+            FilePath = filePath,
+            LastSuccessfulIp = lastIp,
+            LastConnectedAt = lastConnected
+        });
+
+        Trim(settings.RecentProjects);
     }
 
     private static void Trim(List<RecentProjectEntry> items)

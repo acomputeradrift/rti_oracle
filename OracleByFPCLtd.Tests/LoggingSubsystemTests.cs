@@ -106,4 +106,31 @@ public sealed class LoggingSubsystemTests
             File.Delete(htmlPath);
         }
     }
+
+    [Fact]
+    public void LogEventDoesNotThrowWhenHtmlLogIsLocked()
+    {
+        var htmlPath = Path.Combine(Path.GetTempPath(), $"{Guid.NewGuid():N}.html");
+        var logger = new CentralLogger(new CentralLoggerOptions
+        {
+            HtmlLogPath = htmlPath,
+            TimestampProvider = () => new DateTime(2026, 2, 19, 11, 28, 0, DateTimeKind.Local)
+        });
+
+        using var lockStream = new FileStream(htmlPath, FileMode.Open, FileAccess.ReadWrite, FileShare.None);
+        var ex = Record.Exception(() => logger.LogEvent(new LogEntry(
+            SeverityLevel.Info,
+            "abc123",
+            "MainWindow",
+            "Connection",
+            "Connected to Websocket")));
+
+        Assert.Null(ex);
+
+        lockStream.Dispose();
+        if (File.Exists(htmlPath))
+        {
+            File.Delete(htmlPath);
+        }
+    }
 }
