@@ -119,6 +119,26 @@ public sealed class CentralLogger
         _statusSink(normalizedLevel, trimmed);
     }
 
+    public void LogPlainLine(string line)
+    {
+        if (string.IsNullOrWhiteSpace(_htmlLogPath) || string.IsNullOrWhiteSpace(line))
+        {
+            return;
+        }
+
+        EnsureHtmlLogFileExists(_htmlLogPath);
+        var html = File.ReadAllText(_htmlLogPath);
+        var marker = "</pre>";
+        var index = html.IndexOf(marker, StringComparison.OrdinalIgnoreCase);
+        if (index < 0)
+        {
+            return;
+        }
+
+        html = html.Insert(index, EscapeHtml(line) + Environment.NewLine);
+        File.WriteAllText(_htmlLogPath, html);
+    }
+
     private void WriteHtmlLine(Dictionary<string, object?> payload)
     {
         if (string.IsNullOrWhiteSpace(_htmlLogPath))

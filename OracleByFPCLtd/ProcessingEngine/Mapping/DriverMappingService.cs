@@ -51,6 +51,10 @@ public sealed class DriverMappingService
                 continue;
             }
 
+            // Capture mapping transition from the profile-mapped command before
+            // readability formatting changes the command shape.
+            var hasTransition = TryExtractMappingTransition(rawText, mappedText, out var transition);
+
             if (DriverMessageTemplateFormatter.TryFormatDriverCommand(mappedText, profile.DeviceName, out var formattedCommand))
             {
                 mappedText = formattedCommand;
@@ -65,8 +69,21 @@ public sealed class DriverMappingService
                 mappedText += " [UNRESOLVED]";
             }
 
-            var hasTransition = TryExtractMappingTransition(rawText, mappedText, out var transition);
-            if (hasTransition)
+            var resolvedSubstitution = hasTransition && !unresolved;
+            LogStructuredEvent(
+                unresolved ? SeverityLevel.Warn : SeverityLevel.Info,
+                "Processing:Mapping",
+                "Driver profile mapper accepted line",
+                new Dictionary<string, string>
+                {
+                    ["driver"] = profile.DeviceName,
+                    ["line"] = evt.RawLineNumber.ToString(),
+                    ["mapperAccepted"] = "true",
+                    ["resolvedSubstitution"] = resolvedSubstitution ? "true" : "false",
+                    ["unresolved"] = unresolved ? "true" : "false"
+                });
+
+            if (resolvedSubstitution)
             {
                 var transitionParts = transition.Split(" -> ", 2, StringSplitOptions.None);
                 var mappedFrom = transitionParts.Length > 0 ? transitionParts[0] : "";
@@ -74,7 +91,7 @@ public sealed class DriverMappingService
                 LogStructuredEvent(
                     SeverityLevel.Success,
                     "Processing:Mapping",
-                    $"Processed log line mapped to Apex file ({transition})",
+                    BuildApexMappingMessage(transition),
                     new Dictionary<string, string>
                     {
                         ["driver"] = profile.DeviceName,
@@ -144,6 +161,11 @@ public sealed class DriverMappingService
         return Path.Combine(folder, "oracle-structured.log");
     }
 
+    private static string BuildApexMappingMessage(string transition)
+    {
+        return $"Processed log line mapped to Apex file (Source {transition})";
+    }
+
     private static bool IsDriverLine(string text)
     {
         return text.Contains("Driver - Command:", StringComparison.OrdinalIgnoreCase)
@@ -203,7 +225,10 @@ public sealed class DriverMappingService
                 continue;
             }
 
-            transition = $"{rawArg} -> {mappedArg}";
+            if (!TryExtractLeafTransition(rawArg, mappedArg, out transition))
+            {
+                transition = $"{rawArg} -> {mappedArg}";
+            }
             return true;
         }
 
@@ -227,15 +252,15 @@ public sealed class DriverMappingService
         var command = commandMatch.Groups["command"].Value;
         var tailIndex = command.LastIndexOf('\\');
         var tail = tailIndex >= 0 ? command[(tailIndex + 1)..] : command;
-        var open = tail.LastIndexOf('(');
         var close = tail.LastIndexOf(')');
+        var open = FindOpenParenIndexForTrailingArgs(tail, close);
         if (open <= 0 || close <= open)
         {
             return false;
         }
 
         var argsText = tail.Substring(open + 1, close - open - 1);
-        foreach (var arg in argsText.Split(',', StringSplitOptions.TrimEntries))
+        foreach (var arg in SplitArgs(argsText))
         {
             if (!string.IsNullOrWhiteSpace(arg))
             {
@@ -243,6 +268,140 @@ public sealed class DriverMappingService
             }
         }
 
+        return args.Count > 0;
+    }
+
+    private static int FindOpenParenIndexForTrailingArgs(string value, int closeIndex)
+    {
+        if (string.IsNullOrWhiteSpace(value) || closeIndex <= 0 || closeIndex >= value.Length)
+        {
+            return -1;
+        }
+
+        var depth = 0;
+        for (var i = closeIndex; i >= 0; i--)
+        {
+            var ch = value[i];
+            if (ch == ')')
+            {
+                depth++;
+                continue;
+            }
+
+            if (ch == '(')
+            {
+                depth--;
+                if (depth == 0)
+                {
+                    return i;
+                }
+            }
+        }
+
+        return -1;
+    }
+
+    private static IEnumerable<string> SplitArgs(string argsText)
+    {
+        if (string.IsNullOrWhiteSpace(argsText))
+        {
+            yield break;
+        }
+
+        var depth = 0;
+        var start = 0;
+        for (var i = 0; i < argsText.Length; i++)
+        {
+            var ch = argsText[i];
+            if (ch == '(')
+            {
+                depth++;
+                continue;
+            }
+
+            if (ch == ')')
+            {
+                if (depth > 0)
+                {
+                    depth--;
+                }
+                continue;
+            }
+
+            if (ch == ',' && depth == 0)
+            {
+                yield return argsText.Substring(start, i - start).Trim();
+                start = i + 1;
+            }
+        }
+
+        yield return argsText[start..].Trim();
+    }
+
+    private static bool TryExtractLeafTransition(string rawValue, string mappedValue, out string transition)
+    {
+        transition = "";
+        if (string.Equals(rawValue, mappedValue, StringComparison.Ordinal))
+        {
+            return false;
+        }
+
+        if (!TryParseCall(rawValue, out var rawName, out var rawArgs)
+            || !TryParseCall(mappedValue, out var mappedName, out var mappedArgs)
+            || !string.Equals(rawName, mappedName, StringComparison.OrdinalIgnoreCase))
+        {
+            transition = $"{rawValue} -> {mappedValue}";
+            return true;
+        }
+
+        var count = Math.Min(rawArgs.Count, mappedArgs.Count);
+        for (var i = 0; i < count; i++)
+        {
+            var rawArg = rawArgs[i];
+            var mappedArg = mappedArgs[i];
+            if (string.Equals(rawArg, mappedArg, StringComparison.Ordinal))
+            {
+                continue;
+            }
+
+            if (TryExtractLeafTransition(rawArg, mappedArg, out transition))
+            {
+                return true;
+            }
+
+            transition = $"{rawArg} -> {mappedArg}";
+            return true;
+        }
+
+        transition = $"{rawValue} -> {mappedValue}";
+        return true;
+    }
+
+    private static bool TryParseCall(string value, out string name, out List<string> args)
+    {
+        name = "";
+        args = new List<string>();
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return false;
+        }
+
+        var trimmed = value.Trim();
+        var close = trimmed.LastIndexOf(')');
+        var open = FindOpenParenIndexForTrailingArgs(trimmed, close);
+        if (open <= 0 || close <= open || close != trimmed.Length - 1)
+        {
+            return false;
+        }
+
+        name = trimmed[..open].Trim();
+        if (string.IsNullOrWhiteSpace(name))
+        {
+            return false;
+        }
+
+        var argsText = trimmed.Substring(open + 1, close - open - 1);
+        args = SplitArgs(argsText).ToList();
         return args.Count > 0;
     }
 }

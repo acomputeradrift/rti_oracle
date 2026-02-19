@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.Reflection;
 using OracleByFPCLtd.DriverProfiles;
 using OracleByFPCLtd.ProjectData;
 using OracleByFPCLtd.ProcessingEngine.Mapping;
@@ -181,6 +182,39 @@ public sealed class ProcessingEngineMappingTests
 
         Assert.Equal("10 [2026-02-10 20:03:30.112] Driver Command (Clipsal C-Bus): 'Landscape Lighting On ramped over 4 seconds.'", line.Text);
         Assert.False(line.IsUnresolved);
+    }
+
+    [Fact]
+    public void DriverMappingServiceTransitionExtractionDoesNotAppendTrailingParenForNestedSystemManagerCommand()
+    {
+        const string rawText = "[2026-02-12 19:21:00.001] Driver - Command:'System Manager\\[Hide]\\Route Command(2, Set Selected Room(Room One))' Sustain:NO";
+        const string mappedText = "[2026-02-12 19:21:00.001] Driver - Command:'System Manager\\[Hide]\\Route Command(2, Set Selected Room(Room 1))' Sustain:NO";
+
+        var method = typeof(DriverMappingService).GetMethod(
+            "TryExtractMappingTransition",
+            BindingFlags.NonPublic | BindingFlags.Static);
+
+        Assert.NotNull(method);
+
+        var args = new object[] { rawText, mappedText, "" };
+        var extracted = (bool)method!.Invoke(null, args)!;
+
+        Assert.True(extracted);
+        Assert.Equal("Room One -> Room 1", args[2]);
+    }
+
+    [Fact]
+    public void DriverMappingServiceApexMappingMessagePrefixesSource()
+    {
+        var method = typeof(DriverMappingService).GetMethod(
+            "BuildApexMappingMessage",
+            BindingFlags.NonPublic | BindingFlags.Static);
+
+        Assert.NotNull(method);
+
+        var message = method!.Invoke(null, new object[] { "1 -> Video Source (Global)" }) as string;
+
+        Assert.Equal("Processed log line mapped to Apex file (Source 1 -> Video Source (Global))", message);
     }
 
     [Fact]

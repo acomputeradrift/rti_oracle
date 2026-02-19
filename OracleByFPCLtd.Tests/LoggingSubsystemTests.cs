@@ -82,4 +82,28 @@ public sealed class LoggingSubsystemTests
         Assert.NotNull(capturedMessage);
         Assert.DoesNotContain("c9f3a1", capturedMessage!, StringComparison.Ordinal);
     }
+
+    [Fact]
+    public void LogPlainLineWritesExactTextWithoutStructuredPrefix()
+    {
+        var htmlPath = Path.Combine(Path.GetTempPath(), $"{Guid.NewGuid():N}.html");
+        var logger = new CentralLogger(new CentralLoggerOptions
+        {
+            HtmlLogPath = htmlPath,
+            TimestampProvider = () => new DateTime(2026, 2, 19, 10, 44, 23, DateTimeKind.Local)
+        });
+
+        const string line = "----- MAPPING START 2026-02-19T10:44:23.8844280-06:00 -----";
+        logger.LogPlainLine(line);
+
+        var html = File.ReadAllText(htmlPath);
+        Assert.Contains(line, html, StringComparison.Ordinal);
+        Assert.DoesNotContain($"{line} MainWindow/Connection", html, StringComparison.Ordinal);
+        Assert.DoesNotContain("[INFO]", html, StringComparison.Ordinal);
+
+        if (File.Exists(htmlPath))
+        {
+            File.Delete(htmlPath);
+        }
+    }
 }

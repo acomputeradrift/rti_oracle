@@ -1797,12 +1797,8 @@ public partial class MainWindow : Window
                 "Ready",
                 "ready",
                 new Dictionary<string, string> { ["ip"] = ip });
-            LogStructuredEvent(
-                SeverityLevel.Info,
-                "MainWindow",
-                "Connection",
-                "----- Initial setup complete; mapping starts -----",
-                new Dictionary<string, string> { ["op"] = "ready_separator" });
+            var mappingStartStamp = DateTimeOffset.Now.ToString("O", CultureInfo.InvariantCulture);
+            LogMappingStartSeparator(mappingStartStamp);
             DisconnectButton.IsEnabled = true;
             ConnectButton.Content = "Connect";
             _lastConnectedIp = ip;
@@ -1947,16 +1943,8 @@ public partial class MainWindow : Window
                                 ["ip"] = ip,
                                 ["attempt"] = _reconnectAttempt.ToString(CultureInfo.InvariantCulture)
                             });
-                        LogStructuredEvent(
-                            SeverityLevel.Info,
-                            "MainWindow",
-                            "Connection",
-                            "----- Initial setup complete; mapping starts -----",
-                            new Dictionary<string, string>
-                            {
-                                ["op"] = "ready_separator",
-                                ["attempt"] = _reconnectAttempt.ToString(CultureInfo.InvariantCulture)
-                            });
+                        var mappingStartStamp = DateTimeOffset.Now.ToString("O", CultureInfo.InvariantCulture);
+                        LogMappingStartSeparator(mappingStartStamp);
                         DisconnectButton.IsEnabled = true;
                         DiscoverButton.IsEnabled = true;
                         ConnectButton.IsEnabled = false;
@@ -2013,6 +2001,11 @@ public partial class MainWindow : Window
             "Oracle by FP&C",
             "Logs");
         return Path.Combine(folder, "oracle-structured.log");
+    }
+
+    private void LogMappingStartSeparator(string mappingStartStamp)
+    {
+        _centralLogger.LogPlainLine($"----- MAPPING START {mappingStartStamp} -----");
     }
 
     private void LogStructuredEvent(
