@@ -1,8 +1,8 @@
 {
   "version": 2,
-  "dgSpecHash": "TWWVq3Tiqik=",
+  "dgSpecHash": "dsaTWgL6Sjk=",
   "success": true,
-  "projectFilePath": "\\\\Mac\\Home\\Desktop\\Development\\Oracle\\OracleByFPCLtd\\OracleByFPCLtd.csproj",
+  "projectFilePath": "Y:\\Desktop\\Development\\Oracle\\OracleByFPCLtd\\OracleByFPCLtd.csproj",
   "expectedPackageFiles": [
     "C:\\Users\\jamiefeeny\\.nuget\\packages\\microsoft.data.sqlite\\8.0.5\\microsoft.data.sqlite.8.0.5.nupkg.sha512",
     "C:\\Users\\jamiefeeny\\.nuget\\packages\\microsoft.data.sqlite.core\\8.0.5\\microsoft.data.sqlite.core.8.0.5.nupkg.sha512",

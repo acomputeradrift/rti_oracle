@@ -65,27 +65,38 @@ public sealed class DriverMappingService
                 mappedText += " [UNRESOLVED]";
             }
 
-            LogStructuredEvent(
-                SeverityLevel.Success,
-                "Processing:Mapping",
-                BuildApexMappingMessage(rawText, mappedText),
-                new Dictionary<string, string>
-                {
-                    ["driver"] = profile.DeviceName,
-                    ["line"] = evt.RawLineNumber.ToString()
-                });
-
-            if (HasAdditionalInfoData(bundle, profile.DeviceName))
+            var hasTransition = TryExtractMappingTransition(rawText, mappedText, out var transition);
+            if (hasTransition)
             {
+                var transitionParts = transition.Split(" -> ", 2, StringSplitOptions.None);
+                var mappedFrom = transitionParts.Length > 0 ? transitionParts[0] : "";
+                var mappedTo = transitionParts.Length > 1 ? transitionParts[1] : "";
                 LogStructuredEvent(
                     SeverityLevel.Success,
                     "Processing:Mapping",
-                    "Processed log line mapped to Additional Info file (<Driver>:<id> -> <name>)",
+                    $"Processed log line mapped to Apex file ({transition})",
                     new Dictionary<string, string>
                     {
                         ["driver"] = profile.DeviceName,
-                        ["line"] = evt.RawLineNumber.ToString()
+                        ["line"] = evt.RawLineNumber.ToString(),
+                        ["mappedFrom"] = mappedFrom,
+                        ["mappedTo"] = mappedTo
                     });
+
+                if (HasAdditionalInfoData(bundle, profile.DeviceName))
+                {
+                    LogStructuredEvent(
+                        SeverityLevel.Success,
+                        "Processing:Mapping",
+                        "Processed log line mapped to Additional Info file (<Driver>:<id> -> <name>)",
+                        new Dictionary<string, string>
+                        {
+                            ["driver"] = profile.DeviceName,
+                            ["line"] = evt.RawLineNumber.ToString(),
+                            ["mappedFrom"] = mappedFrom,
+                            ["mappedTo"] = mappedTo
+                        });
+                }
             }
 
             return new ProcessedLine($"{evt.RawLineNumber} {mappedText}", unresolved);
@@ -172,16 +183,6 @@ public sealed class DriverMappingService
             || additional.CbusGroups.Count > 0
             || additional.CbusHvacZones.Count > 0
             || additional.CbusScenes.Count > 0;
-    }
-
-    private static string BuildApexMappingMessage(string rawText, string mappedText)
-    {
-        if (TryExtractMappingTransition(rawText, mappedText, out var transition))
-        {
-            return $"Processed log line mapped to Apex file ({transition})";
-        }
-
-        return "Processed log line mapped to Apex file";
     }
 
     private static bool TryExtractMappingTransition(string rawText, string mappedText, out string transition)

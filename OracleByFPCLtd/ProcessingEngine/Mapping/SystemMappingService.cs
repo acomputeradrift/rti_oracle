@@ -92,7 +92,9 @@ public sealed class SystemMappingService
             new Dictionary<string, string>
             {
                 ["line"] = evt.RawLineNumber.ToString(),
-                ["device"] = deviceName
+                ["device"] = deviceName,
+                ["mappedFrom"] = $"Page {pageNumber}",
+                ["mappedTo"] = pageName
             });
         return new ProcessedLine($"{evt.RawLineNumber} {resolved}", false);
     }
