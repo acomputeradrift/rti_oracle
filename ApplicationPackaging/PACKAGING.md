@@ -90,6 +90,13 @@ Copy-Item "$repo\ApplicationPackaging\CHANGELOG.md" "$release\CHANGELOG.md" -For
 - Final artifact name must be `OracleByFPC_v<version>.exe`.
 - Startup is usually fastest when launching the EXE from a local disk on the client PC (not from a network share path).
 
+## Changelog Style (Required)
+- Changelog content must be user-facing and feature-focused.
+- Write entries only as user-visible outcomes under `### Added`, `### Changed`, and `### Fixed`.
+- Do not include internal code references, class names, method names, file paths, operation IDs, or implementation notes.
+- Prefer plain language that explains what improved for operators/installers.
+- If an item is internal-only and has no user impact, leave it out of the changelog.
+
 ## Troubleshooting
 - In PowerShell, line continuation is backtick `` ` `` (not `\`).
 - Use Windows paths (`Y:\...`) in PowerShell commands.

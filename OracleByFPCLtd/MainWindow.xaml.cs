@@ -3404,35 +3404,133 @@ public partial class MainWindow : Window
             });
 
             var acknowledged = 0;
-            if (primaryChannel != null)
-            {
-                using (LogLevelCommandContext.BeginBaseline())
-                {
-                    if (await ApplyLogLevelCommandWithAckAsync(primaryChannel, 0, BaselineDiagnosticsAckTimeoutMilliseconds))
-                    {
-                        acknowledged++;
-                    }
-                }
-            }
-
+            var projectConfirmed = false;
             if (diagnosticsDriver != null)
             {
                 using (LogLevelCommandContext.BeginBaseline())
                 {
-                    if (await ApplyLogLevelCommandWithAckAsync(diagnosticsDriver, 1, BaselineDiagnosticsAckTimeoutMilliseconds))
+                    var primeResult = await _transport.SendLogLevelCommandAsync(
+                        diagnosticsDriver.DName,
+                        "1");
+                    if (primeResult.Dispatched)
                     {
-                        acknowledged++;
+                        EmitPhaseStatus(
+                            "LogLevels:Status",
+                            "INFO",
+                            "Hard Diagnostics project prime dispatched",
+                            "hard_diag_project_prime_dispatched",
+                            new Dictionary<string, string>
+                            {
+                                ["projectTarget"] = diagnosticsDriver.DName,
+                                ["projectLevel"] = "1"
+                            });
+                    }
+                    else
+                    {
+                        EmitPhaseStatus(
+                            "LogLevels:Status",
+                            "FAIL",
+                            "Log level status failed",
+                            "hard_diag_project_prime_dispatch_fail",
+                            new Dictionary<string, string>
+                            {
+                                ["projectTarget"] = diagnosticsDriver.DName,
+                                ["projectLevel"] = "1"
+                            });
+                    }
+                }
+
+                using (LogLevelCommandContext.BeginBaseline())
+                {
+                    projectConfirmed = await ApplyLogLevelCommandWithAckAsync(diagnosticsDriver, 1, BaselineDiagnosticsAckTimeoutMilliseconds);
+                }
+
+                if (projectConfirmed)
+                {
+                    acknowledged++;
+                    EmitPhaseStatus(
+                        "LogLevels:Status",
+                        "SUCCESS",
+                        "Hard Diagnostics project confirm acknowledged",
+                        "hard_diag_project_confirm_ack_ok",
+                        new Dictionary<string, string>
+                        {
+                            ["projectTarget"] = diagnosticsDriver.DName,
+                            ["projectLevel"] = "1"
+                        });
+                }
+                else
+                {
+                    EmitPhaseStatus(
+                        "LogLevels:Status",
+                        "FAIL",
+                        "Log level status failed",
+                        "hard_diag_project_confirm_ack_fail",
+                        new Dictionary<string, string>
+                        {
+                            ["projectTarget"] = diagnosticsDriver.DName,
+                            ["projectLevel"] = "1"
+                        });
+                }
+            }
+
+            if (primaryChannel != null)
+            {
+                if (!projectConfirmed)
+                {
+                    EmitPhaseStatus(
+                        "LogLevels:Status",
+                        "WARN",
+                        "Hard Diagnostics system set skipped until project confirm",
+                        "hard_diag_system_set_skipped");
+                }
+                else
+                {
+                    using (LogLevelCommandContext.BeginBaseline())
+                    {
+                        if (await ApplyLogLevelCommandWithAckAsync(primaryChannel, 0, BaselineDiagnosticsAckTimeoutMilliseconds))
+                        {
+                            acknowledged++;
+                            EmitPhaseStatus(
+                                "LogLevels:Status",
+                                "SUCCESS",
+                                "Hard Diagnostics system set acknowledged",
+                                "hard_diag_system_set_ack_ok",
+                                new Dictionary<string, string>
+                                {
+                                    ["systemTarget"] = primaryChannel.DName,
+                                    ["systemLevel"] = "0"
+                                });
+                        }
+                        else
+                        {
+                            EmitPhaseStatus(
+                                "LogLevels:Status",
+                                "FAIL",
+                                "Log level status failed",
+                                "hard_diag_system_set_ack_fail",
+                                new Dictionary<string, string>
+                                {
+                                    ["systemTarget"] = primaryChannel.DName,
+                                    ["systemLevel"] = "0"
+                                });
+                        }
                     }
                 }
             }
 
             if (acknowledged == 2)
             {
+                EmitPhaseStatus(
+                    "LogLevels:Status",
+                    "SUCCESS",
+                    "Hard Diagnostics levels confirmed",
+                    "hard_diag_sequence_complete_ok");
                 LogStructuredEvent(
                     SeverityLevel.Success,
                     "MainWindow",
                     "LogLevels:DiagnosticsSelection",
-                    "Diagnostics baseline targets confirmed.",
+                    "Hard Diagnostics baseline targets confirmed.",
                     new Dictionary<string, string>
                     {
                         ["systemTarget"] = DiagnosticsPrimaryProcessorName,
@@ -3443,11 +3541,21 @@ public partial class MainWindow : Window
             }
             else
             {
+                EmitPhaseStatus(
+                    "LogLevels:Status",
+                    "FAIL",
+                    "Log level status failed",
+                    "hard_diag_sequence_complete_fail",
+                    new Dictionary<string, string>
+                    {
+                        ["acknowledged"] = acknowledged.ToString(CultureInfo.InvariantCulture),
+                        ["expected"] = "2"
+                    });
                 LogStructuredEvent(
                     SeverityLevel.Error,
                     "MainWindow",
                     "LogLevels:DiagnosticsSelection",
-                    "Diagnostics baseline targets not fully confirmed.",
+                    "Hard Diagnostics baseline targets not fully confirmed.",
                     new Dictionary<string, string>
                     {
                         ["acknowledged"] = acknowledged.ToString(CultureInfo.InvariantCulture),

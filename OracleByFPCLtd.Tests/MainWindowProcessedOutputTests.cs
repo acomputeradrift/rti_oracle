@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
+using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Windows;
@@ -354,6 +355,65 @@ public sealed class MainWindowProcessedOutputTests
 
             Assert.False(acknowledged);
             Assert.InRange(elapsed.TotalMilliseconds, 25, 800);
+        });
+    }
+
+    [Fact]
+    public void ForceProtectedLogLevelsSendsProjectPrimeConfirmThenSystem()
+    {
+        RunOnSta(() =>
+        {
+            var window = new MainWindow();
+            var transport = new FakeDiagnosticsTransport
+            {
+                IsConnected = true,
+                AutoAckCommands = true
+            };
+            InvokeSetTransport(window, transport, false);
+            SetForceProtectedPreconditions(window, "192.168.1.143", "DRIVER//6");
+
+            var drivers = new List<DriverInfo>
+            {
+                new(6, "Diagnostics: Primary Processor", "DRIVER//6"),
+                new(1, "Weather", "DRIVER//1")
+            };
+
+            WaitForTaskWithDoEvents(InvokeForceProtectedLogLevels(window, drivers));
+
+            var sent = transport.SentLogLevelCommands.Select(x => $"{x.Type}:{x.Level}").ToList();
+            Assert.Equal(3, sent.Count);
+            Assert.Equal("DRIVER//6:1", sent[0]);
+            Assert.Equal("DRIVER//6:1", sent[1]);
+            Assert.Equal("Diagnostics: Primary Processor:0", sent[2]);
+        });
+    }
+
+    [Fact]
+    public void ForceProtectedLogLevelsSkipsSystemWhenProjectConfirmFails()
+    {
+        RunOnSta(() =>
+        {
+            var window = new MainWindow();
+            var transport = new FakeDiagnosticsTransport
+            {
+                IsConnected = true,
+                AutoAckCommands = true,
+                ShouldDispatch = (index, _, _) => index == 1
+            };
+            InvokeSetTransport(window, transport, false);
+            SetForceProtectedPreconditions(window, "192.168.1.143", "DRIVER//6");
+
+            var drivers = new List<DriverInfo>
+            {
+                new(6, "Diagnostics: Primary Processor", "DRIVER//6"),
+                new(1, "Weather", "DRIVER//1")
+            };
+
+            WaitForTaskWithDoEvents(InvokeForceProtectedLogLevels(window, drivers));
+
+            var sent = transport.SentLogLevelCommands.Select(x => $"{x.Type}:{x.Level}").ToList();
+            Assert.DoesNotContain("Diagnostics: Primary Processor:0", sent);
+            Assert.Contains("Log level status failed", GetStatusText(window));
         });
     }
 
@@ -754,6 +814,29 @@ public sealed class MainWindowProcessedOutputTests
         return (ConnectionPanel)field!.GetValue(window)!;
     }
 
+    private static Task InvokeForceProtectedLogLevels(MainWindow window, IReadOnlyList<DriverInfo> drivers)
+    {
+        var method = typeof(MainWindow).GetMethod("ForceProtectedLogLevelsAsync", BindingFlags.Instance | BindingFlags.NonPublic);
+        Assert.NotNull(method);
+        return (Task)method!.Invoke(window, new object[] { drivers })!;
+    }
+
+    private static void SetForceProtectedPreconditions(MainWindow window, string ip, string diagnosticsDName)
+    {
+        SetPrivateField(window, "_lastConnectedIp", ip);
+        SetPrivateField(window, "_logLevelsBaselineCaptured", true);
+        SetPrivateField(window, "_diagnosticsDriverDName", diagnosticsDName);
+
+        var tcs = new TaskCompletionSource<bool>();
+        tcs.TrySetResult(true);
+        SetPrivateField(window, "_logLevelsBaselineTcs", tcs);
+
+        var phaseField = typeof(MainWindow).GetField("_connectionPhase", BindingFlags.Instance | BindingFlags.NonPublic);
+        Assert.NotNull(phaseField);
+        var phaseValue = Enum.Parse(phaseField!.FieldType, "BaselineAwait");
+        phaseField.SetValue(window, phaseValue);
+    }
+
     private static void DoEvents()
     {
         var frame = new DispatcherFrame();
@@ -763,6 +846,23 @@ public sealed class MainWindowProcessedOutputTests
             return null;
         }), null);
         Dispatcher.PushFrame(frame);
+    }
+
+    private static void WaitForTaskWithDoEvents(Task task, int timeoutMs = 5000)
+    {
+        var deadline = DateTime.UtcNow.AddMilliseconds(timeoutMs);
+        while (!task.IsCompleted && DateTime.UtcNow < deadline)
+        {
+            DoEvents();
+            Thread.Sleep(10);
+        }
+
+        if (!task.IsCompleted)
+        {
+            throw new TimeoutException("Timed out waiting for task completion.");
+        }
+
+        task.GetAwaiter().GetResult();
     }
 
     private static void RunOnSta(Action action)
@@ -813,6 +913,11 @@ public sealed class MainWindowProcessedOutputTests
         public bool IsConnected { get; set; }
         public List<string> DiscoverResults { get; set; } = new();
         public bool ConnectShouldFail { get; set; }
+        public bool AutoAckCommands { get; set; }
+        public int AckDelayMs { get; set; } = 25;
+        public Func<int, string, string, bool>? ShouldDispatch { get; set; }
+        public Func<int, string, string, bool>? ShouldAck { get; set; }
+        public List<(string Type, string Level)> SentLogLevelCommands { get; } = new();
 
         public Task<List<string>> DiscoverAsync(TimeSpan timeout) => Task.FromResult(DiscoverResults);
         public Task ConnectAsync(string ip)
@@ -825,7 +930,51 @@ public sealed class MainWindowProcessedOutputTests
         }
         public Task DisconnectAsync() => Task.CompletedTask;
         public Task<CommandDispatchResult> SendLogLevelCommandAsync(string type, string level, CancellationToken token = default)
-            => Task.FromResult(CommandDispatchResult.Success());
+        {
+            SentLogLevelCommands.Add((type, level));
+            var sendIndex = SentLogLevelCommands.Count;
+            var shouldDispatch = ShouldDispatch?.Invoke(sendIndex, type, level) ?? true;
+            if (!shouldDispatch)
+            {
+                var failure = new OperationFailure(
+                    FailureCodes.LogLevelDispatchFailed,
+                    "Dispatch blocked by fake transport.",
+                    $"type={type};level={level};index={sendIndex}",
+                    DateTime.UtcNow);
+                return Task.FromResult(CommandDispatchResult.Fail(failure));
+            }
+
+            if (AutoAckCommands)
+            {
+                var shouldAck = ShouldAck?.Invoke(sendIndex, type, level) ?? true;
+                if (shouldAck)
+                {
+                    _ = Task.Run(async () =>
+                    {
+                        await Task.Delay(AckDelayMs);
+                        var websocketPayload = JsonSerializer.Serialize(new
+                        {
+                            type = "Subscribe",
+                            resource = "LogLevel",
+                            value = new
+                            {
+                                type,
+                                level
+                            }
+                        });
+                        var text = $"Diagnostics: Primary Processor - OnHTTPServerData() data.websocket = {websocketPayload}";
+                        var raw = JsonSerializer.Serialize(new
+                        {
+                            messageType = "MessageLog",
+                            text
+                        });
+                        RawMessageReceived?.Invoke(this, raw);
+                    });
+                }
+            }
+
+            return Task.FromResult(CommandDispatchResult.Success());
+        }
         public Task SendLogLevelAsync(string type, string level) => Task.CompletedTask;
         public Task<List<DriverInfo>> LoadDriversAsync(string ip) => Task.FromResult(new List<DriverInfo>());
 
