@@ -1,143 +1,154 @@
-- The SHP diagnostics WebSocket endpoint is `ws://<SHP_IP>:1234/diagnosticswss` and accepts an HTTP 101 upgrade handshake.
+# RawDiagnosticsFeeds All Info
+
+- [SHP API All Knowledge > TESTED > WebSocket endpoint and handshake] The SHP diagnostics WebSocket endpoint is `ws://<SHP_IP>:1234/diagnosticswss`, and the server accepts an HTTP 101 upgrade handshake.
 Value: Implemented
 Evidence: Archives/WebsocketDiagnostics/loglevel_probe.ps1 :: New-WebSocketSession
-- After a successful WebSocket connection, the server sends an echo welcome message as JSON.
+- [SHP API All Knowledge > TESTED > WebSocket endpoint and handshake] After a successful diagnostics WebSocket connection, the server sends an echo welcome message to the client.
 Value: Confirmed
 Evidence: SMH_api_all_knowledge.md :: TESTED > 1) WebSocket API endpoint and handshake are confirmed
-- Observed WebSocket message types include `echo`, `LogLevels`, `MessageLog`, `Sysvar`, and `SysvarPers`.
+- [SHP API All Knowledge > TESTED > WebSocket message types] Observed diagnostics WebSocket message types include `echo`, `LogLevels`, `MessageLog`, `Sysvar`, and `SysvarPers`.
 Value: Confirmed
 Evidence: SMH_api_all_knowledge.md :: TESTED > 2) WebSocket message types seen on wire are confirmed
-- The log stream subscription payload uses `{"type":"Subscribe","resource":"MessageLog","value":"true"}`.
+- [SHP API All Knowledge > TESTED > Subscribe command shapes] Message log subscription uses a `Subscribe` payload targeting `MessageLog` with a true value.
 Value: Implemented
 Evidence: Archives/WebsocketDiagnostics/loglevel_probe.ps1 :: Send-Subscribe
-- The sysvar stream subscription payload uses `{"type":"Subscribe","resource":"Sysvar","value":"true"}`.
+- [SHP API All Knowledge > TESTED > Subscribe command shapes] Sysvar stream subscription uses a `Subscribe` payload targeting `Sysvar` with a true value.
 Value: Implemented
 Evidence: Archives/WebsocketDiagnostics/loglevel_probe.ps1 :: Send-Subscribe
-- The log level set payload uses `{"type":"Subscribe","resource":"LogLevel","value":{"type":"<DName>","level":"<0-3>"}}`.
+- [SHP API All Knowledge > TESTED > Subscribe command shapes] Log level writes use a `Subscribe` payload with resource `LogLevel` and `value.type` plus `value.level`.
 Value: Implemented
 Evidence: Archives/WebsocketDiagnostics/loglevel_probe.ps1 :: Set-DriverLogLevel
-- The sysvar per-ID toggle payload uses `{"type":"Subscribe","resource":"Sysvar","value":{"id":<ID>,"status":true|false}}`.
+- [SHP API All Knowledge > TESTED > Subscribe command shapes] Per-ID sysvar toggles use a `Subscribe` payload where `value` contains `id` and boolean `status` fields.
 Value: Confirmed
 Evidence: SMH_api_all_knowledge.md :: TESTED > 3) WebSocket subscribe command shapes are confirmed
-- The persistent sysvar request payload uses `{"type":"Subscribe","resource":"SysvarPers"}`.
+- [SHP API All Knowledge > TESTED > Subscribe command shapes] Persistent sysvar requests use a `Subscribe` payload that targets the `SysvarPers` resource.
 Value: Confirmed
 Evidence: SMH_api_all_knowledge.md :: TESTED > 3) WebSocket subscribe command shapes are confirmed
-- LogLevel acknowledgements are parsed from `Setting LogLevel on ... to ...` textual patterns.
+- [SHP API All Knowledge > TESTED > LogLevel parsing] Log-level acknowledgement parsing supports `Setting LogLevel on DRIVER (id) to level` style message lines.
 Value: Implemented
 Evidence: Archives/WebsocketDiagnostics/loglevel_probe.ps1 :: Parse-LogLevelUpdateText
-- The HTTP endpoint `http://<SHP_IP>:5000/diagnostics/data/drivers` returns driver-related diagnostics data.
+- [SHP API All Knowledge > TESTED > LogLevel parsing] Log-level acknowledgement parsing also supports plain category forms such as `Setting LogLevel on EVENTS_INPUT to 3`.
 Value: Implemented
-Evidence: Archives/WebsocketDiagnostics/loglevel_probe.ps1 :: $driversUri, Parse-DriversJson
-- The HTTP endpoint `http://<SHP_IP>:5000/diagnostics/data/system_status` returns processor status and metrics data.
+Evidence: Archives/WebsocketDiagnostics/loglevel_probe.ps1 :: Parse-LogLevelUpdateText
+- [SHP API All Knowledge > TESTED > HTTP endpoints] The endpoint `http://<SHP_IP>:5000/diagnostics/data/drivers` is confirmed to return driver diagnostics data.
 Value: Implemented
-Evidence: Archives/WebsocketDiagnostics/loglevel_probe.ps1 :: $systemStatusUri, Get-ProcessorMetadata
-- The HTTP endpoint `http://<SHP_IP>:5000/diagnostics/data/sysvars` returns sysvar data and may return gzip-compressed JSON.
+Evidence: Archives/WebsocketDiagnostics/loglevel_probe.ps1 :: Parse-DriversJson
+- [SHP API All Knowledge > TESTED > HTTP endpoints] The endpoint `http://<SHP_IP>:5000/diagnostics/data/system_status` is confirmed to return processor status and metrics data.
+Value: Implemented
+Evidence: Archives/WebsocketDiagnostics/loglevel_probe.ps1 :: Get-ProcessorMetadata
+- [SHP API All Knowledge > TESTED > HTTP endpoints] The endpoint `http://<SHP_IP>:5000/diagnostics/data/sysvars` is confirmed and may return gzip-compressed JSON.
 Value: Confirmed
 Evidence: SMH_api_all_knowledge.md :: TESTED > 5) HTTP diagnostics endpoints on port 5000 are confirmed
-- The SHP serves a diagnostics web UI shell on port 80 at `/diagnostics`.
+- [SHP API All Knowledge > TESTED > HTTP web UI] The path `/diagnostics` on port 80 serves an HTML diagnostics web UI shell.
 Value: Confirmed
 Evidence: SMH_api_all_knowledge.md :: TESTED > 6) HTTP web UI on port 80 is confirmed
-- Diagnostics HTML on port 80 references static CSS and JavaScript assets under `/diagnostics/...` paths.
+- [SHP API All Knowledge > TESTED > HTTP web UI] The diagnostics HTML references static assets under `/diagnostics` including JavaScript and CSS bundles.
 Value: Confirmed
 Evidence: SMH_api_all_knowledge.md :: TESTED > 6) HTTP web UI on port 80 is confirmed
-- Captured driver endpoint payloads include a `port_list` field that references ports including 80, 5000, and 1234.
+- [SHP API All Knowledge > TESTED > Drivers metadata] Captured driver payloads include a `port_list` field that references diagnostics service ports such as 80, 5000, and 1234.
 Value: Confirmed
 Evidence: SMH_api_all_knowledge.md :: TESTED > 7) Additional on-wire metadata from drivers endpoint is confirmed
-- Alternate HTTP log-level snapshot endpoints are hypothesized as `/diagnostics/data/loglevels`, `/diagnostics/data/log_levels`, and `/diagnostics/data/loglevel`.
+- [SHP API All Knowledge > THEORY > Alternate endpoints] Some SHP builds may expose alternative log-level snapshot endpoints like `/diagnostics/data/loglevels`, `/diagnostics/data/log_levels`, or `/diagnostics/data/loglevel`.
 Value: Implemented
 Evidence: Archives/WebsocketDiagnostics/loglevel_probe.ps1 :: Get-LogLevelsSnapshotByHttp
-- TraceViewer traffic repeatedly uses TCP port 2113 on the SHP side.
-Value: Confirmed
-Evidence: oracle_reconnect.md :: Proven (from pcap) > P1) TraceViewer uses TCP port 2113 on the SHP
-- TraceViewer reconnect attempts send a small ASCII `hello` probe from client to SHP.
-Value: Confirmed
-Evidence: oracle_reconnect.md :: Proven (from pcap) > P2) Client sends a small ASCII probe on reconnect
-- SHP responses on the TraceViewer channel decode as UTF-16LE diagnostic log text.
-Value: Confirmed
-Evidence: oracle_reconnect.md :: Proven (from pcap) > P3) SHP responds with UTF-16LE log lines
-- Multiple short TCP sessions to port 2113 occur around reboot windows and match reconnect-like behavior.
-Value: Confirmed
-Evidence: oracle_reconnect.md :: Proven (from pcap) > P4) Multiple short sessions observed around reboot
-- The likely minimal TraceViewer handshake is open TCP, send `hello`, then read log stream.
-- Reconnect probe timing near three-second intervals is observed and likely client-specific behavior.
-- A minimal third-party client procedure is connect to `SHP_IP:2113`, send `hello`, decode UTF-16LE, then retry after disconnect.
-- It remains unknown whether `hello` must be resent after the connection is already established.
-- It remains unknown whether hidden control or keepalive messages exist beyond the observed `hello` probe.
-- It remains unknown whether category suppression is controlled by protocol negotiation or by project flags.
-- Observed diagnostics transport behavior is explicitly documented as empirical and non-authoritative.
-- Observational transport notes are not intended to define contracts, guarantees, permissions, or stable schemas.
-- Third-party tools are used only for observation and are not project runtime dependencies.
-- Observed diagnostics output is delivered over TCP with an observed default port of 2113.
-- CONFLICT: Observed transport notes state communication is SHP-to-client only after connection except for log-level configuration.
-- CONFLICT: Capture evidence shows the client sends a `hello` payload to SHP on reconnect attempts over TCP/2113.
-Value: Confirmed
-Evidence: oracle_reconnect.md :: Proven (from pcap) > P2) Client sends a small ASCII probe on reconnect
-- Observed payload text is UTF-16LE and messages use explicit start and end framing markers.
-- Observed framing markers are start `0x01 0x00` and end `0x03 0x00` around decoded messages.
-- Framing markers delimit logical messages but do not guarantee TCP packet boundary alignment.
-- Partial records are expected because stream record boundaries do not reliably align with TCP segments.
-- Contradictory transport findings must be recorded rather than silently replacing older observations.
-- A capture analyzed today includes an ID11 project push, an SHP reboot, and post-reboot connection attempts.
-Value: Confirmed
-Evidence: TODAY_diagnostics_plane_summary_for_codex.md :: Part A - Proven > A1) The capture context (Project push + reboot)
-- A candidate ID11 push flow is associated with TCP port 50339 and appears to carry binary resource content.
-Value: Confirmed
-Evidence: TODAY_diagnostics_plane_summary_for_codex.md :: Part A - Proven > A3) Raw TCP observations tied to project push
-- A short SHP response of about twenty bytes after project push is observed but its semantics remain unproven.
-Value: Confirmed
-Evidence: TODAY_diagnostics_plane_summary_for_codex.md :: Part A - Proven > A3) Raw TCP observations tied to project push
-- During the reboot window, SYN clusters are observed with SHP source ports in the 50331 to 50343 range.
-Value: Confirmed
-Evidence: TODAY_diagnostics_plane_summary_for_codex.md :: Part A - Proven > A4) TCP ports during reboot window
-- Workstation traffic to several public IP addresses is observed, but service attribution is not provable from IPs alone.
-Value: Confirmed
-Evidence: TODAY_diagnostics_plane_summary_for_codex.md :: Part A - Proven > A5) External IP traffic is present (attribution not provable)
-- A working decoder exists for entire-conversation captures while single-transport capture decoding needs a separate approach.
-Value: Confirmed
-Evidence: TODAY_diagnostics_plane_summary_for_codex.md :: Part A - Proven > A6) TCP stream decoding status + failure mode (decoder correctness issue)
-- Current single-transport decoding still shows ellipsis truncation, indicating missing reconstructed payload segments.
-Value: Confirmed
-Evidence: TODAY_diagnostics_plane_summary_for_codex.md :: Part A - Proven > A6) TCP stream decoding status + failure mode (decoder correctness issue)
-- A documented root-cause hypothesis is dropped or unreconstructed split segments near printable and non-printable boundaries.
-- Methodology guidance requires treating HTTP, raw TCP, and WebSocket as separate observation layers.
-Value: Confirmed
-Evidence: TODAY_diagnostics_plane_summary_for_codex.md :: Part A - Proven > A7) Transport-layer roles (methodology-level, not implementation)
-- Proposed transport redesign requires multi-transport observation, raw capture persistence, and timestamp correlation.
-Value: Confirmed
-Evidence: TODAY_diagnostics_plane_summary_for_codex.md :: Part A - Proven > A7) Transport-layer roles (methodology-level, not implementation)
-- The ID11 push stream contains embedded debug-related strings including `DebugLevel0` and `DebugTrace` values.
-Value: Confirmed
-Evidence: TraceViewer_capture_analysis.md :: 1) Log-level flag propagation (ID11 -> TraceViewer) > 1.1 Project push stream contains explicit debug/log configuration keys
-- The ID11 push stream also contains a TraceViewer routing description that references routing log info to TraceViewer.
-Value: Confirmed
-Evidence: TraceViewer_capture_analysis.md :: 1) Log-level flag propagation (ID11 -> TraceViewer) > 1.2 Project push contains explicit TraceViewer routing description
-- No explicit on-wire message proves driver-level filter negotiation or acknowledgement between ID11 and TraceViewer.
-- TraceViewer appears to behave as a passive TCP/2113 log consumer rather than an active on-wire filter negotiator.
-- The no-debug comparison capture shows `DebugTracefalse` while the debug-enabled capture shows `DebugTracetrue`.
-Value: Confirmed
-Evidence: TraceViewer_capture_analysis.md :: Appendix > A.1 DebugTrace flips from true -> false
-- DebugLevel appears present as `DebugLevel0` in both compared captures, so driver-specific filtering remains unproven.
-Value: Confirmed
-Evidence: TraceViewer_capture_analysis.md :: Appendix > A.2 DebugLevel remains present and set to 0 in both captures
-- A proof procedure requires paired captures where only Debug Level changes and both payload diff and resulting logs are compared.
-- CONFLICT: One methodology note expects diagnostics WebSocket upgrades likely on port 80 unless evidence proves otherwise.
-- CONFLICT: Capture-backed evidence confirms diagnostics WebSocket traffic at `ws://<SHP_IP>:1234/diagnosticswss`.
-Value: Confirmed
-Evidence: SMH_api_all_knowledge.md :: TESTED > 1) WebSocket API endpoint and handshake are confirmed
-- Post-change `LogLevels` snapshots are documented as unreliable for write confirmation in recent tests.
-Value: Confirmed
-Evidence: SMH_driver_log_status_sync_implementation.md :: Known Constraint
-- The first `LogLevels` message is used as the baseline snapshot for initial UI state construction.
+- [SHP API All Knowledge > THEORY > Two-plane model] Diagnostics behavior may be split between an HTTP or WebSocket browser plane and a separate TraceViewer TCP/2113 plane.
+- [SHP API All Knowledge > THEORY > Project push effect] TraceViewer debug behavior may be influenced by pushed project fields such as `DebugTrace` and `DebugLevel`.
+- [SHP API All Knowledge > THEORY > SysvarPers semantics] `SysvarPers` likely returns only persistent sysvar identifiers rather than a guaranteed full sysvar universe.
+- [SHP API All Knowledge > THEORY > Reconnect interval scope] The observed approximately three-second reconnect interval may be client-specific rather than an SHP-wide invariant.
+
+- [Driver Log Status Sync > Confirmed strategy] The UI initialization flow should capture the first `LogLevels` message and use that snapshot as baseline state.
+Value: Implemented
+Evidence: Archives/WebsocketDiagnostics/loglevel_probe.ps1 :: Collect-ObservedLogLevelEntries
+- [Driver Log Status Sync > Confirmed strategy] After baseline initialization, the system should immediately enforce `Diagnostics: Primary Processor = 0` and `DRIVER//4 = 1`.
 Value: Confirmed
 Evidence: SMH_driver_log_status_sync_implementation.md :: Confirmed Strategy
-- Runtime sync after baseline should use `OnHTTPServerData() data.websocket = ... LogLevel ...` lines as confirmation signals.
+- [Driver Log Status Sync > Confirmed strategy] The `Diagnostics: Primary Processor` and `DRIVER//4` controls should remain hidden from normal user-facing UI.
+Value: Confirmed
+Evidence: SMH_driver_log_status_sync_implementation.md :: Confirmed Strategy
+- [Driver Log Status Sync > Runtime signal] Runtime confirmation for user log-level changes should come from matching `OnHTTPServerData() data.websocket = {...LogLevel...}` lines.
 Value: Implemented
 Evidence: Archives/WebsocketDiagnostics/loglevel_probe.ps1 :: Parse-LogLevelUpdateText, Wait-ForDriverLevelAcks
-- UI state tracking is defined with `currentLevel`, `pendingLevel`, and status values `idle`, `requested`, `confirmed`, and `unconfirmed`.
-- On reconnect, controls should enter temporary unknown state, rebuild from first `LogLevels`, then resume acknowledgement-based tracking.
-- The controls `Diagnostics: Primary Processor` and `DRIVER//4` must be forced to levels 0 and 1 and hidden from normal UI.
-- Forced protected levels should be reasserted on connect, reconnect, and optional low-frequency health checks.
-- Sync logic should parse `OnHTTPServerData() data.websocket = ...` lines and ignore unrelated runtime log noise.
+- [Driver Log Status Sync > State model] Each UI control tracks `currentLevel`, `pendingLevel`, and a status lifecycle of `idle`, `requested`, `confirmed`, or `unconfirmed`.
+- [Driver Log Status Sync > State model] On timeout without matching acknowledgement lines, the UI keeps `currentLevel` unchanged and marks the request as `unconfirmed`.
+- [Driver Log Status Sync > Protected controls] Controller logic should re-assert enforced protected levels on connect, reconnect, and optional low-frequency health checks.
+- [Driver Log Status Sync > Output filtering] Status synchronization should parse `OnHTTPServerData() data.websocket = ...` lines and ignore unrelated diagnostic noise.
 Value: Implemented
 Evidence: Archives/WebsocketDiagnostics/loglevel_probe.ps1 :: Parse-LogLevelUpdateText, Wait-ForDriverLevelAcks
-- Suggested confirmation timeout is three to five seconds with one retry before marking a change unconfirmed.
+- [Driver Log Status Sync > Reconnect behavior] On reconnect, the UI should enter a temporary reloading state, rebuild from first `LogLevels`, and then re-apply forced controls.
+- [Driver Log Status Sync > Timeouts and retries] Per-change confirmation should use a three-to-five-second timeout with at most one automatic retry.
+- [Driver Log Status Sync > Known constraint] Post-change `LogLevels` snapshots were not reliable in recent tests, so runtime sync should prefer `OnHTTPServerData` acknowledgements after baseline.
+Value: Confirmed
+Evidence: SMH_driver_log_status_sync_implementation.md :: Known Constraint
+
+- [Transport Observations > Scope and authority] Transport observations are explicitly non-authoritative and do not define contracts, guarantees, or permissions.
+- [Transport Observations > Methodology] Observations were derived from passive SHP monitoring, TCP stream inspection, and raw-to-decoded byte comparison.
+- [Transport Observations > Methodology] Third-party tools are used only for observation and are not runtime dependencies of RTI Oracle.
+- [Transport Observations > Transport characteristics] Observed diagnostics output is delivered over TCP with a default observed SHP port of 2113.
+- [Transport Observations > Transport characteristics] Observations indicate SHP-to-client streaming after connect with no command channel evidence beyond log-level configuration behavior.
+- [Transport Observations > Encoding and framing] Observed diagnostic payload text is UTF-16LE and uses explicit start and end framing markers.
+- [Transport Observations > Encoding and framing] Observed framing delimiters are `0x01 0x00` for start and `0x03 0x00` for end.
+- [Transport Observations > Stream behavior] The diagnostics feed must be parsed as a continuous byte stream because record boundaries do not align with TCP packets.
+- [Transport Observations > Stream behavior] Partial records are expected and normal during stream-safe diagnostics parsing.
+- [Transport Observations > Change rules] New findings may be appended with evidence, and contradictory findings must be recorded rather than erased.
+
+- [TraceViewer Reconnect > Proven] TraceViewer connections were observed using TCP port 2113 on the SHP across multiple conversations.
+Value: Confirmed
+Evidence: oracle_reconnect.md :: Proven (from pcap) > P1
+- [TraceViewer Reconnect > Proven] On reconnect attempts, the client sends a small ASCII `hello` probe toward the SHP.
+Value: Confirmed
+Evidence: oracle_reconnect.md :: Proven (from pcap) > P2
+- [TraceViewer Reconnect > Proven] After reconnect, SHP responses decode as UTF-16LE log lines and continue as runtime stream output.
+Value: Confirmed
+Evidence: oracle_reconnect.md :: Proven (from pcap) > P3
+- [TraceViewer Reconnect > Proven] Multiple short TCP sessions around reboot were observed and are consistent with reconnect behavior.
+Value: Confirmed
+Evidence: oracle_reconnect.md :: Proven (from pcap) > P4
+- [TraceViewer Reconnect > Theory] A minimal reconnect loop likely opens TCP, sends `hello`, reads logs, and retries after disconnect.
+- [TraceViewer Reconnect > Theory] Reconnect probe spacing is approximately three seconds in the captured sessions.
+- [TraceViewer Reconnect > Guidance] A minimal third-party client procedure is to connect to `SHP_IP:2113`, send `hello`, decode UTF-16LE, and reconnect on closure.
+- [TraceViewer Reconnect > Risks and unknowns] Unknowns include repeated-hello requirements, hidden control messages, and keepalive semantics beyond observed probes.
+
+- [TraceViewer Capture Analysis > Log-level propagation proven] ID11 push payloads contained embedded debug configuration keys including `DebugLevel0` and `DebugTracetrue`.
+Value: Confirmed
+Evidence: TraceViewer_capture_analysis.md :: 1) Log-level flag propagation > 1.1 Project push stream contains explicit debug/log configuration keys
+- [TraceViewer Capture Analysis > Log-level propagation proven] ID11 push payloads also contained text indicating routing behavior with `description="Routes LogInfo to Traceviewer"`.
+Value: Confirmed
+Evidence: TraceViewer_capture_analysis.md :: 1) Log-level flag propagation > 1.2 Project push contains explicit TraceViewer routing description
+- [TraceViewer Capture Analysis > Log-level propagation limits] The capture did not prove a direct on-wire TraceViewer protocol message that enumerates driver log levels or filter acknowledgements.
+- [TraceViewer Capture Analysis > Reconnect proven] Multiple sessions to `192.168.1.143:2113` showed repeated client `hello` probes and SHP UTF-16LE responses.
+Value: Confirmed
+Evidence: TraceViewer_capture_analysis.md :: 2) TraceViewer reconnect method > 2.1, 2.2, 2.3
+- [TraceViewer Capture Analysis > Reconnect limits] The capture did not prove whether additional startup tokens beyond `hello` are required for a complete client implementation.
+- [TraceViewer Capture Analysis > Appendix proven differences] Comparison captures showed `DebugTrace` flipping between true and false while `DebugLevel0` remained present in both pushes.
+Value: Confirmed
+Evidence: TraceViewer_capture_analysis.md :: Appendix > Proven differences in the ID11 push payload > A.1 and A.2
+
+- [TODAY Diagnostics Plane Summary > Proven context] The analyzed reboot capture context included ID11 project push activity, SHP reboot, and post-reboot reconnection attempts.
+Value: Confirmed
+Evidence: TODAY_diagnostics_plane_summary_for_codex.md :: Part A - Proven > A1
+- [TODAY Diagnostics Plane Summary > Proven observations] The SHP served HTTP traffic on port 80 and included web UI-style static asset requests.
+Value: Confirmed
+Evidence: TODAY_diagnostics_plane_summary_for_codex.md :: Part A - Proven > A2
+- [TODAY Diagnostics Plane Summary > Proven observations] A TCP flow involving port 50339 was identified as a strong candidate for ID11 project or package push traffic.
+Value: Confirmed
+Evidence: TODAY_diagnostics_plane_summary_for_codex.md :: Part A - Proven > A3
+- [TODAY Diagnostics Plane Summary > Proven observations] During the reboot window, SYN traffic clustered with SHP source ports in the 50331 through 50343 range.
+Value: Confirmed
+Evidence: TODAY_diagnostics_plane_summary_for_codex.md :: Part A - Proven > A4
+- [TODAY Diagnostics Plane Summary > Proven limitation] Attribution of public IP destinations was explicitly marked as unprovable from IP addresses alone.
+Value: Confirmed
+Evidence: TODAY_diagnostics_plane_summary_for_codex.md :: Part A - Proven > A5
+- [TODAY Diagnostics Plane Summary > Decoder status] A working decoder exists for Entire Conversation captures, while Single Transport captures require a separate decoding approach.
+Value: Confirmed
+Evidence: TODAY_diagnostics_plane_summary_for_codex.md :: Part A - Proven > A6
+- [TODAY Diagnostics Plane Summary > Decoder status] Current single-transport decoding still shows ellipsis truncation, indicating likely segment reconstruction loss across frames or lines.
+- [TODAY Diagnostics Plane Summary > Methodology] The transport design should treat HTTP, raw TCP, and WebSocket as separate observation layers until evidence proves stronger coupling.
+- [TODAY Diagnostics Plane Summary > Methodology] The redesigned transport approach should support multi-transport observation, raw replay persistence, and timestamp-based correlation.
+- [TODAY Diagnostics Plane Summary > Theory] A two-plane diagnostics model may exist with TraceViewer-style raw TCP behavior and separate browser WebSocket or HTTP diagnostics behavior.
+- [TODAY Diagnostics Plane Summary > Theory] Log-level control may use two mechanisms, with runtime browser controls separated from ID11 push-time TraceViewer configuration.
+- [TODAY Diagnostics Plane Summary > Theory] Reboot-window reconnect attempts may represent TraceViewer recovery behavior but require stronger endpoint attribution evidence.
+- [TODAY Diagnostics Plane Summary > Theory] Public IP traffic may represent RTI cloud or driver phone-home behavior and requires DNS or TLS metadata for proof.
+- [TODAY Diagnostics Plane Summary > Theory] Diagnostics payloads may be mixed binary envelopes with UTF-16LE text segments interleaved inside stream data.
+- [TODAY Diagnostics Plane Summary > Procedure] Recommended evidence capture should start before push, include full reboot, and retain at least two post-reboot minutes.
+- [TODAY Diagnostics Plane Summary > Procedure] Capture artifacts should include `.pcapng` plus raw Follow TCP Stream exports for every candidate diagnostics port.
+- [TODAY Diagnostics Plane Summary > Procedure] Controlled validation should time-stamp UI actions so packet evidence can be correlated to log-level changes.
