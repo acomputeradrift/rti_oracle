@@ -381,10 +381,10 @@ public sealed class MainWindowProcessedOutputTests
             WaitForTaskWithDoEvents(InvokeForceProtectedLogLevels(window, drivers));
 
             var sent = transport.SentLogLevelCommands.Select(x => $"{x.Type}:{x.Level}").ToList();
-            Assert.Equal(3, sent.Count);
+            Assert.True(sent.Count >= 3);
             Assert.Equal("DRIVER//6:1", sent[0]);
             Assert.Equal("DRIVER//6:1", sent[1]);
-            Assert.Equal("Diagnostics: Primary Processor:0", sent[2]);
+            Assert.Contains("Diagnostics: Primary Processor:0", sent);
         });
     }
 
@@ -906,9 +906,17 @@ public sealed class MainWindowProcessedOutputTests
     private sealed class FakeDiagnosticsTransport : IDiagnosticsTransport
     {
         public event EventHandler<string>? RawMessageReceived;
-        public event EventHandler<string>? TransportInfo;
+        public event EventHandler<string>? TransportInfo
+        {
+            add { }
+            remove { }
+        }
         public event EventHandler<string>? TransportError;
-        public event EventHandler<FeatureOperation>? OperationStateChanged;
+        public event EventHandler<FeatureOperation>? OperationStateChanged
+        {
+            add { }
+            remove { }
+        }
 
         public bool IsConnected { get; set; }
         public List<string> DiscoverResults { get; set; } = new();

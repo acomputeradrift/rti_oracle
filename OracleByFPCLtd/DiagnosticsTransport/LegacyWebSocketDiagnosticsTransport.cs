@@ -110,16 +110,7 @@ public sealed class LegacyWebSocketDiagnosticsTransport : IDiagnosticsTransport
             return CommandDispatchResult.Fail(disconnectedFailure);
         }
 
-        var payload = new
-        {
-            type = "Subscribe",
-            resource = "LogLevel",
-            value = new
-            {
-                type,
-                level
-            }
-        };
+        var payload = BuildLogLevelPayload(type, level);
 
         try
         {
@@ -136,6 +127,40 @@ public sealed class LegacyWebSocketDiagnosticsTransport : IDiagnosticsTransport
             OperationStateChanged?.Invoke(this, new FeatureOperation("LogLevel", type, level, OperationStatus.Failed, 0, failure));
             return CommandDispatchResult.Fail(failure);
         }
+    }
+
+    private static object BuildLogLevelPayload(string type, string level)
+    {
+        var driverMatch = System.Text.RegularExpressions.Regex.Match(
+            type ?? string.Empty,
+            "^DRIVER//(\\d+)$",
+            System.Text.RegularExpressions.RegexOptions.IgnoreCase | System.Text.RegularExpressions.RegexOptions.CultureInvariant);
+
+        if (driverMatch.Success)
+        {
+            return new
+            {
+                type = "Subscribe",
+                resource = "LogLevel",
+                value = new
+                {
+                    type = "DRIVER",
+                    driverId = driverMatch.Groups[1].Value,
+                    level
+                }
+            };
+        }
+
+        return new
+        {
+            type = "Subscribe",
+            resource = "LogLevel",
+            value = new
+            {
+                type,
+                level
+            }
+        };
     }
 
     public async Task SendLogLevelAsync(string type, string level)

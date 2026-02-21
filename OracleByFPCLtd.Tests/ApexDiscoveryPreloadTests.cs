@@ -10,7 +10,7 @@ namespace OracleByFPCLtd.Tests;
 public sealed class ApexDiscoveryPreloadTests
 {
     private static string ApexPath =>
-        Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "ApexDiscovery", "Verrier Home FEENY EDIT v49.apex"));
+        Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "ApexDiscovery", "Assets", "Verrier Home FEENY EDIT v49.apex"));
 
     [Fact]
     public void PageIndexMapIncludesDevicePageNames()

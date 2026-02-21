@@ -215,7 +215,11 @@ public sealed class DiagnosticsTransportFacadeTests
 
     private sealed class FakeLogLevelController : ILogLevelController
     {
-        public event EventHandler<FeatureOperation>? OperationStateChanged;
+        public event EventHandler<FeatureOperation>? OperationStateChanged
+        {
+            add { }
+            remove { }
+        }
         public int SendCalls { get; private set; }
         public string LastType { get; private set; } = "";
         public string LastLevel { get; private set; } = "";

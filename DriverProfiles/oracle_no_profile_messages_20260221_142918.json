@@ -1,0 +1,16 @@
+{
+  "CreatedUtc": "2026-02-21T20:29:18.3413498Z",
+  "AppVersion": "1.0.0.0",
+  "Drivers": [
+    {
+      "DriverName": "System Variables",
+      "Messages": [
+        "Driver - Command:'System Variables\\Integers\\Decrease(1, 1)' Sustain:NO",
+        "Driver - Command:'System Variables\\Integers\\Increase(1, 1)' Sustain:NO",
+        "Driver - Command:'System Variables\\Integers\\Test(1, equal, 0, 1)' Sustain:NO",
+        "Driver - Command:'System Variables\\Integers\\Test(1, equal, 1, 2)' Sustain:NO",
+        "Driver - Command:'System Variables\\Strings\\Set(1, Room)' Sustain:NO"
+      ]
+    }
+  ]
+}

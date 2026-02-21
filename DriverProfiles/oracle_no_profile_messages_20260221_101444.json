@@ -1,0 +1,19 @@
+{
+  "CreatedUtc": "2026-02-21T18:14:44.1122618Z",
+  "AppVersion": "1.1.6.0",
+  "Drivers": [
+    {
+      "DriverName": "DSC PowerSeries",
+      "Messages": [
+        "Driver event 'When 'Garage West DOOR Closed' happens on 'DSC PowerSeries\\Zone Closing''",
+        "Driver event 'When 'Garage West DOOR Opened' happens on 'DSC PowerSeries\\Zone Open''"
+      ]
+    },
+    {
+      "DriverName": "Venstar ColorTouch",
+      "Messages": [
+        "Driver event 'When 'Garage (Stat 2) - Operating State Change' happens on 'Venstar ColorTouch\\Garage (Stat 2) Events''"
+      ]
+    }
+  ]
+}

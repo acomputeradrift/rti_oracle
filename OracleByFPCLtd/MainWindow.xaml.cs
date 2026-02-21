@@ -53,6 +53,8 @@ public partial class MainWindow : Window
     private const int ReconnectInitialDelaySeconds = 3;
     private const int LogLevelAckTimeoutMilliseconds = 3000;
     private const int BaselineDiagnosticsAckTimeoutMilliseconds = 7000;
+    private const int BaselineStartupSettleMaxMilliseconds = 8000;
+    private const int BaselineStartupAckQuietMilliseconds = 2000;
     private const int LogLevelAckMaxRetryCount = 1;
     private const int LogLevelsBaselineTimeoutMilliseconds = 3000;
     private const double ProcessedWidthPadding = 12;
@@ -129,6 +131,8 @@ public partial class MainWindow : Window
     private bool _isReconnecting;
     private int _reconnectAttempt;
     private bool _suppressReconnect;
+    private int _startupAckCountSinceReset;
+    private DateTime _lastStartupAckUtc = DateTime.MinValue;
     private string? _lastConnectedIp;
     private bool _logLevelsBaselineCaptured;
     private TaskCompletionSource<bool>? _logLevelsBaselineTcs;
@@ -2596,6 +2600,8 @@ public partial class MainWindow : Window
             var text = textElement.GetString();
             if (LogLevelAckParser.TryParse(text, out var dName, out var level))
             {
+                _startupAckCountSinceReset++;
+                _lastStartupAckUtc = DateTime.UtcNow;
                 UpdateDriverFromLogLevel(dName, level);
             }
         }
@@ -3346,6 +3352,8 @@ public partial class MainWindow : Window
             return;
         }
 
+        await WaitForStartupAckSettleAsync();
+
         if (drivers == null || drivers.Count == 0)
         {
             return;
@@ -3708,6 +3716,58 @@ public partial class MainWindow : Window
                 ["timeoutMs"] = LogLevelsBaselineTimeoutMilliseconds.ToString(CultureInfo.InvariantCulture)
             });
         return false;
+    }
+
+    private async Task WaitForStartupAckSettleAsync()
+    {
+        if (_startupAckCountSinceReset <= 0 || _lastStartupAckUtc == DateTime.MinValue)
+        {
+            return;
+        }
+
+        EmitPhaseStatus(
+            "LogLevels:Status",
+            "INFO",
+            "Waiting for startup log-level ACK chatter to settle",
+            "startup_ack_settle_begin",
+            new Dictionary<string, string>
+            {
+                ["observedAckCount"] = _startupAckCountSinceReset.ToString(CultureInfo.InvariantCulture),
+                ["quietMs"] = BaselineStartupAckQuietMilliseconds.ToString(CultureInfo.InvariantCulture),
+                ["maxMs"] = BaselineStartupSettleMaxMilliseconds.ToString(CultureInfo.InvariantCulture)
+            });
+
+        var startedUtc = DateTime.UtcNow;
+        while ((DateTime.UtcNow - startedUtc).TotalMilliseconds < BaselineStartupSettleMaxMilliseconds)
+        {
+            if ((DateTime.UtcNow - _lastStartupAckUtc).TotalMilliseconds >= BaselineStartupAckQuietMilliseconds)
+            {
+                EmitPhaseStatus(
+                    "LogLevels:Status",
+                    "INFO",
+                    "Startup log-level ACK chatter settled",
+                    "startup_ack_settle_ok",
+                    new Dictionary<string, string>
+                    {
+                        ["observedAckCount"] = _startupAckCountSinceReset.ToString(CultureInfo.InvariantCulture)
+                    });
+                return;
+            }
+
+            await Task.Delay(100);
+        }
+
+        EmitPhaseStatus(
+            "LogLevels:Status",
+            "WARN",
+            "Startup ACK settle window elapsed; continuing baseline writes",
+            "startup_ack_settle_timeout",
+            new Dictionary<string, string>
+            {
+                ["observedAckCount"] = _startupAckCountSinceReset.ToString(CultureInfo.InvariantCulture),
+                ["quietMs"] = BaselineStartupAckQuietMilliseconds.ToString(CultureInfo.InvariantCulture),
+                ["maxMs"] = BaselineStartupSettleMaxMilliseconds.ToString(CultureInfo.InvariantCulture)
+            });
     }
 
     private static string JoinContextValues(IReadOnlyCollection<string> values)
@@ -4690,6 +4750,8 @@ public partial class MainWindow : Window
         _lastBaselineNames = null;
         _baselineStatusReported = false;
         _projectDriversLoaded = false;
+        _startupAckCountSinceReset = 0;
+        _lastStartupAckUtc = DateTime.MinValue;
         _hiddenLogLevelTargets.Clear();
         _hiddenLogLevelTargets.Add(DiagnosticsPrimaryProcessorName);
         _diagnosticsDriverDName = null;

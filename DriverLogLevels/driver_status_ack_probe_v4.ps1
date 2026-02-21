@@ -3,7 +3,7 @@ param(
     [string]$Ip,
 
     [Parameter(Mandatory = $false)]
-    [int]$AckTimeoutSeconds = 7,
+    [int]$AckTimeoutSeconds = 20,
 
     [Parameter(Mandatory = $false)]
     [int]$StartupSettleMaxSeconds = 8,
@@ -22,6 +22,7 @@ param(
 
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
+$ScriptVersion = '4.1.0'
 
 trap {
     Write-Line -Text ("[FAIL] line {0}: {1}" -f $_.InvocationInfo.ScriptLineNumber, $_.Exception.Message) -ForegroundColor Red
@@ -137,7 +138,7 @@ function Invoke-SelfTest {
         throw "SelfTest failed: embedded websocket ack values [$dName/$level]"
     }
 
-    Write-Line -Text '[PASS] SelfTest passed.' -ForegroundColor Green
+    Write-Line -Text ("[PASS] SelfTest passed. Version={0}" -f $ScriptVersion) -ForegroundColor Green
 }
 
 function Get-Json {
@@ -644,18 +645,8 @@ function Set-DriverLogLevel {
     )
 
     $driverIdMatch = [regex]::Match($DriverDName, '^DRIVER//(\d+)$', [System.Text.RegularExpressions.RegexOptions]::IgnoreCase)
-    $payloads = New-Object System.Collections.ArrayList
-    [void]$payloads.Add([pscustomobject]@{
-            type = 'Subscribe'
-            resource = 'LogLevel'
-            value = [pscustomobject]@{
-                type = $DriverDName
-                level = [string]$Level
-            }
-        })
-
     if ($driverIdMatch.Success) {
-        [void]$payloads.Add([pscustomobject]@{
+        Send-JsonMessage -Session $Session -Payload ([pscustomobject]@{
                 type = 'Subscribe'
                 resource = 'LogLevel'
                 value = [pscustomobject]@{
@@ -664,11 +655,17 @@ function Set-DriverLogLevel {
                     driverId = [string]$driverIdMatch.Groups[1].Value
                 }
             })
+        return
     }
 
-    foreach ($payload in $payloads) {
-        Send-JsonMessage -Session $Session -Payload $payload
-    }
+    Send-JsonMessage -Session $Session -Payload ([pscustomobject]@{
+            type = 'Subscribe'
+            resource = 'LogLevel'
+            value = [pscustomobject]@{
+                type = $DriverDName
+                level = [string]$Level
+            }
+        })
 }
 
 function Resolve-AckAliasTargets {

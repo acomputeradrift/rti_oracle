@@ -29,6 +29,7 @@ param(
 
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
+$ScriptVersion = '1.1.0'
 
 $CriticalSystemChannels = @(
     'EVENTS_INPUT',
@@ -145,7 +146,12 @@ function Invoke-SelfTest {
     Assert-Equal -Actual $wsParsed.DName -Expected 'DEVICES_RTIPANEL' -Message 'Websocket payload parser type'
     Assert-Equal -Actual $wsParsed.Level -Expected 3 -Message 'Websocket payload parser level'
 
-    Write-Host 'SelfTest passed.'
+    $driverWsParsed = Parse-LogLevelUpdateText -Text 'Diagnostics: Primary Processor - OnHTTPServerData() data.websocket = {"type":"Subscribe","resource":"LogLevel","value":{"type":"DRIVER","level":"0","driverId":"2"}}'
+    Assert-Equal -Actual $driverWsParsed.DName -Expected 'DRIVER//2' -Message 'Websocket payload parser canonical driver id'
+    Assert-Equal -Actual $driverWsParsed.DriverId -Expected 2 -Message 'Websocket payload parser canonical driverId'
+    Assert-Equal -Actual $driverWsParsed.Level -Expected 0 -Message 'Websocket payload parser canonical driver level'
+
+    Write-Host ("SelfTest passed. Version={0}" -f $ScriptVersion)
 }
 
 function Get-Json {
@@ -707,7 +713,24 @@ function Parse-LogLevelUpdateText {
         return $null
     }
 
-    $dName = [string]$obj.value.type
+    $typeName = [string]$obj.value.type
+    if ([string]::IsNullOrWhiteSpace($typeName)) {
+        return $null
+    }
+
+    $driverId = $null
+    if ($obj.value.PSObject.Properties.Name -contains 'driverId') {
+        $parsedDriverId = 0
+        if ([int]::TryParse([string]$obj.value.driverId, [ref]$parsedDriverId)) {
+            $driverId = $parsedDriverId
+        }
+    }
+
+    $dName = $typeName
+    if ($typeName -ieq 'DRIVER' -and $null -ne $driverId) {
+        $dName = "DRIVER//$driverId"
+    }
+
     if ([string]::IsNullOrWhiteSpace($dName)) {
         return $null
     }
@@ -717,7 +740,7 @@ function Parse-LogLevelUpdateText {
         return $null
     }
 
-    $id = Get-DriverIdFromDName -DriverDName $dName
+    $id = if ($null -ne $driverId) { [int]$driverId } else { Get-DriverIdFromDName -DriverDName $dName }
     return [pscustomobject]@{
         DName = $dName
         DriverId = $id
@@ -923,18 +946,8 @@ function Set-DriverLogLevel {
 
     $driverId = Get-DriverIdFromDName -DriverDName $DriverDName
 
-    $payloads = New-Object System.Collections.ArrayList
-    [void]$payloads.Add([pscustomobject]@{
-            type = 'Subscribe'
-            resource = 'LogLevel'
-            value = [pscustomobject]@{
-                type = $DriverDName
-                level = [string]$Level
-            }
-        })
-
     if ($null -ne $driverId) {
-        [void]$payloads.Add([pscustomobject]@{
+        Send-JsonMessage -Session $Session -Payload ([pscustomobject]@{
                 type = 'Subscribe'
                 resource = 'LogLevel'
                 value = [pscustomobject]@{
@@ -943,11 +956,17 @@ function Set-DriverLogLevel {
                     driverId = [string]$driverId
                 }
             })
+        return
     }
 
-    foreach ($payload in $payloads) {
-        Send-JsonMessage -Session $Session -Payload $payload
-    }
+    Send-JsonMessage -Session $Session -Payload ([pscustomobject]@{
+            type = 'Subscribe'
+            resource = 'LogLevel'
+            value = [pscustomobject]@{
+                type = $DriverDName
+                level = [string]$Level
+            }
+        })
 }
 
 function Send-Subscribe {
@@ -1027,6 +1046,7 @@ if ($QuerySnapshotSeconds -lt 1 -or $QuerySnapshotSeconds -gt 30) {
 
 $systemStatusUri = "http://${Ip}:5000/diagnostics/data/system_status"
 $driversUri = "http://${Ip}:5000/diagnostics/data/drivers"
+Write-Host ("[probe] Version {0}" -f $ScriptVersion)
 
 $statusText = Get-Json -Uri $systemStatusUri
 $statusObj = ConvertFrom-Json -InputObject $statusText

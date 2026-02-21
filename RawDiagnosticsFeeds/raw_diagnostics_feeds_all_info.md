@@ -18,6 +18,9 @@ Evidence: Archives/WebsocketDiagnostics/loglevel_probe.ps1 :: Send-Subscribe
 - [SHP API All Knowledge > TESTED > Subscribe command shapes] Log level writes use a `Subscribe` payload with resource `LogLevel` and `value.type` plus `value.level`.
 Value: Implemented
 Evidence: Archives/WebsocketDiagnostics/loglevel_probe.ps1 :: Set-DriverLogLevel
+- [SHP API All Knowledge > TESTED > Subscribe command shapes] Canonical driver write shape `{"type":"Subscribe","resource":"LogLevel","value":{"type":"DRIVER","driverId":"<id>","level":"<0-3>"}}` was validated live on 2026-02-21 against `192.168.1.143`, and the returned `OnHTTPServerData() data.websocket` ack preserved `type:"DRIVER"` with matching `driverId`.
+Value: Confirmed
+Evidence: Live WS probe on 2026-02-21 (Codex terminal session, target `192.168.1.143`)
 - [SHP API All Knowledge > TESTED > Subscribe command shapes] Per-ID sysvar toggles use a `Subscribe` payload where `value` contains `id` and boolean `status` fields.
 Value: Confirmed
 Evidence: SMH_api_all_knowledge.md :: TESTED > 3) WebSocket subscribe command shapes are confirmed
