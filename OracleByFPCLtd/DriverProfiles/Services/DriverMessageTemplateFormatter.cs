@@ -425,6 +425,17 @@ public static class DriverMessageTemplateFormatter
     private static bool TryBuildSystemVariablesSentence(string command, string actionName, IReadOnlyList<string> args, out string sentence)
     {
         sentence = "";
+        if (command.StartsWith("System Variables\\Strings\\", StringComparison.OrdinalIgnoreCase))
+        {
+            if (actionName.Equals("Set", StringComparison.OrdinalIgnoreCase) && args.Count >= 2)
+            {
+                sentence = $"String {args[0]} set to {args[1]}";
+                return true;
+            }
+
+            return false;
+        }
+
         if (!command.StartsWith("System Variables\\Integers\\", StringComparison.OrdinalIgnoreCase))
         {
             return false;
@@ -432,23 +443,28 @@ public static class DriverMessageTemplateFormatter
 
         if (actionName.Equals("Decrease", StringComparison.OrdinalIgnoreCase) && args.Count >= 2)
         {
-            sentence = $"{args[0]} decreased by {args[1]}";
+            sentence = $"{FormatSystemVariableSubject(args[0])} decreased by {args[1]}";
             return true;
         }
 
         if (actionName.Equals("Increase", StringComparison.OrdinalIgnoreCase) && args.Count >= 2)
         {
-            sentence = $"{args[0]} increased by {args[1]}";
+            sentence = $"{FormatSystemVariableSubject(args[0])} increased by {args[1]}";
             return true;
         }
 
         if (actionName.Equals("Test", StringComparison.OrdinalIgnoreCase) && args.Count >= 3)
         {
-            sentence = $"Testing: Is {args[0]} {args[1]} to {args[2]}?";
+            sentence = $"Testing: Is {FormatSystemVariableSubject(args[0])} {args[1]} to {args[2]}?";
             return true;
         }
 
         return false;
+    }
+
+    private static string FormatSystemVariableSubject(string value)
+    {
+        return int.TryParse(value, out var index) ? $"IntegerIndex {index}" : value;
     }
 
     private static bool TryBuildSonosSentence(string actionName, IReadOnlyList<string> args, out string sentence)

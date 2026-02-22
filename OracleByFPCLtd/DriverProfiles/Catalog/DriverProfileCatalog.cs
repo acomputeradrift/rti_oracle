@@ -10,6 +10,7 @@ public static class DriverProfileCatalog
         return new[]
         {
             RtiAd64Profile.Definition,
+            RtiDiagnosticsProfile.Definition,
             RtiInternalProfile.Definition,
             RtiSystemVariableEventsProfile.Definition,
             VauxLattisMatrixProfile.Definition,

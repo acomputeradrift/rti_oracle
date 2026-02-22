@@ -36,6 +36,9 @@ public static class RtiInternalProfile
     private static readonly Regex SystemMacroStartEndPattern = new Regex(
         @"^(?:\[[^\]]+\]\s*)?System macro '(?<macro>[^']+)' - (?<phase>Start|End)$",
         RegexOptions.IgnoreCase | RegexOptions.Compiled);
+    private static readonly Regex StopMacroPattern = new Regex(
+        @"^(?:\[[^\]]+\]\s*)?Stop macro$",
+        RegexOptions.IgnoreCase | RegexOptions.Compiled);
     private static readonly Regex RelayIndexPattern = new Regex(
         @"\bRELAY\s+(?<index>\d+)\b",
         RegexOptions.IgnoreCase | RegexOptions.Compiled);
@@ -143,7 +146,8 @@ ORDER BY d.DeviceId, p.PageOrder;
             if (MacroStartEndPattern.IsMatch(rawText)
                 || ButtonUpPattern.IsMatch(rawText)
                 || DeviceConnectedDisconnectedPattern.IsMatch(rawText)
-                || SystemMacroStartEndPattern.IsMatch(rawText))
+                || SystemMacroStartEndPattern.IsMatch(rawText)
+                || StopMacroPattern.IsMatch(rawText))
             {
                 return true;
             }

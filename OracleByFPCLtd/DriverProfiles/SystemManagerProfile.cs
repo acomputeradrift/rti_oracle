@@ -18,6 +18,9 @@ public static class SystemManagerProfile
     private static readonly Regex DriverEventPattern = new Regex(
         "happens on\\s*'System Manager\\\\",
         RegexOptions.IgnoreCase | RegexOptions.Compiled);
+    private static readonly Regex UpdatePattern = new Regex(
+        @"^(?:(?<timestamp>\[[^\]]+\])\s*)?System Manager -\s*(?<update>.+)$",
+        RegexOptions.IgnoreCase | RegexOptions.Compiled);
 
     public static IDriverProfileMapper Mapper { get; } = new SystemManagerMapper();
 
@@ -53,6 +56,23 @@ public static class SystemManagerProfile
                 }
 
                 unresolved = HasUnresolvedSourceIndex(rawText);
+                return true;
+            }
+
+            var updateMatch = UpdatePattern.Match(rawText);
+            if (updateMatch.Success)
+            {
+                var timestamp = updateMatch.Groups["timestamp"].Value;
+                var updateText = updateMatch.Groups["update"].Value.Trim();
+                updateText = updateText.TrimEnd('\r', '\n');
+                if (updateText.StartsWith("Variable Stats:", StringComparison.Ordinal))
+                {
+                    updateText = updateText.TrimStart();
+                }
+
+                mappedText = string.IsNullOrWhiteSpace(timestamp)
+                    ? $"Driver Update (System Manager): '{updateText}'"
+                    : $"{timestamp} Driver Update (System Manager): '{updateText}'";
                 return true;
             }
 

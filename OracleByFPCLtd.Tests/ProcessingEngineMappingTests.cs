@@ -384,6 +384,7 @@ public sealed class ProcessingEngineMappingTests
     [InlineData("Device 'RTiPanel (iPhone X or newer)' has disconnected")]
     [InlineData("System macro 'LIGHTS - LUTRON Master Bath ALL ON' - Start")]
     [InlineData("System macro 'LIGHTS - LUTRON Master Bath ALL ON' - End")]
+    [InlineData("Stop macro")]
     public void DriverMappingServiceClaimsRtiInternalLifecycleLines(string raw)
     {
         var bundle = new ProjectDataBundle();
@@ -411,6 +412,20 @@ public sealed class ProcessingEngineMappingTests
     }
 
     [Fact]
+    public void DriverMappingServiceClaimsRtiDiagnosticsPrimaryProcessorLine()
+    {
+        var bundle = new ProjectDataBundle();
+        var service = new DriverMappingService();
+        var raw = "Diagnostics: Primary Processor - OnHTTPServerData() data.websocket = {\"type\":\"Subscribe\"}";
+        var evt = new DiagnosticEvent(33, raw);
+
+        var line = service.Map(evt, bundle);
+
+        Assert.Equal($"33 {raw}", line.Text);
+        Assert.False(line.IsUnresolved);
+    }
+
+    [Fact]
     public void DriverMappingServiceTreatsSystemManagerAsProfile()
     {
         var bundle = new ProjectDataBundle();
@@ -420,6 +435,39 @@ public sealed class ProcessingEngineMappingTests
         var line = service.Map(evt, bundle);
 
         Assert.Equal("11 Driver - Command:'System Manager\\Layer Visibility\\Set Layer Visibility(Source List)' Sustain:NO", line.Text);
+        Assert.False(line.IsUnresolved);
+    }
+
+    [Theory]
+    [InlineData("System Manager -  Variable Stats: Added 5 with 0 of those subscribed, 1 were skipped. Removed 6 from old view with 0 of those unsubscribed and 5 spliced. 6 Total considered.", "Driver Update (System Manager): 'Variable Stats: Added 5 with 0 of those subscribed, 1 were skipped. Removed 6 from old view with 0 of those unsubscribed and 5 spliced. 6 Total considered.'")]
+    [InlineData("System Manager - Changing selected room for RTiPanel (iPhone X or newer) to GLOBAL", "Driver Update (System Manager): 'Changing selected room for RTiPanel (iPhone X or newer) to GLOBAL'")]
+    [InlineData("System Manager - Clock: UpdateTimeSysVars at Sun Feb 22 2026 10:36:00 GMT+0000", "Driver Update (System Manager): 'Clock: UpdateTimeSysVars at Sun Feb 22 2026 10:36:00 GMT+0000'")]
+    [InlineData("System Manager - newRoom -> 0", "Driver Update (System Manager): 'newRoom -> 0'")]
+    [InlineData("System Manager - oldRoom -> 0", "Driver Update (System Manager): 'oldRoom -> 0'")]
+    [InlineData("System Manager - strView -> %1", "Driver Update (System Manager): 'strView -> %1'")]
+    public void DriverMappingServiceFormatsSystemManagerUpdateLines(string raw, string expectedBody)
+    {
+        var bundle = new ProjectDataBundle();
+        var service = new DriverMappingService();
+        var evt = new DiagnosticEvent(34, raw);
+
+        var line = service.Map(evt, bundle);
+
+        Assert.Equal($"34 {expectedBody}", line.Text);
+        Assert.False(line.IsUnresolved);
+    }
+
+    [Fact]
+    public void DriverMappingServiceFormatsSystemManagerUpdateLinesWithTimestamp()
+    {
+        var bundle = new ProjectDataBundle();
+        var service = new DriverMappingService();
+        var raw = "[2026-02-22 10:36:00.000] System Manager - Clock: UpdateTimeSysVars at Sun Feb 22 2026 10:36:00 GMT+0000";
+        var evt = new DiagnosticEvent(35, raw);
+
+        var line = service.Map(evt, bundle);
+
+        Assert.Equal("35 [2026-02-22 10:36:00.000] Driver Update (System Manager): 'Clock: UpdateTimeSysVars at Sun Feb 22 2026 10:36:00 GMT+0000'", line.Text);
         Assert.False(line.IsUnresolved);
     }
 
@@ -554,6 +602,47 @@ public sealed class ProcessingEngineMappingTests
 
         Assert.Equal("26 [2026-02-21 11:00:03.000] Driver Command (System Variables): 'Testing: Is Room Count equal to 1?'", line.Text);
         Assert.False(line.IsUnresolved);
+    }
+
+    [Fact]
+    public void DriverMappingServiceFormatsSystemVariablesStringSetWithoutMapping()
+    {
+        var bundle = new ProjectDataBundle();
+        var service = new DriverMappingService();
+        var evt = new DiagnosticEvent(102, "[2026-02-22 11:13:50.469] Driver - Command:'System Variables\\Strings\\Set(1, Room)' Sustain:NO");
+
+        var line = service.Map(evt, bundle);
+
+        Assert.Equal("102 [2026-02-22 11:13:50.469] Driver Command (System Variables): 'String 1 set to Room.'", line.Text);
+        Assert.False(line.IsUnresolved);
+    }
+
+    [Fact]
+    public void DriverMappingServiceFormatsSystemVariablesIncreaseNoMapWithIntegerIndexLabel()
+    {
+        var bundle = new ProjectDataBundle();
+        var service = new DriverMappingService();
+        var evt = new DiagnosticEvent(13, "[2026-02-22 10:58:57.950] Driver - Command:'System Variables\\Integers\\Increase(1, 1)' Sustain:NO");
+
+        var line = service.Map(evt, bundle);
+
+        Assert.Equal("13 [2026-02-22 10:58:57.950] Driver Command (System Variables): 'IntegerIndex 1 increased by 1.' [No Map!]", line.Text);
+        Assert.True(line.IsUnresolved);
+    }
+
+    [Theory]
+    [InlineData(14, "[2026-02-22 10:58:58.116] Driver - Command:'System Variables\\Integers\\Test(1, equal, 0, 1)' Sustain:NO", "14 [2026-02-22 10:58:58.116] Driver Command (System Variables): 'Testing: Is IntegerIndex 1 equal to 0?' [No Map!]")]
+    [InlineData(15, "[2026-02-22 10:58:58.225] Driver - Command:'System Variables\\Integers\\Test(1, equal, 1, 2)' Sustain:NO", "15 [2026-02-22 10:58:58.225] Driver Command (System Variables): 'Testing: Is IntegerIndex 1 equal to 1?' [No Map!]")]
+    public void DriverMappingServiceFormatsSystemVariablesTestNoMapWithIntegerIndexLabel(int lineNumber, string raw, string expected)
+    {
+        var bundle = new ProjectDataBundle();
+        var service = new DriverMappingService();
+        var evt = new DiagnosticEvent(lineNumber, raw);
+
+        var line = service.Map(evt, bundle);
+
+        Assert.Equal(expected, line.Text);
+        Assert.True(line.IsUnresolved);
     }
 
     private static ProjectDataBundle BuildBundle()
