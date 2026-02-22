@@ -335,6 +335,82 @@ public sealed class ProcessingEngineMappingTests
     }
 
     [Fact]
+    public void DriverMappingServiceMapsRtiInternalIrPortCommand()
+    {
+        var bundle = new ProjectDataBundle();
+        var service = new DriverMappingService();
+        var evt = new DiagnosticEvent(28, "IR - Port:'XP-8v','ECB5 #1' Command:'POWER OFF [ / / ]' Sustain:NO");
+
+        var line = service.Map(evt, bundle);
+
+        Assert.Equal("28 IR Command (Internal): 'POWER OFF -> XP-8v: ECB5 #1'", line.Text);
+        Assert.False(line.IsUnresolved);
+    }
+
+    [Fact]
+    public void DriverMappingServiceMapsRtiInternalRelayTriggerAction()
+    {
+        var bundle = new ProjectDataBundle();
+        var service = new DriverMappingService();
+        var evt = new DiagnosticEvent(29, "Relay/Trigger - Port:'XP-8v','Garage Door West' Action:OFF");
+
+        var line = service.Map(evt, bundle);
+
+        Assert.Equal("29 Relay/Trigger Command (Internal): 'OFF -> XP-8v: Garage Door West'", line.Text);
+        Assert.False(line.IsUnresolved);
+    }
+
+    [Fact]
+    public void DriverMappingServiceMapsRtiInternalRcm12RelayNameFromAdditionalInfo()
+    {
+        var bundle = new ProjectDataBundle();
+        var driverData = new AdditionalDriverData();
+        driverData.RelayNames[2] = "Boiler Pump";
+        bundle.Additional.Drivers["RTI Internal"] = driverData;
+        var service = new DriverMappingService();
+        var evt = new DiagnosticEvent(30, "IR - Port:'XP-8v','RTI RCM-12 Relay Module' Command:'RELAY 2 CLOSE [ / / ]' Sustain:NO");
+
+        var line = service.Map(evt, bundle);
+
+        Assert.Equal("30 IR Command (Internal): 'Boiler Pump CLOSE -> XP-8v: RTI RCM-12 Relay Module'", line.Text);
+        Assert.False(line.IsUnresolved);
+    }
+
+    [Theory]
+    [InlineData("Macro - End")]
+    [InlineData("Macro - Start")]
+    [InlineData("Button Up")]
+    [InlineData("Device 'RTiPanel (iPhone X or newer)' has connected")]
+    [InlineData("Device 'RTiPanel (iPhone X or newer)' has disconnected")]
+    [InlineData("System macro 'LIGHTS - LUTRON Master Bath ALL ON' - Start")]
+    [InlineData("System macro 'LIGHTS - LUTRON Master Bath ALL ON' - End")]
+    public void DriverMappingServiceClaimsRtiInternalLifecycleLines(string raw)
+    {
+        var bundle = new ProjectDataBundle();
+        var service = new DriverMappingService();
+        var evt = new DiagnosticEvent(31, raw);
+
+        var line = service.Map(evt, bundle);
+
+        Assert.Equal($"31 {raw}", line.Text);
+        Assert.False(line.IsUnresolved);
+    }
+
+    [Fact]
+    public void DriverMappingServiceStripsTransportFromRtiInternalButtonDownLine()
+    {
+        var bundle = new ProjectDataBundle();
+        var service = new DriverMappingService();
+        var raw = "Button Down - Device:'RTiPanel (iPhone X or newer)' Transport:Ethernet TCP";
+        var evt = new DiagnosticEvent(32, raw);
+
+        var line = service.Map(evt, bundle);
+
+        Assert.Equal("32 Button Down - Device:'RTiPanel (iPhone X or newer)'", line.Text);
+        Assert.False(line.IsUnresolved);
+    }
+
+    [Fact]
     public void DriverMappingServiceTreatsSystemManagerAsProfile()
     {
         var bundle = new ProjectDataBundle();

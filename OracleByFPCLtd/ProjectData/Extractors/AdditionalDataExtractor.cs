@@ -437,6 +437,8 @@ public static class AdditionalDataExtractor
         var outputNameHeader = schema.Columns.FirstOrDefault(c => c.Role == AdditionalInfoColumnRole.OutputName)?.Header;
         var integerIndexHeader = schema.Columns.FirstOrDefault(c => c.Role == AdditionalInfoColumnRole.IntegerIndex)?.Header;
         var integerNameHeader = schema.Columns.FirstOrDefault(c => c.Role == AdditionalInfoColumnRole.IntegerName)?.Header;
+        var relayIndexHeader = schema.Columns.FirstOrDefault(c => c.Role == AdditionalInfoColumnRole.RelayIndex)?.Header;
+        var relayNameHeader = schema.Columns.FirstOrDefault(c => c.Role == AdditionalInfoColumnRole.RelayName)?.Header;
 
         foreach (var row in rows)
         {
@@ -523,6 +525,16 @@ public static class AdditionalDataExtractor
                 if (TryParseIndex(integerIndexText, out var index) && !string.IsNullOrWhiteSpace(integerName))
                 {
                     AddMapping(driverData.IntegerNames, index, integerName, "integer", driverName, data.Errors);
+                }
+            }
+
+            if (relayIndexHeader != null && relayNameHeader != null)
+            {
+                var relayIndexText = row.TryGetValue(relayIndexHeader, out var relayIndex) ? relayIndex : "";
+                var relayName = row.TryGetValue(relayNameHeader, out var relayLabel) ? relayLabel : "";
+                if (TryParseIndex(relayIndexText, out var index) && !string.IsNullOrWhiteSpace(relayName))
+                {
+                    AddMapping(driverData.RelayNames, index, relayName, "relay", driverName, data.Errors);
                 }
             }
         }
