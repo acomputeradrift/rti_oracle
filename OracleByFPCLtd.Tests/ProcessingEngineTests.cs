@@ -36,6 +36,7 @@ public sealed class ProcessingEngineTests
         var output = engine.ProcessLine(input, 7);
 
         Assert.Contains("[UNRESOLVED]", output.Text, StringComparison.Ordinal);
+        Assert.DoesNotContain("[No Profile!]", output.Text, StringComparison.Ordinal);
         Assert.True(output.IsUnresolved);
     }
 }

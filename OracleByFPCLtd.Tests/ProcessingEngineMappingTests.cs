@@ -309,6 +309,32 @@ public sealed class ProcessingEngineMappingTests
     }
 
     [Fact]
+    public void DriverMappingServiceMarksNoProfileForNonDriverLine()
+    {
+        var bundle = new ProjectDataBundle();
+        var service = new DriverMappingService();
+        var evt = new DiagnosticEvent(2, "[2026-01-24 10:00:00.000] Random non-profile line");
+
+        var line = service.Map(evt, bundle);
+
+        Assert.Equal("2 [2026-01-24 10:00:00.000] Random non-profile line [No Profile!]", line.Text);
+        Assert.True(line.IsUnresolved);
+    }
+
+    [Fact]
+    public void DriverMappingServiceMapsPageLineViaRtiInternalProfile()
+    {
+        var bundle = BuildBundle();
+        var service = new DriverMappingService();
+        var evt = new DiagnosticEvent(27, "[2026-01-24 10:00:00.000] Change to page 1 on device 'RTiPanel (iPhone X or newer)'");
+
+        var line = service.Map(evt, bundle);
+
+        Assert.Equal("27 [2026-01-24 10:00:00.000] Change to page \"Room Select\" on device 'RTiPanel (iPhone X or newer)'", line.Text);
+        Assert.False(line.IsUnresolved);
+    }
+
+    [Fact]
     public void DriverMappingServiceTreatsSystemManagerAsProfile()
     {
         var bundle = new ProjectDataBundle();

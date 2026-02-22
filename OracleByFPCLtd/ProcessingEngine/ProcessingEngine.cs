@@ -45,12 +45,23 @@ public sealed class ProcessingEngine
     {
         var defaultText = $"{evt.RawLineNumber} {evt.RawText}";
         var driverLine = _driverMappingService.Map(evt, _bundle);
-        if (driverLine.IsUnresolved || !string.Equals(driverLine.Text, defaultText, StringComparison.Ordinal))
+        var hasNoProfileTag = driverLine.Text.Contains("[No Profile!]", StringComparison.Ordinal);
+        if (!hasNoProfileTag && (driverLine.IsUnresolved || !string.Equals(driverLine.Text, defaultText, StringComparison.Ordinal)))
         {
             return driverLine;
         }
 
         var systemLine = _systemMappingService.Map(evt, _bundle);
+        if (hasNoProfileTag)
+        {
+            var text = systemLine.Text;
+            if (!text.Contains("[No Profile!]", StringComparison.Ordinal))
+            {
+                text += " [No Profile!]";
+            }
+            return new ProcessedLine(text, true);
+        }
+
         if (systemLine.IsUnresolved || !string.Equals(systemLine.Text, defaultText, StringComparison.Ordinal))
         {
             return systemLine;

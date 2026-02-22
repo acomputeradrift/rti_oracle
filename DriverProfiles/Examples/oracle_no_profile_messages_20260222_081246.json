@@ -1,0 +1,25 @@
+{
+  "CreatedUtc": "2026-02-22T16:12:46.6548175Z",
+  "AppVersion": "1.1.7.0",
+  "Drivers": [
+    {
+      "DriverName": "DSC PowerSeries",
+      "Messages": [
+        "Driver event 'When 'Garage West DOOR Closed' happens on 'DSC PowerSeries\\Zone Closing''",
+        "Driver event 'When 'Garage West DOOR Opened' happens on 'DSC PowerSeries\\Zone Open''"
+      ]
+    },
+    {
+      "DriverName": "Jandy AquaLink RS",
+      "Messages": [
+        "Driver - Command:'Jandy AquaLink RS\\Spa Control\\Spa Off' Sustain:NO"
+      ]
+    },
+    {
+      "DriverName": "Venstar ColorTouch",
+      "Messages": [
+        "Driver event 'When 'Garage (Stat 2) - Operating State Change' happens on 'Venstar ColorTouch\\Garage (Stat 2) Events''"
+      ]
+    }
+  ]
+}

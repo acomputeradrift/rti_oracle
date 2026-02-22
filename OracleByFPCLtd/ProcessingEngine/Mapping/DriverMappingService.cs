@@ -123,17 +123,12 @@ public sealed class DriverMappingService
             return new ProcessedLine($"{evt.RawLineNumber} {mappedText}", unresolved);
         }
 
-        if (IsDriverLine(rawText))
-        {
-            LogStructuredEvent(
-                SeverityLevel.Warn,
-                "Processing:Mapping",
-                "Driver profile not found.",
-                new Dictionary<string, string> { ["rawText"] = rawText });
-            return new ProcessedLine($"{evt.RawLineNumber} {rawText} [No Profile!]", true);
-        }
-
-        return new ProcessedLine($"{evt.RawLineNumber} {rawText}", false);
+        LogStructuredEvent(
+            SeverityLevel.Warn,
+            "Processing:Mapping",
+            "Driver profile not found.",
+            new Dictionary<string, string> { ["rawText"] = rawText });
+        return new ProcessedLine($"{evt.RawLineNumber} {rawText} [No Profile!]", true);
     }
 
     private static void LogStructuredEvent(
@@ -168,12 +163,6 @@ public sealed class DriverMappingService
     private static string BuildApexMappingMessage(string transition)
     {
         return $"Processed log line mapped to Apex file (Source {transition})";
-    }
-
-    private static bool IsDriverLine(string text)
-    {
-        return text.Contains("Driver - Command:", StringComparison.OrdinalIgnoreCase)
-            || text.Contains("Driver event", StringComparison.OrdinalIgnoreCase);
     }
 
     private static bool IsDriverCommandLine(string text)

@@ -3,10 +3,10 @@ using System.Collections;
 using System.Collections.ObjectModel;
 using System.Collections.Generic;
 using System.ComponentModel;
+using System.Diagnostics;
 using System.Globalization;
 using System.IO;
 using System.Linq;
-using System.Text.Encodings.Web;
 using System.Text.Json;
 using System.Text.RegularExpressions;
 using System.Threading;
@@ -4348,7 +4348,7 @@ public partial class MainWindow : Window
             return match.Groups["driver"].Value.Trim();
         }
 
-        return "Unknown Driver";
+        return "Uncategorized";
     }
 
     private void MainWindow_Closing(object? sender, CancelEventArgs e)
@@ -4361,12 +4361,43 @@ public partial class MainWindow : Window
             }
 
             var report = BuildNoProfileReport();
-            var reportPath = WriteNoProfileReportToDesktop(report);
-            AppendAppStatus("INFO", $"Saved no-profile driver report to your Desktop: {reportPath}");
+            var writeResult = NoProfileReportFileService.Write(report);
+            if (writeResult.Success && !string.IsNullOrWhiteSpace(writeResult.Path))
+            {
+                var reportPath = writeResult.Path;
+                AppendAppStatus("INFO", $"Saved no-profile driver report: {reportPath}");
+                var result = MessageBox.Show(
+                    this,
+                    $"A no-profile driver report was saved to:\n{reportPath}\n\nPlease send this file to feeny.jamie@gmail.com.\n\nOpen folder now?",
+                    "No-Profile Report Saved",
+                    MessageBoxButton.YesNo,
+                    MessageBoxImage.Information);
+                if (result == MessageBoxResult.Yes)
+                {
+                    OpenReportFolder(reportPath);
+                }
+            }
+            else
+            {
+                var error = writeResult.Error ?? "Unknown file write error.";
+                AppendAppStatus("WARN", $"Failed to write no-profile driver report: {error}");
+                MessageBox.Show(
+                    this,
+                    $"Oracle could not save the no-profile driver report.\n\nReason: {error}\n\nPlease contact feeny.jamie@gmail.com.",
+                    "No-Profile Report Not Saved",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Warning);
+            }
         }
         catch (Exception ex)
         {
             AppendAppStatus("WARN", $"Failed to write no-profile driver report: {ex.Message}");
+            MessageBox.Show(
+                this,
+                $"Oracle could not save the no-profile driver report.\n\nReason: {ex.Message}\n\nPlease contact feeny.jamie@gmail.com.",
+                "No-Profile Report Not Saved",
+                MessageBoxButton.OK,
+                MessageBoxImage.Warning);
         }
         finally
         {
@@ -4394,18 +4425,40 @@ public partial class MainWindow : Window
         return typeof(MainWindow).Assembly.GetName().Version?.ToString() ?? "unknown";
     }
 
-    private static string WriteNoProfileReportToDesktop(NoProfileReport report)
+    private void OpenReportFolder(string reportPath)
     {
-        var desktop = Environment.GetFolderPath(Environment.SpecialFolder.DesktopDirectory);
-        var fileName = $"oracle_no_profile_messages_{DateTime.Now:yyyyMMdd_HHmmss}.json";
-        var path = Path.Combine(desktop, fileName);
-        var json = JsonSerializer.Serialize(report, new JsonSerializerOptions
+        if (string.IsNullOrWhiteSpace(reportPath))
         {
-            WriteIndented = true,
-            Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping
-        });
-        File.WriteAllText(path, json);
-        return path;
+            return;
+        }
+
+        try
+        {
+            if (File.Exists(reportPath))
+            {
+                Process.Start(new ProcessStartInfo
+                {
+                    FileName = "explorer.exe",
+                    Arguments = $"/select,\"{reportPath}\"",
+                    UseShellExecute = true
+                });
+                return;
+            }
+
+            var folder = Path.GetDirectoryName(reportPath);
+            if (!string.IsNullOrWhiteSpace(folder) && Directory.Exists(folder))
+            {
+                Process.Start(new ProcessStartInfo
+                {
+                    FileName = folder,
+                    UseShellExecute = true
+                });
+            }
+        }
+        catch (Exception ex)
+        {
+            AppendAppStatus("WARN", $"Saved report but could not open folder: {ex.Message}");
+        }
     }
 
     private sealed record NoProfileReport(

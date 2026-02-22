@@ -1,0 +1,15 @@
+{
+  "CreatedUtc": "2026-02-22T16:19:10.0641376Z",
+  "AppVersion": "1.1.7.0",
+  "Drivers": [
+    {
+      "DriverName": "Vantage InFusion",
+      "Messages": [
+        "Driver - Command:'Vantage InFusion\\Tasks\\Execute Task(AUDIO - Hallway Button LED OFF, Press)' Sustain:NO",
+        "Driver - Command:'Vantage InFusion\\Tasks\\Execute Task(AUDIO - Hallway Button LED ON, Press)' Sustain:NO",
+        "Driver event 'When 'SE Lamp (VID 178) Off' happens on 'Vantage InFusion\\Button LEDs (1-100)''",
+        "Driver event 'When 'SE Lamp (VID 178) On' happens on 'Vantage InFusion\\Button LEDs (1-100)''"
+      ]
+    }
+  ]
+}
