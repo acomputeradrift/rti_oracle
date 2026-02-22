@@ -122,7 +122,7 @@ public sealed class DriverMessageTemplateFormatterTests
         var formatted = DriverMessageTemplateFormatter.TryFormatDriverEvent(mappedText, "DSC PowerSeries", out var output);
 
         Assert.True(formatted);
-        Assert.Equal("[2026-02-21 10:12:44.112] Driver Event (DSC PowerSeries): 'Garage West DOOR Opened.'", output);
+        Assert.Equal("[2026-02-21 10:12:44.112] Driver Event (DSC PowerSeries): 'When Garage West DOOR Opened.'", output);
     }
 
     [Fact]
@@ -133,6 +133,28 @@ public sealed class DriverMessageTemplateFormatterTests
         var formatted = DriverMessageTemplateFormatter.TryFormatDriverEvent(mappedText, "Venstar ColorTouch", out var output);
 
         Assert.True(formatted);
-        Assert.Equal("[2026-02-21 10:14:44.112] Driver Event (Venstar ColorTouch): 'Garage (Stat 2) - Operating State Change.'", output);
+        Assert.Equal("[2026-02-21 10:14:44.112] Driver Event (Venstar ColorTouch): 'When Garage (Stat 2) - Operating State Change.'", output);
+    }
+
+    [Fact]
+    public void TryFormatDriverCommandFormatsVantageInFusionExecuteTask()
+    {
+        var mappedText = "[2026-02-22 12:10:00.000] Driver - Command:'Vantage InFusion\\Tasks\\Execute Task(AUDIO - Hallway Button LED OFF, Press)' Sustain:NO";
+
+        var formatted = DriverMessageTemplateFormatter.TryFormatDriverCommand(mappedText, "Vantage InFusion", out var output);
+
+        Assert.True(formatted);
+        Assert.Equal("[2026-02-22 12:10:00.000] Driver Command (Vantage InFusion): 'Task AUDIO - Hallway Button LED OFF is executed (Press).'", output);
+    }
+
+    [Fact]
+    public void TryFormatDriverEventFormatsVantageInFusionLampEvent()
+    {
+        var mappedText = "[2026-02-22 12:11:00.000] Driver event 'When 'SE Lamp (VID 178) On' happens on 'Vantage InFusion\\Button LEDs (1-100)''";
+
+        var formatted = DriverMessageTemplateFormatter.TryFormatDriverEvent(mappedText, "Vantage InFusion", out var output);
+
+        Assert.True(formatted);
+        Assert.Equal("[2026-02-22 12:11:00.000] Driver Event (Vantage InFusion): 'When SE Lamp (VID 178) is turned ON.'", output);
     }
 }

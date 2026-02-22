@@ -35,6 +35,7 @@ public static class DriverProfileCatalog
             JandyIAqualinkProfile.Definition,
             DscPowerSeriesProfile.Definition,
             VenstarColorTouchProfile.Definition,
+            VantageInFusionProfile.Definition,
             SystemVariablesProfile.Definition
         };
     }

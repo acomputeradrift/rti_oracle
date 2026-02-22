@@ -519,7 +519,7 @@ public sealed class ProcessingEngineMappingTests
 
         var line = service.Map(evt, bundle);
 
-        Assert.Equal("21 [2026-02-21 10:12:44.112] Driver Event (DSC PowerSeries): 'Garage West DOOR Opened.'", line.Text);
+        Assert.Equal("21 [2026-02-21 10:12:44.112] Driver Event (DSC PowerSeries): 'When Garage West DOOR Opened.'", line.Text);
         Assert.False(line.IsUnresolved);
     }
 
@@ -532,7 +532,33 @@ public sealed class ProcessingEngineMappingTests
 
         var line = service.Map(evt, bundle);
 
-        Assert.Equal("22 [2026-02-21 10:14:44.112] Driver Event (Venstar ColorTouch): 'Garage (Stat 2) - Operating State Change.'", line.Text);
+        Assert.Equal("22 [2026-02-21 10:14:44.112] Driver Event (Venstar ColorTouch): 'When Garage (Stat 2) - Operating State Change.'", line.Text);
+        Assert.False(line.IsUnresolved);
+    }
+
+    [Fact]
+    public void DriverMappingServiceFormatsVantageInFusionDriverCommand()
+    {
+        var bundle = new ProjectDataBundle();
+        var service = new DriverMappingService();
+        var evt = new DiagnosticEvent(36, "[2026-02-22 12:10:00.000] Driver - Command:'Vantage InFusion\\Tasks\\Execute Task(AUDIO - Hallway Button LED OFF, Press)' Sustain:NO");
+
+        var line = service.Map(evt, bundle);
+
+        Assert.Equal("36 [2026-02-22 12:10:00.000] Driver Command (Vantage InFusion): 'Task AUDIO - Hallway Button LED OFF is executed (Press).'", line.Text);
+        Assert.False(line.IsUnresolved);
+    }
+
+    [Fact]
+    public void DriverMappingServiceFormatsVantageInFusionDriverEvent()
+    {
+        var bundle = new ProjectDataBundle();
+        var service = new DriverMappingService();
+        var evt = new DiagnosticEvent(37, "[2026-02-22 12:11:00.000] Driver event 'When 'SE Lamp (VID 178) On' happens on 'Vantage InFusion\\Button LEDs (1-100)''");
+
+        var line = service.Map(evt, bundle);
+
+        Assert.Equal("37 [2026-02-22 12:11:00.000] Driver Event (Vantage InFusion): 'When SE Lamp (VID 178) is turned ON.'", line.Text);
         Assert.False(line.IsUnresolved);
     }
 

@@ -88,6 +88,13 @@ public static class DriverMessageTemplateFormatter
             return false;
         }
 
+        if (driverName.Equals("Vantage InFusion", StringComparison.OrdinalIgnoreCase))
+        {
+            sentence = NormalizeVantageEventSentence(sentence);
+        }
+
+        sentence = $"When {sentence}";
+
         if (!sentence.EndsWith(".", StringComparison.Ordinal))
         {
             sentence += ".";
@@ -154,6 +161,8 @@ public static class DriverMessageTemplateFormatter
                 return TryBuildVhdxSentence(actionName, args, out sentence);
             case "Jandy iAquaLink":
                 return TryBuildJandySentence(actionName, out sentence);
+            case "Vantage InFusion":
+                return TryBuildVantageInFusionSentence(actionName, args, out sentence);
             default:
                 return false;
         }
@@ -717,6 +726,33 @@ public static class DriverMessageTemplateFormatter
         }
 
         return false;
+    }
+
+    private static bool TryBuildVantageInFusionSentence(string actionName, IReadOnlyList<string> args, out string sentence)
+    {
+        sentence = "";
+        if (actionName.Equals("Execute Task", StringComparison.OrdinalIgnoreCase) && args.Count >= 2)
+        {
+            sentence = $"Task {args[0]} is executed ({args[1]})";
+            return true;
+        }
+
+        return false;
+    }
+
+    private static string NormalizeVantageEventSentence(string sentence)
+    {
+        if (sentence.EndsWith(" On", StringComparison.OrdinalIgnoreCase))
+        {
+            return sentence[..^3].TrimEnd() + " is turned ON";
+        }
+
+        if (sentence.EndsWith(" Off", StringComparison.OrdinalIgnoreCase))
+        {
+            return sentence[..^4].TrimEnd() + " is turned OFF";
+        }
+
+        return sentence;
     }
 
     private static bool TryExtractTimestampAndBody(string rawText, out string timestamp, out string body)
