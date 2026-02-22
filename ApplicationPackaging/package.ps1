@@ -8,14 +8,57 @@ param(
 
 $ErrorActionPreference = "Stop"
 
-$releaseDir = Join-Path $PackagesRoot ("v" + $Version)
+function Resolve-FilesystemPath {
+    param(
+        [Parameter(Mandatory=$true)]
+        [string]$PathValue,
+        [Parameter(Mandatory=$true)]
+        [string]$ParameterName
+    )
+
+    if ([string]::IsNullOrWhiteSpace($PathValue)) {
+        throw "$ParameterName cannot be empty."
+    }
+
+    $candidate = $PathValue.Trim()
+    if ($candidate -match "^[^:]+::") {
+        $candidate = $candidate -replace "^[^:]+::", ""
+    }
+
+    try {
+        $resolved = Resolve-Path -LiteralPath $candidate -ErrorAction Stop
+    } catch {
+        throw "Invalid $ParameterName path: '$PathValue'. Use a real filesystem path (for example \\server\share\folder or Y:\folder)."
+    }
+
+    return $resolved.ProviderPath
+}
+
+$resolvedRepoRoot = Resolve-FilesystemPath -PathValue $RepoRoot -ParameterName "RepoRoot"
+$resolvedPackagesRoot = Resolve-FilesystemPath -PathValue $PackagesRoot -ParameterName "PackagesRoot"
+
+$requiredProjectPath = Join-Path $resolvedRepoRoot "OracleByFPCLtd"
+$requiredUiPath = Join-Path $resolvedRepoRoot "UserInterface"
+$requiredChangelogPath = Join-Path $resolvedRepoRoot "ApplicationPackaging\CHANGELOG.md"
+
+if (!(Test-Path -LiteralPath $requiredProjectPath)) {
+    throw "Expected project folder not found: $requiredProjectPath"
+}
+if (!(Test-Path -LiteralPath $requiredUiPath)) {
+    throw "Expected UI folder not found: $requiredUiPath"
+}
+if (!(Test-Path -LiteralPath $requiredChangelogPath)) {
+    throw "Expected changelog not found: $requiredChangelogPath"
+}
+
+$releaseDir = Join-Path $resolvedPackagesRoot ("v" + $Version)
 $stagingDir = Join-Path $releaseDir "source-staging"
 $publishDir = Join-Path $releaseDir "publish"
 $defaultExe = Join-Path $publishDir "OracleByFPCLtd.exe"
 $versionedExe = Join-Path $publishDir ("OracleByFPC_v" + $Version + ".exe")
 
 Write-Host "Packaging OracleByFPCLtd v$Version"
-Write-Host "RepoRoot: $RepoRoot"
+Write-Host "RepoRoot: $resolvedRepoRoot"
 Write-Host "ReleaseDir: $releaseDir"
 Write-Host "StartupOptimized: $StartupOptimized"
 
@@ -28,21 +71,21 @@ New-Item -ItemType Directory -Force -Path $stagingDir | Out-Null
 New-Item -ItemType Directory -Force -Path $publishDir | Out-Null
 
 # Copy app project (exclude build outputs)
-robocopy "$RepoRoot\OracleByFPCLtd" "$stagingDir\OracleByFPCLtd" /E /XD bin obj
+robocopy "$resolvedRepoRoot\OracleByFPCLtd" "$stagingDir\OracleByFPCLtd" /E /R:1 /W:1 /XD bin obj
 if ($LASTEXITCODE -ge 8) {
     throw "robocopy for OracleByFPCLtd failed with exit code $LASTEXITCODE"
 }
 
 # Copy required UI resource
 New-Item -ItemType Directory -Force -Path "$stagingDir\UserInterface" | Out-Null
-robocopy "$RepoRoot\UserInterface" "$stagingDir\UserInterface" feeny-logo-100-circle-black-back.png
+robocopy "$resolvedRepoRoot\UserInterface" "$stagingDir\UserInterface" feeny-logo-100-circle-black-back.png /R:1 /W:1
 if ($LASTEXITCODE -ge 8) {
     throw "robocopy for UserInterface failed with exit code $LASTEXITCODE"
 }
 
 # Stage packaging changelog so project content include resolves during publish
 New-Item -ItemType Directory -Force -Path "$stagingDir\ApplicationPackaging" | Out-Null
-Copy-Item "$RepoRoot\ApplicationPackaging\CHANGELOG.md" "$stagingDir\ApplicationPackaging\CHANGELOG.md" -Force
+Copy-Item "$resolvedRepoRoot\ApplicationPackaging\CHANGELOG.md" "$stagingDir\ApplicationPackaging\CHANGELOG.md" -Force
 
 # Publish single-file EXE
 $csproj = "$stagingDir\OracleByFPCLtd\OracleByFPCLtd.csproj"
@@ -77,7 +120,7 @@ if (Test-Path $versionedExe) {
 Rename-Item -Path $defaultExe -NewName (Split-Path $versionedExe -Leaf)
 
 # Copy changelog and build metadata
-Copy-Item "$RepoRoot\ApplicationPackaging\CHANGELOG.md" "$releaseDir\CHANGELOG.md" -Force
+Copy-Item "$resolvedRepoRoot\ApplicationPackaging\CHANGELOG.md" "$releaseDir\CHANGELOG.md" -Force
 @(
     "Version: $Version"
     "Built: $(Get-Date -Format 'yyyy-MM-dd HH:mm')"

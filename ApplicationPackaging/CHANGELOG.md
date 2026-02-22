@@ -1,5 +1,20 @@
 # Changelog
 
+## [1.1.8] - 2026-02-22
+
+### Added
+- New driver profiles for `RTI Diagnostics` and `Vantage InFusion`.
+- No-profile driver report export now supports fallback save locations and can open the saved file location after export.
+- RTI Internal mapping now supports relay-name lookups from Additional Info sheet data for `RTI RCM-12 Relay Module`.
+
+### Changed
+- RTI Internal mapping coverage was expanded for page-change logs, internal IR/relay commands, and internal lifecycle events.
+- System Manager update lines are now normalized into `Driver Update (System Manager)` output.
+- Driver event sentence formatting now uses consistent `When ...` phrasing, with clearer Vantage InFusion ON/OFF wording.
+
+### Fixed
+- Lines without a matched profile now retain the `[No Profile!]` marker while still allowing system-level mapping to proceed.
+
 ## [1.1.7] - 2026-02-20
 
 ### Changed

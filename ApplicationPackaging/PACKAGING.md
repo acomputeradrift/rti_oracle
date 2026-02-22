@@ -41,6 +41,12 @@ Use the script in this folder:
 Y:\Desktop\Development\Oracle\ApplicationPackaging\package.ps1 -Version 1.1.2
 ```
 
+If your system blocks direct script execution, run with process-scoped bypass:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File "Y:\Desktop\Development\Oracle\ApplicationPackaging\package.ps1" -Version 1.1.2
+```
+
 For maximum startup performance (default in script):
 
 ```powershell
@@ -102,3 +108,5 @@ Copy-Item "$repo\ApplicationPackaging\CHANGELOG.md" "$release\CHANGELOG.md" -For
 - Use Windows paths (`Y:\...`) in PowerShell commands.
 - If `MSB1009 Project file does not exist`, verify staging first:
   - `Test-Path "$staging\OracleByFPCLtd\OracleByFPCLtd.csproj"` should be `True`.
+- If you see `running scripts is disabled on this system`, run packaging via:
+  - `powershell -NoProfile -ExecutionPolicy Bypass -File "...\ApplicationPackaging\package.ps1" -Version <version>`
