@@ -140,6 +140,7 @@ public sealed class AdditionalDriverData
 {
     public Dictionary<int, string> InputNames { get; } = new();
     public Dictionary<int, string> OutputNames { get; } = new();
+    public Dictionary<int, string> IntegerNames { get; } = new();
     public Dictionary<(int AppId, int GroupId), CbusGroupEntry> CbusGroups { get; } = new();
     public Dictionary<(int GroupId, int ZoneId), CbusHvacEntry> CbusHvacZones { get; } = new();
     public Dictionary<(int AppId, int GroupId, int ActionSelector), CbusSceneEntry> CbusScenes { get; } = new();

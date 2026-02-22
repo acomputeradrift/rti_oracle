@@ -59,6 +59,10 @@ public sealed class DriverMappingService
             {
                 mappedText = formattedCommand;
             }
+            else if (DriverMessageTemplateFormatter.TryFormatDriverEvent(mappedText, profile.DeviceName, out var formattedEvent))
+            {
+                mappedText = formattedEvent;
+            }
 
             if (unresolved && IsDriverCommandLine(mappedText) && ShouldAppendNoMap(mappedText))
             {
@@ -202,6 +206,7 @@ public sealed class DriverMappingService
 
         return additional.InputNames.Count > 0
             || additional.OutputNames.Count > 0
+            || additional.IntegerNames.Count > 0
             || additional.CbusGroups.Count > 0
             || additional.CbusHvacZones.Count > 0
             || additional.CbusScenes.Count > 0;

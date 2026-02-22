@@ -113,4 +113,26 @@ public sealed class DriverMessageTemplateFormatterTests
 
         Assert.False(formatted);
     }
+
+    [Fact]
+    public void TryFormatDriverEventFormatsDscPowerSeriesZoneOpen()
+    {
+        var mappedText = "[2026-02-21 10:12:44.112] Driver event 'When 'Garage West DOOR Opened' happens on 'DSC PowerSeries\\Zone Open''";
+
+        var formatted = DriverMessageTemplateFormatter.TryFormatDriverEvent(mappedText, "DSC PowerSeries", out var output);
+
+        Assert.True(formatted);
+        Assert.Equal("[2026-02-21 10:12:44.112] Driver Event (DSC PowerSeries): 'Garage West DOOR Opened.'", output);
+    }
+
+    [Fact]
+    public void TryFormatDriverEventFormatsVenstarColorTouchOperatingStateChange()
+    {
+        var mappedText = "[2026-02-21 10:14:44.112] Driver event 'When 'Garage (Stat 2) - Operating State Change' happens on 'Venstar ColorTouch\\Garage (Stat 2) Events''";
+
+        var formatted = DriverMessageTemplateFormatter.TryFormatDriverEvent(mappedText, "Venstar ColorTouch", out var output);
+
+        Assert.True(formatted);
+        Assert.Equal("[2026-02-21 10:14:44.112] Driver Event (Venstar ColorTouch): 'Garage (Stat 2) - Operating State Change.'", output);
+    }
 }

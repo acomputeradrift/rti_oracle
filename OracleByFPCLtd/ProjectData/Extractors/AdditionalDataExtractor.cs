@@ -435,6 +435,8 @@ public static class AdditionalDataExtractor
         var inputNameHeader = schema.Columns.FirstOrDefault(c => c.Role == AdditionalInfoColumnRole.InputName)?.Header;
         var outputIndexHeader = schema.Columns.FirstOrDefault(c => c.Role == AdditionalInfoColumnRole.OutputIndex)?.Header;
         var outputNameHeader = schema.Columns.FirstOrDefault(c => c.Role == AdditionalInfoColumnRole.OutputName)?.Header;
+        var integerIndexHeader = schema.Columns.FirstOrDefault(c => c.Role == AdditionalInfoColumnRole.IntegerIndex)?.Header;
+        var integerNameHeader = schema.Columns.FirstOrDefault(c => c.Role == AdditionalInfoColumnRole.IntegerName)?.Header;
 
         foreach (var row in rows)
         {
@@ -511,6 +513,16 @@ public static class AdditionalDataExtractor
                 if (TryParseIndex(outputIndexText, out var index) && !string.IsNullOrWhiteSpace(outputName))
                 {
                     AddMapping(driverData.OutputNames, index, outputName, "output", driverName, data.Errors);
+                }
+            }
+
+            if (integerIndexHeader != null && integerNameHeader != null)
+            {
+                var integerIndexText = row.TryGetValue(integerIndexHeader, out var integerIndex) ? integerIndex : "";
+                var integerName = row.TryGetValue(integerNameHeader, out var integerLabel) ? integerLabel : "";
+                if (TryParseIndex(integerIndexText, out var index) && !string.IsNullOrWhiteSpace(integerName))
+                {
+                    AddMapping(driverData.IntegerNames, index, integerName, "integer", driverName, data.Errors);
                 }
             }
         }

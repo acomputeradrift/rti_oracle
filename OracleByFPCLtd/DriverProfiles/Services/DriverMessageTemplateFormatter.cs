@@ -10,6 +10,7 @@ public static class DriverMessageTemplateFormatter
 {
     private static readonly Regex TimestampRegex = new("^\\[(?<time>[^\\]]+)\\]\\s*(?<body>.*)$", RegexOptions.Compiled);
     private static readonly Regex CommandRegex = new("^Driver - Command:\\s*'(?<command>[^']+)'(?:\\s*(?<extra>.*))?$", RegexOptions.Compiled | RegexOptions.IgnoreCase);
+    private static readonly Regex EventRegex = new("^Driver event\\s*'When\\s*'(?<event>[^']+)'\\s*happens on\\s*'(?<driver>[^'\\\\]+)\\\\(?<path>[^']*)''(?:\\s*(?<extra>.*))?$", RegexOptions.Compiled | RegexOptions.IgnoreCase);
 
     public static bool TryFormatDriverCommand(string mappedText, string driverName, out string formattedText)
     {
@@ -39,12 +40,61 @@ public static class DriverMessageTemplateFormatter
             return false;
         }
 
-        if (!skipPeriod && !sentence.EndsWith(".", StringComparison.Ordinal))
+        if (!skipPeriod
+            && !sentence.EndsWith(".", StringComparison.Ordinal)
+            && !sentence.EndsWith("?", StringComparison.Ordinal)
+            && !sentence.EndsWith("!", StringComparison.Ordinal))
         {
             sentence += ".";
         }
 
         formattedText = $"[{timestamp}] Driver Command ({driverName}): '{sentence}'";
+        if (!string.IsNullOrWhiteSpace(extraInfo))
+        {
+            formattedText += $" {extraInfo}";
+        }
+
+        return true;
+    }
+
+    public static bool TryFormatDriverEvent(string mappedText, string driverName, out string formattedText)
+    {
+        formattedText = mappedText ?? "";
+        if (string.IsNullOrWhiteSpace(mappedText))
+        {
+            return false;
+        }
+
+        if (!TryExtractTimestampAndBody(mappedText, out var timestamp, out var body))
+        {
+            return false;
+        }
+
+        var match = EventRegex.Match(body);
+        if (!match.Success)
+        {
+            return false;
+        }
+
+        var eventDriverName = match.Groups["driver"].Value;
+        if (!string.Equals(eventDriverName, driverName, StringComparison.OrdinalIgnoreCase))
+        {
+            return false;
+        }
+
+        var sentence = match.Groups["event"].Value.Trim();
+        if (string.IsNullOrWhiteSpace(sentence))
+        {
+            return false;
+        }
+
+        if (!sentence.EndsWith(".", StringComparison.Ordinal))
+        {
+            sentence += ".";
+        }
+
+        formattedText = $"[{timestamp}] Driver Event ({driverName}): '{sentence}'";
+        var extraInfo = match.Groups["extra"].Value;
         if (!string.IsNullOrWhiteSpace(extraInfo))
         {
             formattedText += $" {extraInfo}";
@@ -80,6 +130,8 @@ public static class DriverMessageTemplateFormatter
                 return TryBuildTwoWayStringsSentence(actionName, args, out sentence);
             case "System Manager":
                 return TryBuildSystemManagerSentence(command, actionName, args, out sentence, out extraInfo, out skipPeriod);
+            case "System Variables":
+                return TryBuildSystemVariablesSentence(command, actionName, args, out sentence);
             case "Sonos":
                 return TryBuildSonosSentence(actionName, args, out sentence);
             case "RTI AD-64":
@@ -364,6 +416,35 @@ public static class DriverMessageTemplateFormatter
         if (actionName.Equals("Set Layer Visibility", StringComparison.OrdinalIgnoreCase) && args.Count >= 1)
         {
             sentence = $"Layer Visibility set to {args[0]}";
+            return true;
+        }
+
+        return false;
+    }
+
+    private static bool TryBuildSystemVariablesSentence(string command, string actionName, IReadOnlyList<string> args, out string sentence)
+    {
+        sentence = "";
+        if (!command.StartsWith("System Variables\\Integers\\", StringComparison.OrdinalIgnoreCase))
+        {
+            return false;
+        }
+
+        if (actionName.Equals("Decrease", StringComparison.OrdinalIgnoreCase) && args.Count >= 2)
+        {
+            sentence = $"{args[0]} decreased by {args[1]}";
+            return true;
+        }
+
+        if (actionName.Equals("Increase", StringComparison.OrdinalIgnoreCase) && args.Count >= 2)
+        {
+            sentence = $"{args[0]} increased by {args[1]}";
+            return true;
+        }
+
+        if (actionName.Equals("Test", StringComparison.OrdinalIgnoreCase) && args.Count >= 3)
+        {
+            sentence = $"Testing: Is {args[0]} {args[1]} to {args[2]}?";
             return true;
         }
 

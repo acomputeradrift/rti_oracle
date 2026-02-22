@@ -18,6 +18,7 @@ public static class PdfExportStyles
             ProcessedLineCategory.DriverEvent => XColor.FromArgb(0xFC, 0xB0, 0x40),
             ProcessedLineCategory.DriverCommand => XColor.FromArgb(0xFF, 0xFF, 0xFF),
             ProcessedLineCategory.Macro => XColor.FromArgb(0xA7, 0xA9, 0xAC),
+            ProcessedLineCategory.SystemMacro => XColor.FromArgb(0x9E, 0x1E, 0x9E),
             _ => XColor.FromArgb(0x58, 0x58, 0x5A)
         };
     }

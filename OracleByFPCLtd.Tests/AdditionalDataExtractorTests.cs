@@ -123,6 +123,34 @@ public sealed class AdditionalDataExtractorTests
         }
     }
 
+    [Fact]
+    public void ExtractParsesSystemVariablesIntegerSheet()
+    {
+        var headers = new[] { "IntegerIndex", "IntegerName" };
+        var rows = new List<object[]>
+        {
+            new object[] { 1.0, "Room Count" }
+        };
+
+        var path = CreateWorkbookWithSheetData("System Variables", headers, rows);
+        try
+        {
+            var data = AdditionalDataExtractor.Extract(path, new[] { "System Variables" });
+
+            Assert.DoesNotContain(data.Errors, error => error.Contains("No driver profile", StringComparison.Ordinal));
+            Assert.True(data.Drivers.ContainsKey("System Variables"));
+            var driverData = data.Drivers["System Variables"];
+            Assert.Equal("Room Count", driverData.IntegerNames[1]);
+        }
+        finally
+        {
+            if (File.Exists(path))
+            {
+                File.Delete(path);
+            }
+        }
+    }
+
     private static string CreateWorkbook(params string[] sheetNames)
     {
         var path = Path.Combine(Path.GetTempPath(), $"additional_{Guid.NewGuid():N}.xlsx");

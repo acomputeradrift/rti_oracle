@@ -360,6 +360,100 @@ public sealed class ProcessingEngineMappingTests
         Assert.False(line.IsUnresolved);
     }
 
+    [Fact]
+    public void DriverMappingServiceFormatsDscPowerSeriesDriverEvent()
+    {
+        var bundle = new ProjectDataBundle();
+        var service = new DriverMappingService();
+        var evt = new DiagnosticEvent(21, "[2026-02-21 10:12:44.112] Driver event 'When 'Garage West DOOR Opened' happens on 'DSC PowerSeries\\Zone Open''");
+
+        var line = service.Map(evt, bundle);
+
+        Assert.Equal("21 [2026-02-21 10:12:44.112] Driver Event (DSC PowerSeries): 'Garage West DOOR Opened.'", line.Text);
+        Assert.False(line.IsUnresolved);
+    }
+
+    [Fact]
+    public void DriverMappingServiceFormatsVenstarColorTouchDriverEvent()
+    {
+        var bundle = new ProjectDataBundle();
+        var service = new DriverMappingService();
+        var evt = new DiagnosticEvent(22, "[2026-02-21 10:14:44.112] Driver event 'When 'Garage (Stat 2) - Operating State Change' happens on 'Venstar ColorTouch\\Garage (Stat 2) Events''");
+
+        var line = service.Map(evt, bundle);
+
+        Assert.Equal("22 [2026-02-21 10:14:44.112] Driver Event (Venstar ColorTouch): 'Garage (Stat 2) - Operating State Change.'", line.Text);
+        Assert.False(line.IsUnresolved);
+    }
+
+    [Fact]
+    public void DriverMappingServiceFormatsSystemVariablesDecreaseWithIntegerNameMap()
+    {
+        var bundle = new ProjectDataBundle();
+        var driverData = new AdditionalDriverData();
+        driverData.IntegerNames[1] = "Room Count";
+        bundle.Additional.Drivers["System Variables"] = driverData;
+
+        var service = new DriverMappingService();
+        var evt = new DiagnosticEvent(23, "[2026-02-21 11:00:00.000] Driver - Command:'System Variables\\Integers\\Decrease(1, 1)' Sustain:NO");
+
+        var line = service.Map(evt, bundle);
+
+        Assert.Equal("23 [2026-02-21 11:00:00.000] Driver Command (System Variables): 'Room Count decreased by 1.'", line.Text);
+        Assert.False(line.IsUnresolved);
+    }
+
+    [Fact]
+    public void DriverMappingServiceFormatsSystemVariablesIncreaseWithIntegerNameMap()
+    {
+        var bundle = new ProjectDataBundle();
+        var driverData = new AdditionalDriverData();
+        driverData.IntegerNames[1] = "Room Count";
+        bundle.Additional.Drivers["System Variables"] = driverData;
+
+        var service = new DriverMappingService();
+        var evt = new DiagnosticEvent(24, "[2026-02-21 11:00:01.000] Driver - Command:'System Variables\\Integers\\Increase(1, 1)' Sustain:NO");
+
+        var line = service.Map(evt, bundle);
+
+        Assert.Equal("24 [2026-02-21 11:00:01.000] Driver Command (System Variables): 'Room Count increased by 1.'", line.Text);
+        Assert.False(line.IsUnresolved);
+    }
+
+    [Fact]
+    public void DriverMappingServiceFormatsSystemVariablesTestEqualWithIntegerNameMap()
+    {
+        var bundle = new ProjectDataBundle();
+        var driverData = new AdditionalDriverData();
+        driverData.IntegerNames[1] = "Room Count";
+        bundle.Additional.Drivers["System Variables"] = driverData;
+
+        var service = new DriverMappingService();
+        var evt = new DiagnosticEvent(25, "[2026-02-21 11:00:02.000] Driver - Command:'System Variables\\Integers\\Test(1, equal, 0, 1)' Sustain:NO");
+
+        var line = service.Map(evt, bundle);
+
+        Assert.Equal("25 [2026-02-21 11:00:02.000] Driver Command (System Variables): 'Testing: Is Room Count equal to 0?'", line.Text);
+        Assert.False(line.IsUnresolved);
+    }
+
+    [Fact]
+    public void DriverMappingServiceFormatsSystemVariablesTestEqualSecondVariantWithIntegerNameMap()
+    {
+        var bundle = new ProjectDataBundle();
+        var driverData = new AdditionalDriverData();
+        driverData.IntegerNames[1] = "Room Count";
+        bundle.Additional.Drivers["System Variables"] = driverData;
+
+        var service = new DriverMappingService();
+        var evt = new DiagnosticEvent(26, "[2026-02-21 11:00:03.000] Driver - Command:'System Variables\\Integers\\Test(1, equal, 1, 2)' Sustain:NO");
+
+        var line = service.Map(evt, bundle);
+
+        Assert.Equal("26 [2026-02-21 11:00:03.000] Driver Command (System Variables): 'Testing: Is Room Count equal to 1?'", line.Text);
+        Assert.False(line.IsUnresolved);
+    }
+
     private static ProjectDataBundle BuildBundle()
     {
         var bundle = new ProjectDataBundle();

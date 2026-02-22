@@ -15,6 +15,8 @@ public sealed class ProcessedLineClassifierColorTests
     [InlineData("button: Power", ProcessedLineCategory.Button)]
     [InlineData("Page: Room Select", ProcessedLineCategory.Page)]
     [InlineData("page change", ProcessedLineCategory.Page)]
+    [InlineData("System macro", ProcessedLineCategory.SystemMacro)]
+    [InlineData("Stop macro", ProcessedLineCategory.SystemMacro)]
     public void DetermineCategoryUsesCommandOrEventKeywords(string line, ProcessedLineCategory expected)
     {
         var category = ProcessedLineClassifier.DetermineCategory($"1 [2026-01-24 10:00] {line}");
@@ -30,6 +32,7 @@ public sealed class ProcessedLineClassifierColorTests
     [InlineData(ProcessedLineCategory.Button, 0xFF, 0xFF, 0x00)]
     [InlineData(ProcessedLineCategory.Page, 0x1E, 0x90, 0xFF)]
     [InlineData(ProcessedLineCategory.Macro, 0xA7, 0xA9, 0xAC)]
+    [InlineData(ProcessedLineCategory.SystemMacro, 0x9E, 0x1E, 0x9E)]
     [InlineData(ProcessedLineCategory.Default, 0x58, 0x58, 0x5A)]
     public void CategoriesUseBrandColors(ProcessedLineCategory category, byte red, byte green, byte blue)
     {

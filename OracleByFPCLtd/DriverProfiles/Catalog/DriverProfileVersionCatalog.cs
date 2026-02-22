@@ -13,6 +13,7 @@ public static class DriverProfileVersionCatalog
         ["AVProEdge MXNet_1G"] = DateTimeOffset.Parse("2026-02-11T00:00:00Z"),
         ["BijouSeries"] = DateTimeOffset.Parse("2026-02-11T00:00:00Z"),
         ["Clipsal C-Bus"] = DateTimeOffset.Parse("2026-02-11T00:00:00Z"),
+        ["DSC PowerSeries"] = DateTimeOffset.Parse("2026-02-21T00:00:00Z"),
         ["Jandy iAquaLink"] = DateTimeOffset.Parse("2026-02-11T00:00:00Z"),
         ["Layer Switch v2.x"] = DateTimeOffset.Parse("2026-02-11T00:00:00Z"),
         ["Lutron Caseta / RA2 Select"] = DateTimeOffset.Parse("2026-02-11T00:00:00Z"),
@@ -28,10 +29,12 @@ public static class DriverProfileVersionCatalog
         ["Sonance 8130"] = DateTimeOffset.Parse("2026-02-11T00:00:00Z"),
         ["Sonos"] = DateTimeOffset.Parse("2026-02-11T00:00:00Z"),
         ["System Manager"] = DateTimeOffset.Parse("2026-02-11T16:52:00Z"),
+        ["System Variables"] = DateTimeOffset.Parse("2026-02-21T00:00:00Z"),
         ["Two Way Strings"] = DateTimeOffset.Parse("2026-02-11T00:00:00Z"),
         ["Vaux Lattis Matrix"] = DateTimeOffset.Parse("2026-02-11T00:00:00Z"),
         ["VHDx"] = DateTimeOffset.Parse("2026-02-11T00:00:00Z"),
-        ["Yamaha AVENTAGE"] = DateTimeOffset.Parse("2026-02-11T00:00:00Z")
+        ["Yamaha AVENTAGE"] = DateTimeOffset.Parse("2026-02-11T00:00:00Z"),
+        ["Venstar ColorTouch"] = DateTimeOffset.Parse("2026-02-21T00:00:00Z")
     };
 
     public static bool TryGetLastUpdatedUtc(string driverName, out DateTimeOffset lastUpdatedUtc)

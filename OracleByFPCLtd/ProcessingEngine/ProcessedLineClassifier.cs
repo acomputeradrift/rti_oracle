@@ -16,6 +16,7 @@ public enum ProcessedLineCategory
     Page,
     DriverCommand,
     Macro,
+    SystemMacro,
     DriverEvent
 }
 
@@ -59,6 +60,12 @@ public static class ProcessedLineClassifier
             || content.Contains("Macro - End", StringComparison.OrdinalIgnoreCase))
         {
             return ProcessedLineCategory.Macro;
+        }
+
+        if (content.Contains("System macro", StringComparison.OrdinalIgnoreCase)
+            || content.Contains("Stop macro", StringComparison.OrdinalIgnoreCase))
+        {
+            return ProcessedLineCategory.SystemMacro;
         }
 
         if (content.Contains("Event", StringComparison.OrdinalIgnoreCase))
@@ -119,6 +126,7 @@ public static class ProcessedLineClassifier
             ProcessedLineCategory.DriverEvent => CreateBrush(0xFC, 0xB0, 0x40),
             ProcessedLineCategory.DriverCommand => CreateBrush(0xFF, 0xFF, 0xFF),
             ProcessedLineCategory.Macro => CreateBrush(0xA7, 0xA9, 0xAC),
+            ProcessedLineCategory.SystemMacro => CreateBrush(0x9E, 0x1E, 0x9E),
             _ => CreateBrush(0x58, 0x58, 0x5A)
         };
     }

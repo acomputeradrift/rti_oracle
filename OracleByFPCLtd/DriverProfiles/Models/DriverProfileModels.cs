@@ -21,7 +21,9 @@ public enum AdditionalInfoColumnRole
     InputIndex,
     InputName,
     OutputIndex,
-    OutputName
+    OutputName,
+    IntegerIndex,
+    IntegerName
 }
 
 public interface IDriverProfileMapper

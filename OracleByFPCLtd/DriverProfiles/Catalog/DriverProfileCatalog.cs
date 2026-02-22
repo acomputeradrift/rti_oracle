@@ -31,7 +31,10 @@ public static class DriverProfileCatalog
             QMotionQzHub3Profile.Definition,
             RtiVipUhdCtrlProfile.Definition,
             VhdxProfile.Definition,
-            JandyIAqualinkProfile.Definition
+            JandyIAqualinkProfile.Definition,
+            DscPowerSeriesProfile.Definition,
+            VenstarColorTouchProfile.Definition,
+            SystemVariablesProfile.Definition
         };
     }
 

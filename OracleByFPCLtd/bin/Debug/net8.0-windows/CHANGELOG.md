@@ -1,5 +1,10 @@
 # Changelog
 
+## [1.1.7] - 2026-02-20
+
+### Changed
+- Log level setting commands were updated to mirror web server behavior, making command handling significantly more robust.
+
 ## [1.1.6] - 2026-02-20
 
 ### Changed
