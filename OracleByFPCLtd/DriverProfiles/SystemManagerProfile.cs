@@ -212,16 +212,29 @@ public static class SystemManagerProfile
                 return false;
             }
 
+            var indexedSources = bundle.System.SystemManagerSourceCatalog
+                .OrderBy(entry => entry.SourceIndex)
+                .ToList();
+            if (indexedSources.Count > 0)
+            {
+                if (zeroBasedIndex >= indexedSources.Count)
+                {
+                    return false;
+                }
+
+                sourceName = indexedSources[zeroBasedIndex].SourceName;
+                return !string.IsNullOrWhiteSpace(sourceName);
+            }
+
             var orderedSources = bundle.System.SourceCatalog
                 .OrderBy(entry => entry.DeviceId)
                 .ToList();
-            var sourceNumber = zeroBasedIndex + 1;
-            if (sourceNumber <= 0 || sourceNumber > orderedSources.Count)
+            if (zeroBasedIndex >= orderedSources.Count)
             {
                 return false;
             }
 
-            var entry = orderedSources[sourceNumber - 1];
+            var entry = orderedSources[zeroBasedIndex];
             sourceName = string.IsNullOrWhiteSpace(entry.SourceDisplayName) ? entry.SourceName : entry.SourceDisplayName;
             return !string.IsNullOrWhiteSpace(sourceName);
         }

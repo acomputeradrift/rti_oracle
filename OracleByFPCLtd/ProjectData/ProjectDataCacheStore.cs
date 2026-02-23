@@ -192,6 +192,7 @@ public static class ProjectDataCacheStore
         public List<Rs232PortEntry> Rs232Ports { get; set; } = new();
         public List<RoomMappingEntry> RoomMappings { get; set; } = new();
         public List<SourceCatalogEntry> SourceCatalog { get; set; } = new();
+        public List<SystemManagerSourceCatalogEntry> SystemManagerSourceCatalog { get; set; } = new();
         public List<DriverTemplateVariableEntry> DriverTemplateVariables { get; set; } = new();
 
         public static ApexDiscoveryPreloadCache FromResult(ApexDiscoveryPreloadResult result)
@@ -209,6 +210,7 @@ public static class ProjectDataCacheStore
                 Rs232Ports = new List<Rs232PortEntry>(result.Rs232Ports),
                 RoomMappings = new List<RoomMappingEntry>(result.RoomMappings),
                 SourceCatalog = new List<SourceCatalogEntry>(result.SourceCatalog),
+                SystemManagerSourceCatalog = new List<SystemManagerSourceCatalogEntry>(result.SystemManagerSourceCatalog),
                 DriverTemplateVariables = new List<DriverTemplateVariableEntry>(result.DriverTemplateVariables)
             };
         }
@@ -239,6 +241,7 @@ public static class ProjectDataCacheStore
             result.Rs232Ports.AddRange(Rs232Ports);
             result.RoomMappings.AddRange(RoomMappings);
             result.SourceCatalog.AddRange(SourceCatalog);
+            result.SystemManagerSourceCatalog.AddRange(SystemManagerSourceCatalog);
             result.DriverTemplateVariables.AddRange(DriverTemplateVariables);
             return result;
         }

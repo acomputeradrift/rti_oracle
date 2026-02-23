@@ -311,9 +311,12 @@
 - System Manager source name categories include token patterns `SourceInUse<N>` and `SourceName<N>`.
   Value: Confirmed
   Evidence: apex_extraction_schemas.md :: Variables (System Manager) (UNFINISHED) > Proven category: Source Names
-- Source index mapping uses devices filtered by `ControlType IN (5, 6)` and ordered by `DeviceId`.
+- Source index mapping method (OLD): devices filtered by `ControlType IN (5, 6)` and ordered by `DeviceId`.
+  Value: Rejected
+  Evidence: Rejected by verified mismatch (`Set Source(149)` resolving to `AV Overview` instead of expected `Climate Overview`) in Verrier project; this method omits prefix source slots present in System Manager token space.
+- Source index mapping method (NEW): build System Manager source catalog by token range (`SourceInUse<N>` / `SourceName<N>`), prepend required prefix `SourceName*` driver-config entries when present, then append device catalog (`ControlType IN (5, 6)` ordered by `DeviceId`), and resolve `Set Source(N)` as zero-based.
   Value: Implemented
-  Evidence: ProjectData/ApexDiscoveryPreloadExtractor.cs :: ApexDiscoveryPreloadExtractor.LoadSourceCatalog
+  Evidence: OracleByFPCLtd/ProjectData/ApexDiscoveryPreloadExtractor.cs :: `LoadSystemManagerSourceCatalog`
 - System Manager display/source naming for categories beyond Source Names is not yet proven.
 - If no System Manager device row exists, use explicit literal driver naming rather than inferred device rows.
 

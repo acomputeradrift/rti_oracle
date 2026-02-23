@@ -25,6 +25,7 @@ public sealed class ApexDiscoveryPreloadResult
     public List<Rs232PortEntry> Rs232Ports { get; } = new();
     public List<RoomMappingEntry> RoomMappings { get; } = new();
     public List<SourceCatalogEntry> SourceCatalog { get; } = new();
+    public List<SystemManagerSourceCatalogEntry> SystemManagerSourceCatalog { get; } = new();
     public List<DriverTemplateVariableEntry> DriverTemplateVariables { get; } = new();
 }
 
@@ -86,6 +87,9 @@ public sealed record SourceCatalogEntry(
     int ControlType,
     string SourceName,
     string SourceDisplayName);
+public sealed record SystemManagerSourceCatalogEntry(
+    int SourceIndex,
+    string SourceName);
 public sealed record DriverTemplateVariableEntry(
     int DriverDeviceId,
     string DriverDeviceName,
@@ -143,6 +147,7 @@ public static class ApexDiscoveryPreloadExtractor
         LoadRs232Ports(connection, result.Rs232Ports);
         LoadRoomMappings(connection, result.RoomMappings);
         LoadSourceCatalog(connection, result.SourceCatalog);
+        LoadSystemManagerSourceCatalog(connection, result.DriverConfigMap, result.SourceCatalog, result.SystemManagerSourceCatalog);
         LoadDriverTemplateVariables(connection, result.DriverTemplateVariables);
 
         LogStructuredEvent(
@@ -162,6 +167,7 @@ public static class ApexDiscoveryPreloadExtractor
                 ["rs232Ports"] = result.Rs232Ports.Count.ToString(CultureInfo.InvariantCulture),
                 ["roomMappings"] = result.RoomMappings.Count.ToString(CultureInfo.InvariantCulture),
                 ["sourceCatalog"] = result.SourceCatalog.Count.ToString(CultureInfo.InvariantCulture),
+                ["systemManagerSourceCatalog"] = result.SystemManagerSourceCatalog.Count.ToString(CultureInfo.InvariantCulture),
                 ["driverTemplateVariables"] = result.DriverTemplateVariables.Count.ToString(CultureInfo.InvariantCulture)
             });
         return result;
@@ -883,6 +889,185 @@ ORDER BY DeviceId;
                 sourceName,
                 sourceDisplayName));
         }
+    }
+
+    private static void LoadSystemManagerSourceCatalog(
+        SqliteConnection connection,
+        Dictionary<int, DriverConfigEntry> driverConfigMap,
+        IReadOnlyList<SourceCatalogEntry> sourceCatalog,
+        List<SystemManagerSourceCatalogEntry> entries)
+    {
+        var deviceSources = sourceCatalog
+            .OrderBy(entry => entry.DeviceId)
+            .Select(entry => string.IsNullOrWhiteSpace(entry.SourceDisplayName) ? entry.SourceName : entry.SourceDisplayName)
+            .ToList();
+
+        var tokenCount = GetSystemManagerTokenCount(connection);
+        if (tokenCount <= 0)
+        {
+            tokenCount = deviceSources.Count;
+        }
+
+        var requiredPrefixCount = Math.Max(0, tokenCount - deviceSources.Count);
+        var prefixByIndex = ExtractSystemManagerPrefixSources(driverConfigMap, requiredPrefixCount);
+
+        var ordered = new List<string>(tokenCount);
+        for (var i = 0; i < requiredPrefixCount; i++)
+        {
+            ordered.Add(prefixByIndex.TryGetValue(i, out var value) ? value : "");
+        }
+
+        ordered.AddRange(deviceSources);
+        if (ordered.Count > tokenCount)
+        {
+            ordered = ordered.Take(tokenCount).ToList();
+        }
+
+        while (ordered.Count < tokenCount)
+        {
+            ordered.Add("");
+        }
+
+        for (var i = 0; i < ordered.Count; i++)
+        {
+            entries.Add(new SystemManagerSourceCatalogEntry(i, ordered[i]));
+        }
+    }
+
+    private static int GetSystemManagerTokenCount(SqliteConnection connection)
+    {
+        var maxIndex = -1;
+        using var command = connection.CreateCommand();
+        command.CommandText = """
+SELECT SysVarRef
+FROM SystemVariableIds
+WHERE SysVarRef LIKE '{20186C86-446C-4FC6-89E1-1931718A169B}#%@SourceInUse%'
+   OR SysVarRef LIKE '{20186C86-446C-4FC6-89E1-1931718A169B}#%@SourceName%';
+""";
+        using var reader = command.ExecuteReader();
+        while (reader.Read())
+        {
+            if (reader.IsDBNull(0))
+            {
+                continue;
+            }
+
+            var sysVarRef = reader.GetString(0);
+            var atIndex = sysVarRef.IndexOf('@');
+            if (atIndex < 0 || atIndex + 1 >= sysVarRef.Length)
+            {
+                continue;
+            }
+
+            var token = sysVarRef[(atIndex + 1)..];
+            int parsedIndex;
+            if (token.StartsWith("SourceInUse", StringComparison.OrdinalIgnoreCase)
+                && int.TryParse(token.Substring("SourceInUse".Length), NumberStyles.Integer, CultureInfo.InvariantCulture, out parsedIndex))
+            {
+                maxIndex = Math.Max(maxIndex, parsedIndex);
+                continue;
+            }
+
+            if (token.StartsWith("SourceName", StringComparison.OrdinalIgnoreCase)
+                && int.TryParse(token.Substring("SourceName".Length), NumberStyles.Integer, CultureInfo.InvariantCulture, out parsedIndex))
+            {
+                maxIndex = Math.Max(maxIndex, parsedIndex);
+            }
+        }
+
+        return maxIndex + 1;
+    }
+
+    private static Dictionary<int, string> ExtractSystemManagerPrefixSources(
+        Dictionary<int, DriverConfigEntry> driverConfigMap,
+        int requiredPrefixCount)
+    {
+        if (requiredPrefixCount <= 0)
+        {
+            return new Dictionary<int, string>();
+        }
+
+        var candidates = new List<(int DriverDeviceId, Dictionary<int, string> Values, int ContiguousCount, int TotalCount)>();
+        foreach (var driver in driverConfigMap)
+        {
+            var rawIndexValues = new Dictionary<int, string>();
+            foreach (var entry in driver.Value.Config)
+            {
+                var match = SourceNamePattern.Match(entry.Key);
+                if (!match.Success)
+                {
+                    continue;
+                }
+
+                if (!int.TryParse(match.Groups[1].Value, NumberStyles.Integer, CultureInfo.InvariantCulture, out var parsedIndex))
+                {
+                    continue;
+                }
+
+                if (string.IsNullOrWhiteSpace(entry.Value))
+                {
+                    continue;
+                }
+
+                rawIndexValues[parsedIndex] = entry.Value;
+            }
+
+            if (rawIndexValues.Count == 0)
+            {
+                continue;
+            }
+
+            var zeroBasedDriverConfig = rawIndexValues.ContainsKey(0);
+            var mappedValues = new Dictionary<int, string>();
+            foreach (var entry in rawIndexValues)
+            {
+                var mappedIndex = zeroBasedDriverConfig ? entry.Key : entry.Key - 1;
+                if (mappedIndex < 0)
+                {
+                    continue;
+                }
+
+                if (!mappedValues.ContainsKey(mappedIndex))
+                {
+                    mappedValues[mappedIndex] = entry.Value;
+                }
+            }
+
+            if (mappedValues.Count == 0)
+            {
+                continue;
+            }
+
+            var contiguousCount = 0;
+            while (mappedValues.ContainsKey(contiguousCount))
+            {
+                contiguousCount++;
+            }
+
+            candidates.Add((driver.Key, mappedValues, contiguousCount, mappedValues.Count));
+        }
+
+        if (candidates.Count == 0)
+        {
+            return new Dictionary<int, string>();
+        }
+
+        var selected = candidates
+            .OrderByDescending(candidate => candidate.ContiguousCount)
+            .ThenByDescending(candidate => candidate.TotalCount)
+            .ThenBy(candidate => candidate.DriverDeviceId)
+            .First();
+
+        var result = new Dictionary<int, string>();
+        for (var i = 0; i < requiredPrefixCount; i++)
+        {
+            if (selected.Values.TryGetValue(i, out var name))
+            {
+                result[i] = name;
+            }
+        }
+
+        return result;
     }
 
     private static void LoadDriverTemplateVariables(SqliteConnection connection, List<DriverTemplateVariableEntry> entries)

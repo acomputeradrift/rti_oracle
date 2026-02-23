@@ -124,7 +124,7 @@ public sealed class ProcessingEngineMappingTests
 
         var line = service.Map(evt, bundle);
 
-        Assert.Equal("4 Driver - Command:'Clipsal C-Bus\\General\\Immediate Switch(121 [Unknown State!], Living Room Pendant, 56)' Sustain:NO", line.Text);
+        Assert.Equal("4 Driver - Command:'Clipsal C-Bus\\General\\Immediate Switch(121 [Unknown State!], Living Room Pendant)' Sustain:NO", line.Text);
         Assert.True(line.IsUnresolved);
     }
 
@@ -140,6 +140,20 @@ public sealed class ProcessingEngineMappingTests
 
         Assert.Equal("2 Driver event 'When 'App 56, Group 25 [No Map!] On' happens on 'Clipsal C-Bus\\App 56 Group On''", line.Text);
         Assert.True(line.IsUnresolved);
+    }
+
+    [Fact]
+    public void DriverMappingServiceFormatsTimestampedCbusSceneEvent()
+    {
+        var bundle = BuildBundleWithCbus();
+        bundle.Additional.Drivers["Clipsal C-Bus"].CbusScenes[(202, 33, 0)] = new CbusSceneEntry("West Bedroom North Recessed");
+        var service = new DriverMappingService();
+        var evt = new DiagnosticEvent(92, "[2026-02-23 07:25:34.196] Driver event 'When 'App 202, Group 33 Off' happens on 'Clipsal C-Bus\\App 202 Group Off''");
+
+        var line = service.Map(evt, bundle);
+
+        Assert.Equal("92 [2026-02-23 07:25:34.196] Driver Event (Clipsal C-Bus): 'When West Bedroom North Recessed turns Off.'", line.Text);
+        Assert.False(line.IsUnresolved);
     }
 
     [Fact]

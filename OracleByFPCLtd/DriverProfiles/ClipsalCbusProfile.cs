@@ -115,6 +115,7 @@ public static class ClipsalCbusProfile
                 {
                     mappedArgs[0] = MapImmediateSwitchState(mappedArgs[0], ref unresolved);
                     mappedArgs[1] = MapCbusGroup(driverData, mappedArgs[2], mappedArgs[1], ref unresolved);
+                    mappedArgs.RemoveAt(2);
                 }
             }
             else if (prefix.EndsWith("\\General", StringComparison.OrdinalIgnoreCase)
@@ -275,6 +276,16 @@ public static class ClipsalCbusProfile
             if (data.CbusGroups.TryGetValue((appId, groupId), out var entry))
             {
                 return FormatGroupName(entry);
+            }
+
+            var sceneNames = data.CbusScenes
+                .Where(entry => entry.Key.AppId == appId && entry.Key.GroupId == groupId && !string.IsNullOrWhiteSpace(entry.Value.SceneName))
+                .Select(entry => entry.Value.SceneName.Trim())
+                .Distinct(StringComparer.Ordinal)
+                .ToList();
+            if (sceneNames.Count == 1)
+            {
+                return sceneNames[0];
             }
 
             unresolved = true;

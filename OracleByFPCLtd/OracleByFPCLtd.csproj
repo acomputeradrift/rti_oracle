@@ -35,4 +35,8 @@
       <CopyToPublishDirectory>Always</CopyToPublishDirectory>
     </Content>
   </ItemGroup>
+
+  <ItemGroup>
+    <Compile Remove="OracleByFPCLtd.Tests\\**\\*.cs" />
+  </ItemGroup>
 </Project>

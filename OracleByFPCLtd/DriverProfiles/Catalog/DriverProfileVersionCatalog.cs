@@ -28,7 +28,7 @@ public static class DriverProfileVersionCatalog
         ["Samsung Ex-Link"] = DateTimeOffset.Parse("2026-02-11T00:00:00Z"),
         ["Sonance 8130"] = DateTimeOffset.Parse("2026-02-11T00:00:00Z"),
         ["Sonos"] = DateTimeOffset.Parse("2026-02-11T00:00:00Z"),
-        ["System Manager"] = DateTimeOffset.Parse("2026-02-11T16:52:00Z"),
+        ["System Manager"] = DateTimeOffset.Parse("2026-02-23T00:00:00Z"),
         ["System Variables"] = DateTimeOffset.Parse("2026-02-21T00:00:00Z"),
         ["Two Way Strings"] = DateTimeOffset.Parse("2026-02-11T00:00:00Z"),
         ["Vaux Lattis Matrix"] = DateTimeOffset.Parse("2026-02-11T00:00:00Z"),

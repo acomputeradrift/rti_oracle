@@ -11,6 +11,8 @@ public static class DriverMessageTemplateFormatter
     private static readonly Regex TimestampRegex = new("^\\[(?<time>[^\\]]+)\\]\\s*(?<body>.*)$", RegexOptions.Compiled);
     private static readonly Regex CommandRegex = new("^Driver - Command:\\s*'(?<command>[^']+)'(?:\\s*(?<extra>.*))?$", RegexOptions.Compiled | RegexOptions.IgnoreCase);
     private static readonly Regex EventRegex = new("^Driver event\\s*'When\\s*'(?<event>[^']+)'\\s*happens on\\s*'(?<driver>[^'\\\\]+)\\\\(?<path>[^']*)''(?:\\s*(?<extra>.*))?$", RegexOptions.Compiled | RegexOptions.IgnoreCase);
+    private static readonly Regex ClipsalEventPattern = new("^App\\s+(?<app>\\d+)\\s*,\\s*(?<target>.+?)\\s+(?<state>On|Off)$", RegexOptions.Compiled | RegexOptions.IgnoreCase);
+    private static readonly Regex TrailingStatePattern = new("^(?<target>.+?)\\s+(?<state>On|Off)$", RegexOptions.Compiled | RegexOptions.IgnoreCase);
 
     public static bool TryFormatDriverCommand(string mappedText, string driverName, out string formattedText)
     {
@@ -88,9 +90,18 @@ public static class DriverMessageTemplateFormatter
             return false;
         }
 
+        var eventPath = match.Groups["path"].Value;
         if (driverName.Equals("Vantage InFusion", StringComparison.OrdinalIgnoreCase))
         {
             sentence = NormalizeVantageEventSentence(sentence);
+        }
+        else if (driverName.Equals("Clipsal C-Bus", StringComparison.OrdinalIgnoreCase))
+        {
+            sentence = NormalizeClipsalEventSentence(sentence, eventPath);
+        }
+        else if (driverName.Equals("Lutron Caseta / RA2 Select", StringComparison.OrdinalIgnoreCase))
+        {
+            sentence = NormalizeLutronEventSentence(sentence);
         }
 
         sentence = $"When {sentence}";
@@ -173,7 +184,7 @@ public static class DriverMessageTemplateFormatter
         sentence = "";
         if (actionName.Equals("Immediate Switch", StringComparison.OrdinalIgnoreCase) && args.Count >= 2)
         {
-            sentence = $"{args[1]} switched to {args[0]}";
+            sentence = $"{args[1]} turned {args[0]}";
             return true;
         }
 
@@ -620,7 +631,7 @@ public static class DriverMessageTemplateFormatter
         {
             var name = StripIdSuffix(args[0]);
             var duration = TryFormatDuration(args[2], out var durationText) ? durationText : args[2];
-            sentence = $"{name} dimmer level ramped to {args[1]} over {duration}";
+            sentence = $"{name} ramped to {args[1]} over {duration}";
             return true;
         }
 
@@ -629,11 +640,18 @@ public static class DriverMessageTemplateFormatter
             var name = StripIdSuffix(args[0]);
             if (args[1].Equals("Toggle", StringComparison.OrdinalIgnoreCase))
             {
-                sentence = $"{name} switch toggled";
+                sentence = $"{name} toggled";
                 return true;
             }
 
-            sentence = $"{name} switch set to {args[1]}";
+            if (args[1].Equals("On", StringComparison.OrdinalIgnoreCase)
+                || args[1].Equals("Off", StringComparison.OrdinalIgnoreCase))
+            {
+                sentence = $"{name} turned {args[1]}";
+                return true;
+            }
+
+            sentence = $"{name} set to {args[1]}";
             return true;
         }
 
@@ -753,6 +771,47 @@ public static class DriverMessageTemplateFormatter
         }
 
         return sentence;
+    }
+
+    private static string NormalizeClipsalEventSentence(string sentence, string eventPath)
+    {
+        if (eventPath.Contains("HVAC", StringComparison.OrdinalIgnoreCase))
+        {
+            return sentence;
+        }
+
+        var match = ClipsalEventPattern.Match(sentence);
+        if (!match.Success)
+        {
+            return sentence;
+        }
+
+        var target = match.Groups["target"].Value.Trim();
+        var state = match.Groups["state"].Value.Trim();
+        if (string.IsNullOrWhiteSpace(target) || string.IsNullOrWhiteSpace(state))
+        {
+            return sentence;
+        }
+
+        return $"{target} turns {state}";
+    }
+
+    private static string NormalizeLutronEventSentence(string sentence)
+    {
+        var match = TrailingStatePattern.Match(sentence);
+        if (!match.Success)
+        {
+            return sentence;
+        }
+
+        var target = match.Groups["target"].Value.Trim();
+        var state = match.Groups["state"].Value.Trim();
+        if (string.IsNullOrWhiteSpace(target) || string.IsNullOrWhiteSpace(state))
+        {
+            return sentence;
+        }
+
+        return $"{target} turns {state}";
     }
 
     private static bool TryExtractTimestampAndBody(string rawText, out string timestamp, out string body)

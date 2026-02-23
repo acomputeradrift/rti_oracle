@@ -87,7 +87,8 @@ public sealed class ProjectDataExtractor : IProjectDataExtractor
         }
 
         if (ProjectDataCacheStore.TryLoad(apexPath, out var cached)
-            && cached.ApexDiscoveryPreload.SourceCatalog.Count > 0)
+            && cached.ApexDiscoveryPreload.SourceCatalog.Count > 0
+            && cached.ApexDiscoveryPreload.SystemManagerSourceCatalog.Count > 0)
         {
             LogStructuredEvent(
                 SeverityLevel.Info,

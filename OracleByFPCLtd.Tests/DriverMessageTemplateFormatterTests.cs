@@ -13,7 +13,7 @@ public sealed class DriverMessageTemplateFormatterTests
         var formatted = DriverMessageTemplateFormatter.TryFormatDriverCommand(mappedText, "Clipsal C-Bus", out var output);
 
         Assert.True(formatted);
-        Assert.Equal("[2026-02-10 19:00:39.485] Driver Command (Clipsal C-Bus): 'Garage Motion Sensor switched to On.'", output);
+        Assert.Equal("[2026-02-10 19:00:39.485] Driver Command (Clipsal C-Bus): 'Garage Motion Sensor turned On.'", output);
     }
 
     [Fact]
@@ -156,5 +156,49 @@ public sealed class DriverMessageTemplateFormatterTests
 
         Assert.True(formatted);
         Assert.Equal("[2026-02-22 12:11:00.000] Driver Event (Vantage InFusion): 'When SE Lamp (VID 178) is turned ON.'", output);
+    }
+
+    [Fact]
+    public void TryFormatDriverEventFormatsClipsalGroupEventWithTurnsState()
+    {
+        var mappedText = "[2026-02-23 07:25:34.196] Driver event 'When 'App 56, West Bedroom North Recessed Off' happens on 'Clipsal C-Bus\\App 56 Group Off''";
+
+        var formatted = DriverMessageTemplateFormatter.TryFormatDriverEvent(mappedText, "Clipsal C-Bus", out var output);
+
+        Assert.True(formatted);
+        Assert.Equal("[2026-02-23 07:25:34.196] Driver Event (Clipsal C-Bus): 'When West Bedroom North Recessed turns Off.'", output);
+    }
+
+    [Fact]
+    public void TryFormatDriverEventKeepsClipsalHvacEventText()
+    {
+        var mappedText = "[2026-02-23 07:25:34.196] Driver event 'When 'App 56, Garage HVAC On' happens on 'Clipsal C-Bus\\HVAC Events''";
+
+        var formatted = DriverMessageTemplateFormatter.TryFormatDriverEvent(mappedText, "Clipsal C-Bus", out var output);
+
+        Assert.True(formatted);
+        Assert.Equal("[2026-02-23 07:25:34.196] Driver Event (Clipsal C-Bus): 'When App 56, Garage HVAC On.'", output);
+    }
+
+    [Fact]
+    public void TryFormatDriverEventFormatsLutronEventWithTurnsState()
+    {
+        var mappedText = "[2026-02-23 07:25:34.196] Driver event 'When 'Master - East Pendant Off' happens on 'Lutron Caseta / RA2 Select\\Switch Events''";
+
+        var formatted = DriverMessageTemplateFormatter.TryFormatDriverEvent(mappedText, "Lutron Caseta / RA2 Select", out var output);
+
+        Assert.True(formatted);
+        Assert.Equal("[2026-02-23 07:25:34.196] Driver Event (Lutron Caseta / RA2 Select): 'When Master - East Pendant turns Off.'", output);
+    }
+
+    [Fact]
+    public void TryFormatDriverCommandFormatsLutronSwitchCommandAsLightTurnedState()
+    {
+        var mappedText = "[2026-02-23 07:25:34.196] Driver - Command:'Lutron Caseta / RA2 Select\\Switches\\Switch Commands(Master - East Pendant (ID 55), Off)' Sustain:NO";
+
+        var formatted = DriverMessageTemplateFormatter.TryFormatDriverCommand(mappedText, "Lutron Caseta / RA2 Select", out var output);
+
+        Assert.True(formatted);
+        Assert.Equal("[2026-02-23 07:25:34.196] Driver Command (Lutron Caseta / RA2 Select): 'Master - East Pendant turned Off.'", output);
     }
 }
