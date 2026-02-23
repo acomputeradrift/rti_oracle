@@ -2187,11 +2187,8 @@ public partial class MainWindow : Window
         {
             var extractor = new ProjectDataExtractor();
             var result = await Task.Run(() => extractor.Extract(filePath));
-            Dispatcher.Invoke(() =>
-            {
-                InitializeProcessing(result);
-                UpdateAdditionalInfoTemplateAvailability(result);
-            });
+            await InitializeProcessingAsync(result);
+            UpdateAdditionalInfoTemplateAvailability(result);
             var durationMs = ((long)(DateTime.UtcNow - startedUtc).TotalMilliseconds).ToString(CultureInfo.InvariantCulture);
             EmitPhaseStatus(
                 "ProjectData:Apex",
@@ -3848,6 +3845,13 @@ public partial class MainWindow : Window
         InitializeProcessing(result, additionalData);
     }
 
+    private async Task InitializeProcessingAsync(ProjectDataExtractionResult result)
+    {
+        var additionalData = LoadAdditionalData(result);
+        _lastAdditionalData = additionalData;
+        await InitializeProcessingAsync(result, additionalData);
+    }
+
     private void InitializeProcessing(ProjectDataExtractionResult result, AdditionalData additionalData)
     {
         _deviceNameToId.Clear();
@@ -3964,6 +3968,169 @@ public partial class MainWindow : Window
             SetProcessedOutput(_processedLogLines, showPlaceholderIfEmpty: true);
             UpdateDownloadLogsState();
         }
+    }
+
+    private async Task InitializeProcessingAsync(ProjectDataExtractionResult result, AdditionalData additionalData)
+    {
+        _deviceNameToId.Clear();
+        foreach (var entry in result.DiagnosticsMapping)
+        {
+            if (!_deviceNameToId.ContainsKey(entry.DeviceName))
+            {
+                _deviceNameToId[entry.DeviceName] = entry.DeviceId;
+            }
+        }
+
+        var baseBundle = ProjectDataBundle.FromExtractionResult(result);
+        var bundle = new ProjectDataBundle
+        {
+            System = baseBundle.System,
+            Drivers = baseBundle.Drivers,
+            Additional = additionalData
+        };
+        _processingEngine = new ProcessingEngine.ProcessingEngine(bundle);
+
+        var rawSnapshot = _rawLogLines.ToList();
+        var total = rawSnapshot.Count;
+        ShowReprocessingOverlay(total);
+
+        List<string> processed;
+        try
+        {
+            processed = await Task.Run(() =>
+                ProcessingEngineRunner.ProcessNumberedLines(
+                    rawSnapshot,
+                    _processingEngine,
+                    (current, max) =>
+                    {
+                        if (max > 0 && current != max && current % 100 != 0)
+                        {
+                            return;
+                        }
+
+                        Dispatcher.Invoke(() => UpdateReprocessingOverlay(current, max));
+                    }));
+        }
+        catch (Exception ex)
+        {
+            EmitPhaseStatus(
+                "Processing:Formatting",
+                "FAIL",
+                "Formatting failed",
+                "formatting_error",
+                new Dictionary<string, string> { ["error"] = ex.Message },
+                ex);
+            EmitPhaseStatus(
+                "Processing:Mapping",
+                "FAIL",
+                "Mapping failed",
+                "mapping_error",
+                new Dictionary<string, string> { ["error"] = ex.Message },
+                ex);
+            throw;
+        }
+        finally
+        {
+            HideReprocessingOverlay();
+        }
+
+        if (_rawLogLines.Count == 0 || processed.Count == 0)
+        {
+            LogStructuredEvent(
+                SeverityLevel.Info,
+                "MainWindow",
+                "Processing:Formatting",
+                "Formatting skipped because no log lines were available",
+                new Dictionary<string, string>
+                {
+                    ["rawCount"] = _rawLogLines.Count.ToString(CultureInfo.InvariantCulture),
+                    ["processedCount"] = processed.Count.ToString(CultureInfo.InvariantCulture)
+                });
+        }
+        else
+        {
+            EmitPhaseStatus(
+                "Processing:Formatting",
+                "SUCCESS",
+                "Formatting complete",
+                "formatting_complete",
+                new Dictionary<string, string>
+                {
+                    ["rawCount"] = _rawLogLines.Count.ToString(CultureInfo.InvariantCulture),
+                    ["processedCount"] = processed.Count.ToString(CultureInfo.InvariantCulture)
+                });
+            LogStructuredEvent(
+                SeverityLevel.Info,
+                "MainWindow",
+                "Processing:Formatting",
+                "Raw log line formatted (line number, date/time stamp)",
+                new Dictionary<string, string>
+                {
+                    ["rawCount"] = _rawLogLines.Count.ToString(CultureInfo.InvariantCulture)
+                });
+            LogStructuredEvent(
+                SeverityLevel.Info,
+                "MainWindow",
+                "Processing:Formatting",
+                "Processed log line formatted (line number, date/time stamp, readablility)",
+                new Dictionary<string, string>
+                {
+                    ["processedCount"] = processed.Count.ToString(CultureInfo.InvariantCulture)
+                });
+        }
+
+        var unresolvedCount = processed.Count(HasDiagnosticTag);
+        if (processed.Count > 0)
+        {
+            EmitPhaseStatus(
+                "Processing:Mapping",
+                "SUCCESS",
+                "Mapping complete",
+                unresolvedCount > 0 ? "mapping_complete_with_unresolved" : "mapping_complete",
+                new Dictionary<string, string>
+                {
+                    ["processedCount"] = processed.Count.ToString(CultureInfo.InvariantCulture),
+                    ["unresolvedCount"] = unresolvedCount.ToString(CultureInfo.InvariantCulture)
+                });
+        }
+
+        _processedLogLines.Clear();
+        _processedLogLines.AddRange(processed);
+        RecordTaggedMessages(_processedLogLines);
+        if (_filterActive)
+        {
+            ApplyCurrentFilter();
+        }
+        else
+        {
+            SetProcessedOutput(_processedLogLines, showPlaceholderIfEmpty: true);
+            UpdateDownloadLogsState();
+        }
+    }
+
+    private void ShowReprocessingOverlay(int total)
+    {
+        ReprocessingProgressBar.Minimum = 0;
+        ReprocessingProgressBar.Maximum = Math.Max(total, 1);
+        ReprocessingProgressBar.Value = 0;
+        ReprocessingStatusText.Text = "Reprocessing log lines against new Additional Info...";
+        ReprocessingOverlay.Visibility = Visibility.Visible;
+    }
+
+    private void UpdateReprocessingOverlay(int current, int total)
+    {
+        var safeTotal = Math.Max(total, 1);
+        var safeCurrent = Math.Max(0, Math.Min(current, safeTotal));
+        ReprocessingProgressBar.Maximum = safeTotal;
+        ReprocessingProgressBar.Value = safeCurrent;
+        ReprocessingStatusText.Text = $"Reprocessing log lines against new Additional Info... ({safeCurrent}/{safeTotal})";
+    }
+
+    private void HideReprocessingOverlay()
+    {
+        ReprocessingOverlay.Visibility = Visibility.Collapsed;
+        ReprocessingProgressBar.Value = 0;
+        ReprocessingStatusText.Text = "Reprocessing log lines against new Additional Info...";
     }
 
     private AdditionalData LoadAdditionalData(ProjectDataExtractionResult result)

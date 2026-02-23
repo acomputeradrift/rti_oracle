@@ -152,5 +152,33 @@
       <CheckBox x:Name="TcpCaptureCheckBox" Content="TCP Capture (RAW)" />
       <CheckBox x:Name="SendProbeCheckBox" Content="Send probe on connect (diagnostic)" />
     </StackPanel>
+
+    <Grid x:Name="ReprocessingOverlay"
+          Grid.Row="0"
+          Grid.RowSpan="5"
+          Grid.Column="0"
+          Background="#A0000000"
+          Visibility="Collapsed"
+          Panel.ZIndex="50">
+      <Border Width="420"
+              Padding="16"
+              CornerRadius="6"
+              Background="White"
+              HorizontalAlignment="Center"
+              VerticalAlignment="Center">
+        <StackPanel>
+          <TextBlock x:Name="ReprocessingStatusText"
+                     Text="Reprocessing log lines against new Additional Info..."
+                     Margin="0,0,0,10"
+                     TextWrapping="Wrap"
+                     FontWeight="SemiBold" />
+          <ProgressBar x:Name="ReprocessingProgressBar"
+                       Height="16"
+                       Minimum="0"
+                       Maximum="100"
+                       Value="0" />
+        </StackPanel>
+      </Border>
+    </Grid>
   </Grid>
 </Window>

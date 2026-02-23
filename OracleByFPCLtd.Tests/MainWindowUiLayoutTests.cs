@@ -21,6 +21,9 @@ public sealed class MainWindowUiLayoutTests
             Assert.NotNull(window.FindName("DownloadAdditionalInfoTemplateMenuItemControl"));
             Assert.NotNull(window.FindName("AutoscrollMenuItemControl"));
             Assert.NotNull(window.FindName("AboutMenuItemControl"));
+            Assert.NotNull(window.FindName("ReprocessingOverlay"));
+            Assert.NotNull(window.FindName("ReprocessingStatusText"));
+            Assert.NotNull(window.FindName("ReprocessingProgressBar"));
 
             var connection = (OracleByFPCLtd.UI.Panels.ConnectionPanel)window.FindName("ConnectionPanel")!;
             Assert.NotNull(connection.ConnectHeaderText);

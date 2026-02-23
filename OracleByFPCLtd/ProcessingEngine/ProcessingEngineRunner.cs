@@ -16,6 +16,14 @@ public static class ProcessingEngineRunner
 
     public static List<string> ProcessNumberedLines(IEnumerable<string> lines, ProcessingEngine engine)
     {
+        return ProcessNumberedLines(lines, engine, progress: null);
+    }
+
+    public static List<string> ProcessNumberedLines(
+        IEnumerable<string> lines,
+        ProcessingEngine engine,
+        Action<int, int>? progress)
+    {
         if (lines is null)
         {
             throw new ArgumentNullException(nameof(lines));
@@ -25,11 +33,16 @@ public static class ProcessingEngineRunner
             throw new ArgumentNullException(nameof(engine));
         }
 
-        var results = new List<string>();
-        foreach (var line in lines)
+        var lineList = lines as IList<string> ?? new List<string>(lines);
+        var total = lineList.Count;
+        var processedCount = 0;
+        var results = new List<string>(total);
+        foreach (var line in lineList)
         {
             if (!RawLogParser.TryParseNumberedLine(line, out var evt))
             {
+                processedCount++;
+                progress?.Invoke(processedCount, total);
                 continue;
             }
 
@@ -53,6 +66,14 @@ public static class ProcessingEngineRunner
                 {
                     ["line"] = evt.RawLineNumber.ToString()
                 });
+
+            processedCount++;
+            progress?.Invoke(processedCount, total);
+        }
+
+        if (total == 0)
+        {
+            progress?.Invoke(0, 0);
         }
 
         return results;
