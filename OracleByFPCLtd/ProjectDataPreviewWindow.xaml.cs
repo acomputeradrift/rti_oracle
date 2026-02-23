@@ -14,6 +14,7 @@ public partial class ProjectDataPreviewWindow : Window
 {
     private readonly string _apexPath;
     private readonly IProjectDataExtractor _extractor;
+    private readonly ProjectDataExtractionResult? _extractionResult;
     private readonly AdditionalData? _additionalData;
     private ApexDiscoveryPreloadResult? _preload;
     private readonly CentralLogger _centralLogger = new(new CentralLoggerOptions
@@ -35,12 +36,16 @@ public partial class ProjectDataPreviewWindow : Window
     public ObservableCollection<AdditionalInfoDisplayEntry> AdditionalInfoEntries { get; } = new();
     public ObservableCollection<string> AdditionalInfoErrors { get; } = new();
 
-    public ProjectDataPreviewWindow(string apexPath, AdditionalData? additionalData = null)
+    public ProjectDataPreviewWindow(
+        string apexPath,
+        ProjectDataExtractionResult? extractionResult = null,
+        AdditionalData? additionalData = null)
     {
         InitializeComponent();
         DataContext = this;
         _apexPath = apexPath;
         _extractor = new ProjectDataExtractor();
+        _extractionResult = extractionResult;
         _additionalData = additionalData;
         Loaded += ProjectDataPreviewWindow_Loaded;
     }
@@ -54,8 +59,17 @@ public partial class ProjectDataPreviewWindow : Window
     {
         try
         {
-            var progress = new Progress<ProjectDataExtractionProgress>(UpdateProgress);
-            var result = await Task.Run(() => _extractor.Extract(_apexPath, progress));
+            ProjectDataExtractionResult result;
+            if (_extractionResult is not null)
+            {
+                result = _extractionResult;
+                UpdateProgress(new ProjectDataExtractionProgress("Loaded from memory", 100));
+            }
+            else
+            {
+                var progress = new Progress<ProjectDataExtractionProgress>(UpdateProgress);
+                result = await Task.Run(() => _extractor.Extract(_apexPath, progress));
+            }
 
             DiagnosticsMapping.Clear();
             foreach (var entry in result.DiagnosticsMapping)
@@ -140,10 +154,6 @@ public partial class ProjectDataPreviewWindow : Window
 
             LoadAdditionalInfoEntries();
             _preload = result.ApexDiscoveryPreload;
-            if (Owner is MainWindow mainWindow)
-            {
-                mainWindow.InitializeProcessing(result);
-            }
             UpdateProgress(new ProjectDataExtractionProgress("Complete", 100));
         }
         catch (Exception ex)

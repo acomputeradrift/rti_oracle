@@ -141,6 +141,10 @@ public sealed class AdditionalDataExtractorTests
             Assert.True(data.Drivers.ContainsKey("System Variables"));
             var driverData = data.Drivers["System Variables"];
             Assert.Equal("Room Count", driverData.IntegerNames[1]);
+            Assert.Contains(driverData.PreviewEntries, entry =>
+                entry.MapType == "System Variables"
+                && entry.Index == 1
+                && entry.Name == "Room Count");
         }
         finally
         {
@@ -168,6 +172,10 @@ public sealed class AdditionalDataExtractorTests
             Assert.DoesNotContain(data.Errors, error => error.Contains("Unmatched sheet: RTI RCM-12 Relay Module", StringComparison.Ordinal));
             Assert.Contains("RTI Internal", data.Drivers.Keys);
             Assert.Equal("Boiler Pump", data.Drivers["RTI Internal"].RelayNames[2]);
+            Assert.Contains(data.Drivers["RTI Internal"].PreviewEntries, entry =>
+                entry.MapType == "RTI RCM-12 Relay Module"
+                && entry.Index == 2
+                && entry.Name == "Boiler Pump");
         }
         finally
         {

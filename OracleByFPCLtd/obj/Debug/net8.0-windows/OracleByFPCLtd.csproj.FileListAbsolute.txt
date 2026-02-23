@@ -156,3 +156,15 @@ Y:\Desktop\Development\Oracle\OracleByFPCLtd\obj\Debug\net8.0-windows\refint\Ora
 Y:\Desktop\Development\Oracle\OracleByFPCLtd\obj\Debug\net8.0-windows\OracleByFPCLtd.pdb
 Y:\Desktop\Development\Oracle\OracleByFPCLtd\obj\Debug\net8.0-windows\OracleByFPCLtd.genruntimeconfig.cache
 Y:\Desktop\Development\Oracle\OracleByFPCLtd\obj\Debug\net8.0-windows\ref\OracleByFPCLtd.dll
+\\Mac\Home\Desktop\Development\Oracle\.tmp_test_out\Debug\net8.0-windows\CHANGELOG.md
+\\Mac\Home\Desktop\Development\Oracle\.tmp_test_out\Debug\net8.0-windows\OracleByFPCLtd.exe
+\\Mac\Home\Desktop\Development\Oracle\.tmp_test_out\Debug\net8.0-windows\OracleByFPCLtd.deps.json
+\\Mac\Home\Desktop\Development\Oracle\.tmp_test_out\Debug\net8.0-windows\OracleByFPCLtd.runtimeconfig.json
+\\Mac\Home\Desktop\Development\Oracle\.tmp_test_out\Debug\net8.0-windows\OracleByFPCLtd.dll
+\\Mac\Home\Desktop\Development\Oracle\.tmp_test_out\Debug\net8.0-windows\OracleByFPCLtd.pdb
+\\Mac\Home\Desktop\Development\Oracle\.tmp_build_out\Debug\net8.0-windows\CHANGELOG.md
+\\Mac\Home\Desktop\Development\Oracle\.tmp_build_out\Debug\net8.0-windows\OracleByFPCLtd.exe
+\\Mac\Home\Desktop\Development\Oracle\.tmp_build_out\Debug\net8.0-windows\OracleByFPCLtd.deps.json
+\\Mac\Home\Desktop\Development\Oracle\.tmp_build_out\Debug\net8.0-windows\OracleByFPCLtd.runtimeconfig.json
+\\Mac\Home\Desktop\Development\Oracle\.tmp_build_out\Debug\net8.0-windows\OracleByFPCLtd.dll
+\\Mac\Home\Desktop\Development\Oracle\.tmp_build_out\Debug\net8.0-windows\OracleByFPCLtd.pdb

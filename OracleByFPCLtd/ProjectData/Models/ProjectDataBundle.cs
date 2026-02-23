@@ -138,6 +138,7 @@ public sealed class AdditionalData
 
 public sealed class AdditionalDriverData
 {
+    public List<AdditionalInfoPreviewEntry> PreviewEntries { get; } = new();
     public Dictionary<int, string> InputNames { get; } = new();
     public Dictionary<int, string> OutputNames { get; } = new();
     public Dictionary<int, string> IntegerNames { get; } = new();
@@ -150,3 +151,4 @@ public sealed class AdditionalDriverData
 public sealed record CbusGroupEntry(string GroupRoom, string GroupName);
 public sealed record CbusHvacEntry(string GroupName, string ZoneName);
 public sealed record CbusSceneEntry(string SceneName);
+public sealed record AdditionalInfoPreviewEntry(string MapType, int Index, string Name);

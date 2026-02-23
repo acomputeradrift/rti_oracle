@@ -27,6 +27,19 @@ public static class AdditionalInfoDisplayBuilder
 
         foreach (var driver in data.Drivers.OrderBy(entry => entry.Key))
         {
+            if (driver.Value.PreviewEntries.Count > 0)
+            {
+                foreach (var entry in driver.Value.PreviewEntries
+                    .OrderBy(entry => entry.MapType, System.StringComparer.Ordinal)
+                    .ThenBy(entry => entry.Index)
+                    .ThenBy(entry => entry.Name, System.StringComparer.Ordinal))
+                {
+                    yield return new AdditionalInfoDisplayEntry(driver.Key, entry.MapType, entry.Index, entry.Name);
+                }
+
+                continue;
+            }
+
             foreach (var entry in driver.Value.InputNames.OrderBy(entry => entry.Key))
             {
                 yield return new AdditionalInfoDisplayEntry(driver.Key, "Input", entry.Key, entry.Value);
@@ -35,6 +48,16 @@ public static class AdditionalInfoDisplayBuilder
             foreach (var entry in driver.Value.OutputNames.OrderBy(entry => entry.Key))
             {
                 yield return new AdditionalInfoDisplayEntry(driver.Key, "Output", entry.Key, entry.Value);
+            }
+
+            foreach (var entry in driver.Value.IntegerNames.OrderBy(entry => entry.Key))
+            {
+                yield return new AdditionalInfoDisplayEntry(driver.Key, "Integer", entry.Key, entry.Value);
+            }
+
+            foreach (var entry in driver.Value.RelayNames.OrderBy(entry => entry.Key))
+            {
+                yield return new AdditionalInfoDisplayEntry(driver.Key, "Relay", entry.Key, entry.Value);
             }
 
             foreach (var entry in driver.Value.CbusGroups.OrderBy(entry => entry.Key.GroupId))

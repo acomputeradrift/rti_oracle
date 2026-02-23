@@ -449,6 +449,8 @@ public static class AdditionalDataExtractor
 
         foreach (var row in rows)
         {
+            AddSchemaPreviewEntry(driverData, schema, row);
+
             if (appIdHeader != null && groupIdHeader != null && (groupRoomHeader != null || groupNameHeader != null))
             {
                 var appIdText = row.TryGetValue(appIdHeader, out var appId) ? appId : "";
@@ -545,6 +547,103 @@ public static class AdditionalDataExtractor
                 }
             }
         }
+    }
+
+    private static void AddSchemaPreviewEntry(
+        AdditionalDriverData driverData,
+        AdditionalInfoSheetSchema schema,
+        IReadOnlyDictionary<string, string> row)
+    {
+        var index = 0;
+        var hasIndex = false;
+        var labels = new List<string>();
+
+        foreach (var column in schema.Columns)
+        {
+            if (!row.TryGetValue(column.Header, out var rawValue))
+            {
+                continue;
+            }
+
+            var value = rawValue?.Trim() ?? "";
+            if (string.IsNullOrWhiteSpace(value))
+            {
+                continue;
+            }
+
+            if (!hasIndex && IsIndexRole(column.Role) && TryParseIndex(value, out var parsedIndex))
+            {
+                index = parsedIndex;
+                hasIndex = true;
+            }
+
+            if (IsNameRole(column.Role))
+            {
+                labels.Add(value);
+            }
+        }
+
+        var name = labels.Count > 0
+            ? string.Join(" | ", labels.Distinct(StringComparer.Ordinal))
+            : BuildFallbackLabel(schema, row);
+        if (string.IsNullOrWhiteSpace(name))
+        {
+            return;
+        }
+
+        var previewEntry = new AdditionalInfoPreviewEntry(schema.SheetName, hasIndex ? index : 0, name);
+        if (!driverData.PreviewEntries.Contains(previewEntry))
+        {
+            driverData.PreviewEntries.Add(previewEntry);
+        }
+    }
+
+    private static bool IsIndexRole(AdditionalInfoColumnRole role)
+    {
+        return role is AdditionalInfoColumnRole.InputIndex
+            or AdditionalInfoColumnRole.OutputIndex
+            or AdditionalInfoColumnRole.IntegerIndex
+            or AdditionalInfoColumnRole.RelayIndex
+            or AdditionalInfoColumnRole.AppId
+            or AdditionalInfoColumnRole.GroupId
+            or AdditionalInfoColumnRole.ZoneId
+            or AdditionalInfoColumnRole.ActionSelector;
+    }
+
+    private static bool IsNameRole(AdditionalInfoColumnRole role)
+    {
+        return role is AdditionalInfoColumnRole.InputName
+            or AdditionalInfoColumnRole.OutputName
+            or AdditionalInfoColumnRole.IntegerName
+            or AdditionalInfoColumnRole.RelayName
+            or AdditionalInfoColumnRole.GroupName
+            or AdditionalInfoColumnRole.ZoneName
+            or AdditionalInfoColumnRole.GroupRoom
+            or AdditionalInfoColumnRole.SceneName;
+    }
+
+    private static string BuildFallbackLabel(
+        AdditionalInfoSheetSchema schema,
+        IReadOnlyDictionary<string, string> row)
+    {
+        var parts = new List<string>();
+        foreach (var column in schema.Columns)
+        {
+            if (!row.TryGetValue(column.Header, out var value))
+            {
+                continue;
+            }
+
+            var normalized = value?.Trim() ?? "";
+            if (string.IsNullOrWhiteSpace(normalized))
+            {
+                continue;
+            }
+
+            parts.Add($"{column.Header}: {normalized}");
+        }
+
+        return string.Join(" | ", parts);
     }
 
     private static void AddCbusSceneMapping(

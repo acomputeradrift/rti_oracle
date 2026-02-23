@@ -125,6 +125,7 @@ public partial class MainWindow : Window
     private readonly HashSet<string> _projectDriverDNames = new(StringComparer.OrdinalIgnoreCase);
     private readonly Dictionary<int, string> _projectDriverNamesById = new();
     private ProjectDataExtractionResult? _lastProjectExtractionResult;
+    private string? _lastProjectExtractionPath;
     private Task? _projectDataLoadTask;
     private string? _projectDataLoadPath;
     private bool _projectDriversLoaded;
@@ -2170,7 +2171,11 @@ public partial class MainWindow : Window
             return;
         }
 
-        var preview = new ProjectDataPreviewWindow(_projectFilePath, _lastAdditionalData)
+        var hasMatchingExtraction = string.Equals(_lastProjectExtractionPath, _projectFilePath, StringComparison.OrdinalIgnoreCase);
+        var preview = new ProjectDataPreviewWindow(
+            _projectFilePath,
+            hasMatchingExtraction ? _lastProjectExtractionResult : null,
+            hasMatchingExtraction ? _lastAdditionalData : null)
         {
             Owner = this
         };
@@ -2217,6 +2222,7 @@ public partial class MainWindow : Window
             var extractor = new ProjectDataExtractor();
             var result = await Task.Run(() => extractor.Extract(filePath));
             _lastProjectExtractionResult = result;
+            _lastProjectExtractionPath = filePath;
             await InitializeProcessingAsync(result, showReprocessingOverlay: false);
             UpdateAdditionalInfoTemplateAvailability(result);
             var durationMs = ((long)(DateTime.UtcNow - startedUtc).TotalMilliseconds).ToString(CultureInfo.InvariantCulture);
@@ -2286,6 +2292,12 @@ public partial class MainWindow : Window
 
         _apexUploaded = true;
         _projectFilePath = filePath;
+        if (!string.Equals(_lastProjectExtractionPath, filePath, StringComparison.OrdinalIgnoreCase))
+        {
+            _lastProjectExtractionResult = null;
+            _lastProjectExtractionPath = null;
+            _lastAdditionalData = null;
+        }
         ProjectDataHeaderText.Text = "Project Data";
 
         _recentProjectService.RecordProjectSelection(_settings, filePath);
@@ -2307,7 +2319,11 @@ public partial class MainWindow : Window
 
         if (openPreview)
         {
-            var preview = new ProjectDataPreviewWindow(filePath, _lastAdditionalData)
+            var hasMatchingExtraction = string.Equals(_lastProjectExtractionPath, filePath, StringComparison.OrdinalIgnoreCase);
+            var preview = new ProjectDataPreviewWindow(
+                filePath,
+                hasMatchingExtraction ? _lastProjectExtractionResult : null,
+                hasMatchingExtraction ? _lastAdditionalData : null)
             {
                 Owner = this
             };
