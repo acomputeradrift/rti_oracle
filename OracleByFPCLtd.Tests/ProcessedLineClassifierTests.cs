@@ -8,12 +8,15 @@ public sealed class ProcessedLineClassifierTests
     [Theory]
     [InlineData("1 [2026-01-24 10:00:00.000] Device 'RTiPanel' has connected", ProcessedLineCategory.Connect)]
     [InlineData("1 [2026-01-24 10:00:00.000] Device 'RTiPanel' has disconnected", ProcessedLineCategory.Disconnect)]
-    [InlineData("1 [2026-01-24 10:00:00.000] Driver - Command: 'Foo'", ProcessedLineCategory.DriverCommand)]
+    [InlineData("1 [2026-01-24 10:00:00.000] Driver Command (Foo): 'Bar'", ProcessedLineCategory.DriverCommand)]
+    [InlineData("1 [2026-01-24 10:00:00.000] IR Command (Internal): 'Power -> XP-8v: Port 1'", ProcessedLineCategory.DriverCommand)]
     [InlineData("1 [2026-01-24 10:00:00.000] Macro - Start", ProcessedLineCategory.Macro)]
     [InlineData("1 [2026-01-24 10:00:00.000] Macro - End", ProcessedLineCategory.Macro)]
     [InlineData("1 [2026-01-24 10:00:00.000] System macro", ProcessedLineCategory.SystemMacro)]
     [InlineData("1 [2026-01-24 10:00:00.000] Stop macro", ProcessedLineCategory.SystemMacro)]
-    [InlineData("1 [2026-01-24 10:00:00.000] Driver event: Activity Ready", ProcessedLineCategory.DriverEvent)]
+    [InlineData("1 [2026-01-24 10:00:00.000] Driver Event (Foo): 'Activity Ready.'", ProcessedLineCategory.DriverEvent)]
+    [InlineData("1 [2026-01-24 10:00:00.000] Command sent to socket", ProcessedLineCategory.Default)]
+    [InlineData("1 [2026-01-24 10:00:00.000] Event callback fired", ProcessedLineCategory.Default)]
     [InlineData("1 [2026-01-24 10:00:00.000] Something else", ProcessedLineCategory.Default)]
     public void ClassifiesLines(string line, ProcessedLineCategory expected)
     {

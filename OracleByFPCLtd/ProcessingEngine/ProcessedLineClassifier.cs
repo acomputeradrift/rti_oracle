@@ -51,7 +51,8 @@ public static class ProcessedLineClassifier
             return ProcessedLineCategory.Disconnect;
         }
 
-        if (content.Contains("Command", StringComparison.OrdinalIgnoreCase))
+        if (content.Contains("Driver Command", StringComparison.OrdinalIgnoreCase)
+            || content.Contains("IR Command", StringComparison.OrdinalIgnoreCase))
         {
             return ProcessedLineCategory.DriverCommand;
         }
@@ -68,7 +69,7 @@ public static class ProcessedLineClassifier
             return ProcessedLineCategory.SystemMacro;
         }
 
-        if (content.Contains("Event", StringComparison.OrdinalIgnoreCase))
+        if (content.Contains("Driver Event", StringComparison.OrdinalIgnoreCase))
         {
             return ProcessedLineCategory.DriverEvent;
         }

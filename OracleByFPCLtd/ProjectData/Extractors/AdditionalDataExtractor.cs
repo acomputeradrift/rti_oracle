@@ -38,6 +38,13 @@ public static class AdditionalDataExtractor
         var driverNames = new HashSet<string>(
             driverDeviceNames.Where(name => !string.IsNullOrWhiteSpace(name)),
             StringComparer.Ordinal);
+        foreach (var internalProfile in DriverProfileCatalog.Internal())
+        {
+            if (internalProfile.AdditionalInfoSchemas is not null && internalProfile.AdditionalInfoSchemas.Count > 0)
+            {
+                driverNames.Add(internalProfile.DeviceName);
+            }
+        }
 
         using var archive = ZipFile.OpenRead(filePath);
         var workbookSheets = ReadWorkbookSheets(archive, data.Errors);

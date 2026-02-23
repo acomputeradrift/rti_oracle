@@ -22,4 +22,17 @@ public sealed class AdditionalInfoTemplatePlannerTests
         Assert.Contains(schemas, schema => schema.SheetName == "Clipsal C-Bus HVAC");
         Assert.Contains(schemas, schema => schema.SheetName == "Vaux Lattis Matrix");
     }
+
+    [Fact]
+    public void PlannerIncludesRtiInternalSchemasEvenWhenInternalDriverIsNotInConfigList()
+    {
+        var drivers = new List<DriverConfigEntry>
+        {
+            new("Clipsal C-Bus", "Clipsal C-Bus", new Dictionary<string, string>())
+        };
+
+        var schemas = AdditionalInfoTemplatePlanner.DetermineSchemas(drivers);
+
+        Assert.Contains(schemas, schema => schema.SheetName == "RTI RCM-12 Relay Module");
+    }
 }

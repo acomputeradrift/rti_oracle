@@ -151,6 +151,33 @@ public sealed class AdditionalDataExtractorTests
         }
     }
 
+    [Fact]
+    public void ExtractParsesRtiInternalRelaySheetEvenWhenInternalDriverIsNotInDriverNameInput()
+    {
+        var headers = new[] { "RelayIndex", "RelayName" };
+        var rows = new List<object[]>
+        {
+            new object[] { 2.0, "Boiler Pump" }
+        };
+
+        var path = CreateWorkbookWithSheetData("RTI RCM-12 Relay Module", headers, rows);
+        try
+        {
+            var data = AdditionalDataExtractor.Extract(path, new[] { "Clipsal C-Bus" });
+
+            Assert.DoesNotContain(data.Errors, error => error.Contains("Unmatched sheet: RTI RCM-12 Relay Module", StringComparison.Ordinal));
+            Assert.Contains("RTI Internal", data.Drivers.Keys);
+            Assert.Equal("Boiler Pump", data.Drivers["RTI Internal"].RelayNames[2]);
+        }
+        finally
+        {
+            if (File.Exists(path))
+            {
+                File.Delete(path);
+            }
+        }
+    }
+
     private static string CreateWorkbook(params string[] sheetNames)
     {
         var path = Path.Combine(Path.GetTempPath(), $"additional_{Guid.NewGuid():N}.xlsx");

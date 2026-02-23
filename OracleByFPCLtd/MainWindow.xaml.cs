@@ -4434,7 +4434,7 @@ public partial class MainWindow : Window
             }
 
             var report = BuildTaggedMessagesReport();
-            var writeResult = NoProfileReportFileService.Write(report, filePrefix: "oracle_tagged_messages");
+            var writeResult = NoProfileReportFileService.Write(report, filePrefix: "Oracle_Unhandled");
             if (writeResult.Success && !string.IsNullOrWhiteSpace(writeResult.Path))
             {
                 var reportPath = writeResult.Path;

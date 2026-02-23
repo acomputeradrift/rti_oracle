@@ -1,0 +1,67 @@
+{
+  "CreatedUtc": "2026-02-23T16:51:03.4839408Z",
+  "AppVersion": "1.1.8.0",
+  "Drivers": [
+    {
+      "DriverName": "DSC PowerSeries",
+      "Messages": [
+        "Driver - Command:'DSC PowerSeries\\Keypad\\Number Keys(2)' Sustain:YES Rate:100",
+        "Driver - Command:'DSC PowerSeries\\Keypad\\Number Keys(3)' Sustain:YES Rate:100",
+        "Driver - Command:'DSC PowerSeries\\Keypad\\Number Keys(7)' Sustain:YES Rate:100"
+      ]
+    },
+    {
+      "DriverName": "Uncategorized",
+      "Messages": [
+        "Lutron Lower - ID 15, Level is 100",
+        "Lutron Lower - ID 15, Status On is true",
+        "Lutron Lower - ID 15, Switch/Shade Command On/Open (2) Executed",
+        "Lutron Upper - ID 10, Level is 100",
+        "Lutron Upper - ID 10, Set Dimmer Level to 100, with a fade rate of 00:00:02",
+        "Lutron Upper - ID 10, Status On is true",
+        "Lutron Upper - ID 13, Level is 100",
+        "Lutron Upper - ID 13, Status On is true",
+        "Lutron Upper - ID 13, Switch/Shade Command On/Open (2) Executed",
+        "Lutron Upper - ID 15, Level is 100",
+        "Lutron Upper - ID 15, Set Dimmer Level to 100, with a fade rate of 00:00:02",
+        "Lutron Upper - ID 15, Status On is true",
+        "Lutron Upper - ID 16, Level is 100",
+        "Lutron Upper - ID 16, Set Dimmer Level to 100, with a fade rate of 00:00:02",
+        "Lutron Upper - ID 16, Status On is true",
+        "Lutron Upper - ID 2, Level is 0",
+        "Lutron Upper - ID 2, Level is 100",
+        "Lutron Upper - ID 2, Set Dimmer Level to 100, with a fade rate of 00:00:02",
+        "Lutron Upper - ID 2, Status On is false",
+        "Lutron Upper - ID 2, Status On is true",
+        "Lutron Upper - ID 3, Level is 100",
+        "Lutron Upper - ID 3, Set Dimmer Level to 100, with a fade rate of 00:00:02",
+        "Lutron Upper - ID 3, Status On is true",
+        "Lutron Upper - ID 6, Level is 0",
+        "Lutron Upper - ID 6, Level is 100",
+        "Lutron Upper - ID 6, Status On is false",
+        "Lutron Upper - ID 6, Status On is true",
+        "Lutron Upper - ID 6, Switch/Shade Command Off/Closed (3) Executed",
+        "Lutron Upper - ID 6, Switch/Shade Command On/Open (2) Executed",
+        "Lutron Upper - ID 8, Level is 0",
+        "Lutron Upper - ID 8, Level is 100",
+        "Lutron Upper - ID 8, Set Dimmer Level to 100, with a fade rate of 00:00:02",
+        "Lutron Upper - ID 8, Status On is false",
+        "Lutron Upper - ID 8, Status On is true",
+        "Sense event 'When [Sense 1] Gate opens'",
+        "VHDx - Failed to reach the matrix",
+        "Venstar ColorTouch - East Bed is connected",
+        "Venstar ColorTouch - Garage is connected",
+        "Venstar ColorTouch - Guest Room is connected",
+        "Venstar ColorTouch - Hallway is connected",
+        "Venstar ColorTouch - Hobby Room is connected",
+        "Venstar ColorTouch - Laundry Room is connected",
+        "Venstar ColorTouch - Master Bath is connected",
+        "Venstar ColorTouch - Master Bed is connected",
+        "Venstar ColorTouch - Office is connected",
+        "Venstar ColorTouch - Rec Room is connected",
+        "Venstar ColorTouch - Theater is connected",
+        "Venstar ColorTouch - West Bed is connected"
+      ]
+    }
+  ]
+}

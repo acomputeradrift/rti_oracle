@@ -61,6 +61,29 @@ public static class AdditionalInfoTemplatePlanner
             }
         }
 
+        // Internal profiles (for example RTI Internal) do not reliably surface via
+        // DriverConfigMap but can still require Additional Info schemas.
+        foreach (var profile in DriverProfileCatalog.Internal())
+        {
+            if (profile.AdditionalInfoSchemas == null || profile.AdditionalInfoSchemas.Count == 0)
+            {
+                continue;
+            }
+
+            foreach (var schema in profile.AdditionalInfoSchemas)
+            {
+                if (schema == null)
+                {
+                    continue;
+                }
+
+                if (seen.Add(schema.SheetName))
+                {
+                    schemas.Add(schema);
+                }
+            }
+        }
+
         LogStructuredEvent(
             SeverityLevel.Info,
             "DetermineSchemas",
