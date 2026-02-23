@@ -7,17 +7,21 @@ namespace OracleByFPCLtd.Tests;
 public sealed class ProcessedLineClassifierColorTests
 {
     [Theory]
-    [InlineData("Command: volume up", ProcessedLineCategory.DriverCommand)]
-    [InlineData("command: power on", ProcessedLineCategory.DriverCommand)]
-    [InlineData("Event: Trigger fired", ProcessedLineCategory.DriverEvent)]
-    [InlineData("event: Button press", ProcessedLineCategory.DriverEvent)]
+    [InlineData("Driver Command: volume up", ProcessedLineCategory.DriverCommand)]
+    [InlineData("driver command: power on", ProcessedLineCategory.DriverCommand)]
+    [InlineData("IR Command: SAT CH+", ProcessedLineCategory.DriverCommand)]
+    [InlineData("ir command: Apple TV Play", ProcessedLineCategory.DriverCommand)]
+    [InlineData("Driver Event: Trigger fired", ProcessedLineCategory.DriverEvent)]
+    [InlineData("driver event: Zone changed", ProcessedLineCategory.DriverEvent)]
+    [InlineData("Command: volume up", ProcessedLineCategory.Default)]
+    [InlineData("Event: Trigger fired", ProcessedLineCategory.Default)]
     [InlineData("Button: Volume Up", ProcessedLineCategory.Button)]
     [InlineData("button: Power", ProcessedLineCategory.Button)]
     [InlineData("Page: Room Select", ProcessedLineCategory.Page)]
     [InlineData("page change", ProcessedLineCategory.Page)]
     [InlineData("System macro", ProcessedLineCategory.SystemMacro)]
     [InlineData("Stop macro", ProcessedLineCategory.SystemMacro)]
-    public void DetermineCategoryUsesCommandOrEventKeywords(string line, ProcessedLineCategory expected)
+    public void DetermineCategoryUsesStrictDriverKeywords(string line, ProcessedLineCategory expected)
     {
         var category = ProcessedLineClassifier.DetermineCategory($"1 [2026-01-24 10:00] {line}");
 

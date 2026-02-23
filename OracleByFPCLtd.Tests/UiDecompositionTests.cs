@@ -52,9 +52,12 @@ public sealed class UiDecompositionTests
 
             Assert.NotNull(panel.UploadProjectButton);
             Assert.NotNull(panel.RecentProjectComboBox);
+            Assert.NotNull(panel.RecentProjectComboBox.ItemTemplate);
             Assert.NotNull(panel.ProjectPreviewButton);
             Assert.NotNull(panel.UploadAdditionalInfoButton);
             Assert.NotNull(panel.AdditionalInfoFileNameText);
+            Assert.Equal(TextTrimming.CharacterEllipsis, panel.AdditionalInfoFileNameText.TextTrimming);
+            Assert.Equal(TextWrapping.NoWrap, panel.AdditionalInfoFileNameText.TextWrapping);
         });
     }
 

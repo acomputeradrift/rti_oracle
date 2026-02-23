@@ -64,9 +64,9 @@
         <ColumnDefinition Width="8" />
         <ColumnDefinition Width="*" />
         <ColumnDefinition Width="8" />
-        <ColumnDefinition Width="Auto" SharedSizeGroup="HeaderPanelWidth" />
+        <ColumnDefinition Width="*" />
         <ColumnDefinition Width="8" />
-        <ColumnDefinition Width="Auto" SharedSizeGroup="HeaderPanelWidth" />
+        <ColumnDefinition Width="*" />
       </Grid.ColumnDefinitions>
 
       <Border x:Name="ConnectBoxBorder"

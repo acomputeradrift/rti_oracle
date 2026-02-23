@@ -124,6 +124,9 @@ public partial class MainWindow : Window
     private readonly Dictionary<string, Dictionary<string, HashSet<string>>> _taggedMessagesByDriver = new(StringComparer.OrdinalIgnoreCase);
     private readonly HashSet<string> _projectDriverDNames = new(StringComparer.OrdinalIgnoreCase);
     private readonly Dictionary<int, string> _projectDriverNamesById = new();
+    private ProjectDataExtractionResult? _lastProjectExtractionResult;
+    private Task? _projectDataLoadTask;
+    private string? _projectDataLoadPath;
     private bool _projectDriversLoaded;
     private DateTime? _lastProcessorTimestamp;
     private readonly HashSet<string> _missingDriverNameWarnings = new(StringComparer.OrdinalIgnoreCase);
@@ -2182,12 +2185,39 @@ public partial class MainWindow : Window
 
     private async Task LoadProjectDataForProcessingAsync(string filePath)
     {
+        if (_projectDataLoadTask is { IsCompleted: false } inFlightTask
+            && string.Equals(_projectDataLoadPath, filePath, StringComparison.OrdinalIgnoreCase))
+        {
+            await inFlightTask;
+            return;
+        }
+
+        var loadTask = LoadProjectDataForProcessingCoreAsync(filePath);
+        _projectDataLoadTask = loadTask;
+        _projectDataLoadPath = filePath;
+        try
+        {
+            await loadTask;
+        }
+        finally
+        {
+            if (ReferenceEquals(_projectDataLoadTask, loadTask))
+            {
+                _projectDataLoadTask = null;
+                _projectDataLoadPath = null;
+            }
+        }
+    }
+
+    private async Task LoadProjectDataForProcessingCoreAsync(string filePath)
+    {
         var startedUtc = DateTime.UtcNow;
         try
         {
             var extractor = new ProjectDataExtractor();
             var result = await Task.Run(() => extractor.Extract(filePath));
-            await InitializeProcessingAsync(result);
+            _lastProjectExtractionResult = result;
+            await InitializeProcessingAsync(result, showReprocessingOverlay: false);
             UpdateAdditionalInfoTemplateAvailability(result);
             var durationMs = ((long)(DateTime.UtcNow - startedUtc).TotalMilliseconds).ToString(CultureInfo.InvariantCulture);
             EmitPhaseStatus(
@@ -2237,7 +2267,11 @@ public partial class MainWindow : Window
         _settingsStore.Save(_settings);
         _additionalInfoPath = dialog.FileName;
         AdditionalInfoFileNameText.Text = Path.GetFileName(dialog.FileName);
-        if (!string.IsNullOrWhiteSpace(_projectFilePath))
+        if (_lastProjectExtractionResult is not null)
+        {
+            _ = InitializeProcessingAsync(_lastProjectExtractionResult);
+        }
+        else if (!string.IsNullOrWhiteSpace(_projectFilePath))
         {
             _ = LoadProjectDataForProcessingAsync(_projectFilePath);
         }
@@ -3845,11 +3879,11 @@ public partial class MainWindow : Window
         InitializeProcessing(result, additionalData);
     }
 
-    private async Task InitializeProcessingAsync(ProjectDataExtractionResult result)
+    private async Task InitializeProcessingAsync(ProjectDataExtractionResult result, bool showReprocessingOverlay = true)
     {
         var additionalData = LoadAdditionalData(result);
         _lastAdditionalData = additionalData;
-        await InitializeProcessingAsync(result, additionalData);
+        await InitializeProcessingAsync(result, additionalData, showReprocessingOverlay);
     }
 
     private void InitializeProcessing(ProjectDataExtractionResult result, AdditionalData additionalData)
@@ -3970,7 +4004,10 @@ public partial class MainWindow : Window
         }
     }
 
-    private async Task InitializeProcessingAsync(ProjectDataExtractionResult result, AdditionalData additionalData)
+    private async Task InitializeProcessingAsync(
+        ProjectDataExtractionResult result,
+        AdditionalData additionalData,
+        bool showReprocessingOverlay = true)
     {
         _deviceNameToId.Clear();
         foreach (var entry in result.DiagnosticsMapping)
@@ -3992,7 +4029,10 @@ public partial class MainWindow : Window
 
         var rawSnapshot = _rawLogLines.ToList();
         var total = rawSnapshot.Count;
-        ShowReprocessingOverlay(total);
+        if (showReprocessingOverlay)
+        {
+            ShowReprocessingOverlay(total);
+        }
 
         List<string> processed;
         try
@@ -4008,7 +4048,10 @@ public partial class MainWindow : Window
                             return;
                         }
 
-                        Dispatcher.Invoke(() => UpdateReprocessingOverlay(current, max));
+                        if (showReprocessingOverlay)
+                        {
+                            Dispatcher.Invoke(() => UpdateReprocessingOverlay(current, max));
+                        }
                     }));
         }
         catch (Exception ex)
@@ -4031,7 +4074,10 @@ public partial class MainWindow : Window
         }
         finally
         {
-            HideReprocessingOverlay();
+            if (showReprocessingOverlay)
+            {
+                HideReprocessingOverlay();
+            }
         }
 
         if (_rawLogLines.Count == 0 || processed.Count == 0)
