@@ -55,7 +55,7 @@ public sealed class ProcessingEngineMappingTests
 
         var line = service.Map(evt, bundle);
 
-        Assert.Contains("[UNRESOLVED]", line.Text);
+        Assert.Contains("[Unresolved!]", line.Text);
         Assert.True(line.IsUnresolved);
     }
 
@@ -322,6 +322,19 @@ public sealed class ProcessingEngineMappingTests
     }
 
     [Fact]
+    public void DriverMappingServiceMarksIncompleteProfileWhenDriverExistsButLineTypeIsUnsupported()
+    {
+        var bundle = new ProjectDataBundle();
+        var service = new DriverMappingService();
+        var evt = new DiagnosticEvent(203, "[2026-02-23 07:36:52.423] Driver - Command:'DSC PowerSeries\\Keypad\\Number Keys(7)' Sustain:YES Rate:100");
+
+        var line = service.Map(evt, bundle);
+
+        Assert.Equal("203 [2026-02-23 07:36:52.423] Driver - Command:'DSC PowerSeries\\Keypad\\Number Keys(7)' Sustain:YES Rate:100 [Incomplete Profile!]", line.Text);
+        Assert.True(line.IsUnresolved);
+    }
+
+    [Fact]
     public void DriverMappingServiceMapsPageLineViaRtiInternalProfile()
     {
         var bundle = BuildBundle();
@@ -348,6 +361,19 @@ public sealed class ProcessingEngineMappingTests
     }
 
     [Fact]
+    public void DriverMappingServiceMapsRtiInternalIrPortCommandWithTimestamp()
+    {
+        var bundle = new ProjectDataBundle();
+        var service = new DriverMappingService();
+        var evt = new DiagnosticEvent(28, "[2026-02-22 08:19:10.123] IR - Port:'XP-8v','ECB5 #1' Command:'POWER OFF [ / / ]' Sustain:NO");
+
+        var line = service.Map(evt, bundle);
+
+        Assert.Equal("28 [2026-02-22 08:19:10.123] IR Command (Internal): 'POWER OFF -> XP-8v: ECB5 #1'", line.Text);
+        Assert.False(line.IsUnresolved);
+    }
+
+    [Fact]
     public void DriverMappingServiceMapsRtiInternalRelayTriggerAction()
     {
         var bundle = new ProjectDataBundle();
@@ -357,6 +383,19 @@ public sealed class ProcessingEngineMappingTests
         var line = service.Map(evt, bundle);
 
         Assert.Equal("29 Relay/Trigger Command (Internal): 'OFF -> XP-8v: Garage Door West'", line.Text);
+        Assert.False(line.IsUnresolved);
+    }
+
+    [Fact]
+    public void DriverMappingServiceMapsRtiInternalRelayTriggerActionWithTimestamp()
+    {
+        var bundle = new ProjectDataBundle();
+        var service = new DriverMappingService();
+        var evt = new DiagnosticEvent(29, "[2026-02-22 08:19:10.456] Relay/Trigger - Port:'XP-8v','Garage Door West' Action:OFF");
+
+        var line = service.Map(evt, bundle);
+
+        Assert.Equal("29 [2026-02-22 08:19:10.456] Relay/Trigger Command (Internal): 'OFF -> XP-8v: Garage Door West'", line.Text);
         Assert.False(line.IsUnresolved);
     }
 

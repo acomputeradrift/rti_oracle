@@ -20,7 +20,7 @@ public static class DriverProfileVersionCatalog
         ["QMotion QzHub3"] = DateTimeOffset.Parse("2026-02-11T00:00:00Z"),
         ["RTI AD DSP Matrix"] = DateTimeOffset.Parse("2026-02-11T00:00:00Z"),
         ["RTI AD-64"] = DateTimeOffset.Parse("2026-02-11T00:00:00Z"),
-        ["RTI Internal"] = DateTimeOffset.Parse("2026-02-11T00:00:00Z"),
+        ["RTI Internal"] = DateTimeOffset.Parse("2026-02-22T00:00:00Z"),
         ["RTI Music"] = DateTimeOffset.Parse("2026-02-11T00:00:00Z"),
         ["RTI System Variable Events"] = DateTimeOffset.Parse("2026-02-11T00:00:00Z"),
         ["RTI VIP-UHD-CTRL"] = DateTimeOffset.Parse("2026-02-11T00:00:00Z"),

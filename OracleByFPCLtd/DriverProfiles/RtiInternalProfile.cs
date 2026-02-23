@@ -163,6 +163,7 @@ ORDER BY d.DeviceId, p.PageOrder;
             var irMatch = IrPortPattern.Match(rawText);
             if (irMatch.Success)
             {
+                var timestampPrefix = BuildTimestampPrefix(irMatch.Groups["timestamp"].Value);
                 var processor = irMatch.Groups["processor"].Value.Trim();
                 var port = irMatch.Groups["port"].Value.Trim();
                 var command = NormalizeIrCommand(irMatch.Groups["command"].Value);
@@ -171,21 +172,28 @@ ORDER BY d.DeviceId, p.PageOrder;
                     command = MapRcm12RelayCommand(command, bundle, ref unresolved);
                 }
 
-                mappedText = $"IR Command (Internal): '{command} -> {processor}: {port}'";
+                mappedText = $"{timestampPrefix}IR Command (Internal): '{command} -> {processor}: {port}'";
                 return true;
             }
 
             var relayMatch = RelayTriggerPattern.Match(rawText);
             if (relayMatch.Success)
             {
+                var timestampPrefix = BuildTimestampPrefix(relayMatch.Groups["timestamp"].Value);
                 var processor = relayMatch.Groups["processor"].Value.Trim();
                 var port = relayMatch.Groups["port"].Value.Trim();
                 var action = relayMatch.Groups["action"].Value.Trim();
-                mappedText = $"Relay/Trigger Command (Internal): '{action} -> {processor}: {port}'";
+                mappedText = $"{timestampPrefix}Relay/Trigger Command (Internal): '{action} -> {processor}: {port}'";
                 return true;
             }
 
             return false;
+        }
+
+        private static string BuildTimestampPrefix(string timestamp)
+        {
+            timestamp = timestamp?.Trim() ?? "";
+            return string.IsNullOrWhiteSpace(timestamp) ? "" : $"[{timestamp}] ";
         }
 
         private static string NormalizeIrCommand(string command)

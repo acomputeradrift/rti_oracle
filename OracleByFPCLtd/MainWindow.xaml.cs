@@ -91,8 +91,18 @@ public partial class MainWindow : Window
     private static readonly Color RawFocusMatchColor = Color.FromRgb(255, 165, 0);
     private static readonly Color ProcessedMatchColor = Color.FromRgb(255, 236, 153);
     private static readonly Color ProcessedFocusMatchColor = Color.FromRgb(255, 165, 0);
-    private static readonly Regex NoProfileDriverCommandPattern = new Regex("Driver - Command:\\s*'(?<driver>[^\\\\']+)", RegexOptions.IgnoreCase | RegexOptions.Compiled);
-    private static readonly Regex NoProfileDriverEventPattern = new Regex("happens on\\s*'(?<driver>[^\\\\']+)", RegexOptions.IgnoreCase | RegexOptions.Compiled);
+    private static readonly Regex TaggedDriverCommandPattern = new Regex("Driver - Command:\\s*'(?<driver>[^\\\\']+)", RegexOptions.IgnoreCase | RegexOptions.Compiled);
+    private static readonly Regex TaggedDriverEventPattern = new Regex("happens on\\s*'(?<driver>[^\\\\']+)", RegexOptions.IgnoreCase | RegexOptions.Compiled);
+    private static readonly string[] DiagnosticTags =
+    {
+        "[No Profile!]",
+        "[Incomplete Profile!]",
+        "[No Map!]",
+        "[Unknown State!]",
+        "[No Format!]",
+        "[Unresolved!]",
+        "[UNRESOLVED]"
+    };
     private readonly DispatcherTimer _rawFindTimer = new();
     private readonly DispatcherTimer _processedFindTimer = new();
     private readonly OracleSettingsStore _settingsStore = new();
@@ -111,7 +121,7 @@ public partial class MainWindow : Window
     private readonly WebSocketMessageFormatter _messageFormatter = new(DateOnly.FromDateTime(DateTime.Today));
     private readonly Dictionary<string, string> _friendlyNames = new(StringComparer.OrdinalIgnoreCase);
     private readonly Dictionary<string, int> _deviceNameToId = new(StringComparer.OrdinalIgnoreCase);
-    private readonly Dictionary<string, HashSet<string>> _noProfileMessages = new(StringComparer.OrdinalIgnoreCase);
+    private readonly Dictionary<string, Dictionary<string, HashSet<string>>> _taggedMessagesByDriver = new(StringComparer.OrdinalIgnoreCase);
     private readonly HashSet<string> _projectDriverDNames = new(StringComparer.OrdinalIgnoreCase);
     private readonly Dictionary<int, string> _projectDriverNamesById = new();
     private bool _projectDriversLoaded;
@@ -3927,10 +3937,7 @@ public partial class MainWindow : Window
                 });
         }
 
-        var unresolvedCount = processed.Count(line =>
-            line.Contains("[UNRESOLVED]", StringComparison.Ordinal)
-            || line.Contains("[No Map!]", StringComparison.Ordinal)
-            || line.Contains("[No Profile!]", StringComparison.Ordinal));
+        var unresolvedCount = processed.Count(HasDiagnosticTag);
         if (processed.Count > 0)
         {
             EmitPhaseStatus(
@@ -3947,7 +3954,7 @@ public partial class MainWindow : Window
 
         _processedLogLines.Clear();
         _processedLogLines.AddRange(processed);
-        RecordNoProfileMessages(_processedLogLines);
+        RecordTaggedMessages(_processedLogLines);
         if (_filterActive)
         {
             ApplyCurrentFilter();
@@ -4148,7 +4155,7 @@ public partial class MainWindow : Window
                 continue;
             }
 
-            RecordNoProfileMessage(line);
+            RecordTaggedMessage(line);
             if (hasLines)
             {
                 paragraph.Inlines.Add(new LineBreak());
@@ -4227,7 +4234,7 @@ public partial class MainWindow : Window
             _processedVisibleLineCount = 0;
         }
 
-        RecordNoProfileMessage(line);
+        RecordTaggedMessage(line);
         _processedLogLines.Add(line);
         UpdateDownloadLogsState();
 
@@ -4261,37 +4268,50 @@ public partial class MainWindow : Window
         }
     }
 
-    private void RecordNoProfileMessages(IEnumerable<string> lines)
+    private void RecordTaggedMessages(IEnumerable<string> lines)
     {
         foreach (var line in lines)
         {
-            RecordNoProfileMessage(line);
+            RecordTaggedMessage(line);
         }
     }
 
-    private void RecordNoProfileMessage(string line)
+    private void RecordTaggedMessage(string line)
     {
-        if (string.IsNullOrWhiteSpace(line) || !line.Contains("[No Profile!]", StringComparison.Ordinal))
+        if (string.IsNullOrWhiteSpace(line))
         {
             return;
         }
 
-        var raw = line.Replace(" [No Profile!]", "", StringComparison.Ordinal);
-        raw = StripLeadingLineNumber(raw);
-        raw = StripLeadingTimestamp(raw);
+        var tags = ExtractDiagnosticTags(line);
+        if (tags.Count == 0)
+        {
+            return;
+        }
+
+        var raw = NormalizeTaggedLine(line, tags);
         if (string.IsNullOrWhiteSpace(raw))
         {
             return;
         }
 
-        var driverName = ExtractNoProfileDriverName(raw);
-        if (!_noProfileMessages.TryGetValue(driverName, out var messages))
+        var driverName = ExtractTaggedDriverName(raw);
+        if (!_taggedMessagesByDriver.TryGetValue(driverName, out var taggedGroups))
         {
-            messages = new HashSet<string>(StringComparer.Ordinal);
-            _noProfileMessages[driverName] = messages;
+            taggedGroups = new Dictionary<string, HashSet<string>>(StringComparer.OrdinalIgnoreCase);
+            _taggedMessagesByDriver[driverName] = taggedGroups;
         }
 
-        messages.Add(raw);
+        foreach (var tag in tags)
+        {
+            if (!taggedGroups.TryGetValue(tag, out var messages))
+            {
+                messages = new HashSet<string>(StringComparer.Ordinal);
+                taggedGroups[tag] = messages;
+            }
+
+            messages.Add(raw);
+        }
     }
 
     private static string StripLeadingLineNumber(string text)
@@ -4334,15 +4354,15 @@ public partial class MainWindow : Window
         return string.IsNullOrWhiteSpace(remainder) ? text : remainder;
     }
 
-    private static string ExtractNoProfileDriverName(string rawText)
+    private static string ExtractTaggedDriverName(string rawText)
     {
-        var match = NoProfileDriverCommandPattern.Match(rawText);
+        var match = TaggedDriverCommandPattern.Match(rawText);
         if (match.Success)
         {
             return match.Groups["driver"].Value.Trim();
         }
 
-        match = NoProfileDriverEventPattern.Match(rawText);
+        match = TaggedDriverEventPattern.Match(rawText);
         if (match.Success)
         {
             return match.Groups["driver"].Value.Trim();
@@ -4351,25 +4371,78 @@ public partial class MainWindow : Window
         return "Uncategorized";
     }
 
+    private static bool HasDiagnosticTag(string line)
+    {
+        return ExtractDiagnosticTags(line).Count > 0;
+    }
+
+    private static List<string> ExtractDiagnosticTags(string line)
+    {
+        var tags = new List<string>();
+        if (string.IsNullOrWhiteSpace(line))
+        {
+            return tags;
+        }
+
+        foreach (var tag in DiagnosticTags)
+        {
+            if (!line.Contains(tag, StringComparison.Ordinal))
+            {
+                continue;
+            }
+
+            if (string.Equals(tag, "[UNRESOLVED]", StringComparison.Ordinal))
+            {
+                if (!tags.Contains("[Unresolved!]", StringComparer.Ordinal))
+                {
+                    tags.Add("[Unresolved!]");
+                }
+                continue;
+            }
+
+            if (!tags.Contains(tag, StringComparer.Ordinal))
+            {
+                tags.Add(tag);
+            }
+        }
+
+        return tags;
+    }
+
+    private static string NormalizeTaggedLine(string line, IReadOnlyList<string> tags)
+    {
+        var raw = StripLeadingLineNumber(line);
+        raw = StripLeadingTimestamp(raw);
+
+        foreach (var tag in tags)
+        {
+            raw = raw.Replace(" " + tag, "", StringComparison.Ordinal);
+            raw = raw.Replace(tag, "", StringComparison.Ordinal);
+        }
+
+        raw = raw.Replace(" [UNRESOLVED]", "", StringComparison.Ordinal);
+        return raw.Trim();
+    }
+
     private void MainWindow_Closing(object? sender, CancelEventArgs e)
     {
         try
         {
-            if (_noProfileMessages.Count == 0)
+            if (_taggedMessagesByDriver.Count == 0)
             {
                 return;
             }
 
-            var report = BuildNoProfileReport();
-            var writeResult = NoProfileReportFileService.Write(report);
+            var report = BuildTaggedMessagesReport();
+            var writeResult = NoProfileReportFileService.Write(report, filePrefix: "oracle_tagged_messages");
             if (writeResult.Success && !string.IsNullOrWhiteSpace(writeResult.Path))
             {
                 var reportPath = writeResult.Path;
-                AppendAppStatus("INFO", $"Saved no-profile driver report: {reportPath}");
+                AppendAppStatus("INFO", $"Saved tagged driver report: {reportPath}");
                 var result = MessageBox.Show(
                     this,
-                    $"A no-profile driver report was saved to:\n{reportPath}\n\nPlease send this file to feeny.jamie@gmail.com.\n\nOpen folder now?",
-                    "No-Profile Report Saved",
+                    $"A tagged driver report was saved to:\n{reportPath}\n\nPlease send this file to feeny.jamie@gmail.com.\n\nOpen folder now?",
+                    "Tagged Report Saved",
                     MessageBoxButton.YesNo,
                     MessageBoxImage.Information);
                 if (result == MessageBoxResult.Yes)
@@ -4380,41 +4453,46 @@ public partial class MainWindow : Window
             else
             {
                 var error = writeResult.Error ?? "Unknown file write error.";
-                AppendAppStatus("WARN", $"Failed to write no-profile driver report: {error}");
+                AppendAppStatus("WARN", $"Failed to write tagged driver report: {error}");
                 MessageBox.Show(
                     this,
-                    $"Oracle could not save the no-profile driver report.\n\nReason: {error}\n\nPlease contact feeny.jamie@gmail.com.",
-                    "No-Profile Report Not Saved",
+                    $"Oracle could not save the tagged driver report.\n\nReason: {error}\n\nPlease contact feeny.jamie@gmail.com.",
+                    "Tagged Report Not Saved",
                     MessageBoxButton.OK,
                     MessageBoxImage.Warning);
             }
         }
         catch (Exception ex)
         {
-            AppendAppStatus("WARN", $"Failed to write no-profile driver report: {ex.Message}");
+            AppendAppStatus("WARN", $"Failed to write tagged driver report: {ex.Message}");
             MessageBox.Show(
                 this,
-                $"Oracle could not save the no-profile driver report.\n\nReason: {ex.Message}\n\nPlease contact feeny.jamie@gmail.com.",
-                "No-Profile Report Not Saved",
+                $"Oracle could not save the tagged driver report.\n\nReason: {ex.Message}\n\nPlease contact feeny.jamie@gmail.com.",
+                "Tagged Report Not Saved",
                 MessageBoxButton.OK,
                 MessageBoxImage.Warning);
         }
         finally
         {
-            _noProfileMessages.Clear();
+            _taggedMessagesByDriver.Clear();
         }
     }
 
-    private NoProfileReport BuildNoProfileReport()
+    private TaggedMessagesReport BuildTaggedMessagesReport()
     {
-        var drivers = _noProfileMessages
+        var drivers = _taggedMessagesByDriver
             .OrderBy(entry => entry.Key, StringComparer.OrdinalIgnoreCase)
-            .Select(entry => new NoProfileDriverReport(
+            .Select(entry => new TaggedDriverReport(
                 entry.Key,
-                entry.Value.OrderBy(message => message, StringComparer.Ordinal).ToList()))
+                entry.Value
+                    .OrderBy(group => group.Key, StringComparer.OrdinalIgnoreCase)
+                    .Select(group => new TaggedDriverTagReport(
+                        group.Key,
+                        group.Value.OrderBy(message => message, StringComparer.Ordinal).ToList()))
+                    .ToList()))
             .ToList();
 
-        return new NoProfileReport(
+        return new TaggedMessagesReport(
             DateTime.UtcNow,
             GetAppVersion(),
             drivers);
@@ -4461,13 +4539,17 @@ public partial class MainWindow : Window
         }
     }
 
-    private sealed record NoProfileReport(
+    private sealed record TaggedMessagesReport(
         DateTime CreatedUtc,
         string AppVersion,
-        List<NoProfileDriverReport> Drivers);
+        List<TaggedDriverReport> Drivers);
 
-    private sealed record NoProfileDriverReport(
+    private sealed record TaggedDriverReport(
         string DriverName,
+        List<TaggedDriverTagReport> Tags);
+
+    private sealed record TaggedDriverTagReport(
+        string Tag,
         List<string> Messages);
 
     private void UpdateAdditionalInfoTemplateAvailability(ProjectDataExtractionResult result)

@@ -54,7 +54,7 @@ public sealed class SystemMappingService
                     ["pageText"] = pageText,
                     ["device"] = deviceName
                 });
-            return new ProcessedLine($"{evt.RawLineNumber} {evt.RawText} [UNRESOLVED]", true);
+            return new ProcessedLine($"{evt.RawLineNumber} {evt.RawText} [Unresolved!]", true);
         }
 
         if (!TryBuildDeviceNameMap(bundle.System.DiagnosticsMapping, out var deviceNameToId)
@@ -65,7 +65,7 @@ public sealed class SystemMappingService
                 "Processing:Mapping",
                 "Device mapping not found.",
                 new Dictionary<string, string> { ["device"] = deviceName });
-            return new ProcessedLine($"{evt.RawLineNumber} {evt.RawText} [UNRESOLVED]", true);
+            return new ProcessedLine($"{evt.RawLineNumber} {evt.RawText} [Unresolved!]", true);
         }
 
         var pageIndex = pageNumber - 1;
@@ -81,7 +81,7 @@ public sealed class SystemMappingService
                     ["deviceId"] = deviceId.ToString(),
                     ["pageIndex"] = pageIndex.ToString()
                 });
-            return new ProcessedLine($"{evt.RawLineNumber} {evt.RawText} [UNRESOLVED]", true);
+            return new ProcessedLine($"{evt.RawLineNumber} {evt.RawText} [Unresolved!]", true);
         }
 
         var resolved = $"{match.Groups["prefix"].Value}\"{pageName}\"{match.Groups["suffix"].Value}";

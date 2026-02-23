@@ -15,6 +15,12 @@ public sealed class DriverMappingService
     private static readonly Regex CommandCapturePattern = new(
         "Driver - Command:\\s*'(?<command>[^']+)'",
         RegexOptions.IgnoreCase | RegexOptions.Compiled);
+    private static readonly Regex DriverCommandAttributionPattern = new(
+        "^\\s*(?:\\[[^\\]]+\\]\\s*)?Driver - Command:\\s*'(?<driver>[^'\\\\]+)\\\\",
+        RegexOptions.IgnoreCase | RegexOptions.Compiled);
+    private static readonly Regex DriverEventAttributionPattern = new(
+        "happens on\\s*'(?<driver>[^'\\\\]+)\\\\",
+        RegexOptions.IgnoreCase | RegexOptions.Compiled);
     private static readonly CentralLogger CentralLogger = new(new CentralLoggerOptions
     {
         LogFilePath = BuildStructuredLogPath()
@@ -70,7 +76,7 @@ public sealed class DriverMappingService
             }
             else if (unresolved && ShouldAppendUnresolved(mappedText))
             {
-                mappedText += " [UNRESOLVED]";
+                mappedText += " [Unresolved!]";
             }
 
             var resolvedSubstitution = hasTransition && !unresolved;
@@ -128,6 +134,12 @@ public sealed class DriverMappingService
             "Processing:Mapping",
             "Driver profile not found.",
             new Dictionary<string, string> { ["rawText"] = rawText });
+        if (TryExtractAttributedDriverName(rawText, out var attributedDriverName)
+            && HasKnownDriverProfile(attributedDriverName))
+        {
+            return new ProcessedLine($"{evt.RawLineNumber} {rawText} [Incomplete Profile!]", true);
+        }
+
         return new ProcessedLine($"{evt.RawLineNumber} {rawText} [No Profile!]", true);
     }
 
@@ -180,10 +192,68 @@ public sealed class DriverMappingService
 
     private static bool ShouldAppendUnresolved(string text)
     {
-        return !text.Contains("[UNRESOLVED]", StringComparison.Ordinal)
+        return !text.Contains("[Unresolved!]", StringComparison.Ordinal)
+            && !text.Contains("[UNRESOLVED]", StringComparison.Ordinal)
             && !text.Contains("[No Map!]", StringComparison.Ordinal)
             && !text.Contains("[Unknown State!]", StringComparison.Ordinal)
             && !text.Contains("[No Profile!]", StringComparison.Ordinal);
+    }
+
+    private static bool TryExtractAttributedDriverName(string rawText, out string driverName)
+    {
+        driverName = "";
+        if (string.IsNullOrWhiteSpace(rawText))
+        {
+            return false;
+        }
+
+        var commandMatch = DriverCommandAttributionPattern.Match(rawText);
+        if (commandMatch.Success)
+        {
+            driverName = commandMatch.Groups["driver"].Value.Trim();
+            return !string.IsNullOrWhiteSpace(driverName);
+        }
+
+        var eventMatch = DriverEventAttributionPattern.Match(rawText);
+        if (eventMatch.Success)
+        {
+            driverName = eventMatch.Groups["driver"].Value.Trim();
+            return !string.IsNullOrWhiteSpace(driverName);
+        }
+
+        return false;
+    }
+
+    private static bool HasKnownDriverProfile(string driverName)
+    {
+        if (string.IsNullOrWhiteSpace(driverName))
+        {
+            return false;
+        }
+
+        foreach (var profile in DriverProfileCatalog.All())
+        {
+            if (string.Equals(profile.DeviceName, driverName, StringComparison.OrdinalIgnoreCase))
+            {
+                return true;
+            }
+
+            foreach (var alias in profile.Aliases)
+            {
+                if (string.Equals(alias, driverName, StringComparison.OrdinalIgnoreCase))
+                {
+                    return true;
+                }
+            }
+
+            if (string.Equals(profile.DeviceName, "System Variable Events", StringComparison.OrdinalIgnoreCase)
+                && driverName.StartsWith("System Variable Events", StringComparison.OrdinalIgnoreCase))
+            {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private static bool HasAdditionalInfoData(ProjectDataBundle bundle, string driverName)

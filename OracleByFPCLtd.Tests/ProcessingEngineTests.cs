@@ -35,7 +35,7 @@ public sealed class ProcessingEngineTests
         var input = "[2026-01-24 10:00:00.000] Change to page 1 on device 'RTiPanel (iPhone X or newer)'";
         var output = engine.ProcessLine(input, 7);
 
-        Assert.Contains("[UNRESOLVED]", output.Text, StringComparison.Ordinal);
+        Assert.Contains("[Unresolved!]", output.Text, StringComparison.Ordinal);
         Assert.DoesNotContain("[No Profile!]", output.Text, StringComparison.Ordinal);
         Assert.True(output.IsUnresolved);
     }
