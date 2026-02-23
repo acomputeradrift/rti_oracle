@@ -340,11 +340,11 @@ public sealed class ProcessingEngineMappingTests
     {
         var bundle = new ProjectDataBundle();
         var service = new DriverMappingService();
-        var evt = new DiagnosticEvent(203, "[2026-02-23 07:36:52.423] Driver - Command:'DSC PowerSeries\\Keypad\\Number Keys(7)' Sustain:YES Rate:100");
+        var evt = new DiagnosticEvent(203, "[2026-02-23 07:36:52.423] Sense event 'When 'Garage West DOOR Opened' happens on 'DSC PowerSeries\\Zone Open''");
 
         var line = service.Map(evt, bundle);
 
-        Assert.Equal("203 [2026-02-23 07:36:52.423] Driver - Command:'DSC PowerSeries\\Keypad\\Number Keys(7)' Sustain:YES Rate:100 [Incomplete Profile!]", line.Text);
+        Assert.Equal("203 [2026-02-23 07:36:52.423] Sense event 'When 'Garage West DOOR Opened' happens on 'DSC PowerSeries\\Zone Open'' [Incomplete Profile!]", line.Text);
         Assert.True(line.IsUnresolved);
     }
 
@@ -465,6 +465,114 @@ public sealed class ProcessingEngineMappingTests
     }
 
     [Fact]
+    public void DriverMappingServiceFormatsRtiInternalSenseEvent()
+    {
+        var bundle = new ProjectDataBundle();
+        var service = new DriverMappingService();
+        var raw = "Sense event 'When [Sense 1] Gate opens'";
+        var evt = new DiagnosticEvent(33, raw);
+
+        var line = service.Map(evt, bundle);
+
+        Assert.Equal("33 Sense Event (Internal): 'When [Sense 1] Gate opens.'", line.Text);
+        Assert.False(line.IsUnresolved);
+    }
+
+    [Fact]
+    public void DriverMappingServiceFormatsTimestampedRtiInternalSenseEvent()
+    {
+        var bundle = new ProjectDataBundle();
+        var service = new DriverMappingService();
+        var raw = "[2026-02-23 07:25:34.196] Sense event 'When [Sense 1] Gate opens'";
+        var evt = new DiagnosticEvent(34, raw);
+
+        var line = service.Map(evt, bundle);
+
+        Assert.Equal("34 [2026-02-23 07:25:34.196] Sense Event (Internal): 'When [Sense 1] Gate opens.'", line.Text);
+        Assert.False(line.IsUnresolved);
+    }
+
+    [Fact]
+    public void DriverMappingServiceFormatsRtiInternalScheduledEvent()
+    {
+        var bundle = new ProjectDataBundle();
+        var service = new DriverMappingService();
+        var raw = "Scheduled event 'Every day at sunrise'";
+        var evt = new DiagnosticEvent(35, raw);
+
+        var line = service.Map(evt, bundle);
+
+        Assert.Equal("35 Scheduled Event (Internal): 'When Every day at sunrise happens.'", line.Text);
+        Assert.False(line.IsUnresolved);
+    }
+
+    [Fact]
+    public void DriverMappingServiceFormatsTimestampedRtiInternalScheduledEvent()
+    {
+        var bundle = new ProjectDataBundle();
+        var service = new DriverMappingService();
+        var raw = "[2026-02-23 07:25:34.196] Scheduled event 'Every day at sunset'";
+        var evt = new DiagnosticEvent(36, raw);
+
+        var line = service.Map(evt, bundle);
+
+        Assert.Equal("36 [2026-02-23 07:25:34.196] Scheduled Event (Internal): 'When Every day at sunset happens.'", line.Text);
+        Assert.False(line.IsUnresolved);
+    }
+
+    [Fact]
+    public void DriverMappingServiceFormatsRtiInternalDelayCommand()
+    {
+        var bundle = new ProjectDataBundle();
+        var service = new DriverMappingService();
+        var evt = new DiagnosticEvent(361, "Delay 200ms");
+
+        var line = service.Map(evt, bundle);
+
+        Assert.Equal("361 Driver Command (Internal): 'Delay 200ms.'", line.Text);
+        Assert.False(line.IsUnresolved);
+    }
+
+    [Fact]
+    public void DriverMappingServiceFormatsTimestampedRtiInternalDelayCommand()
+    {
+        var bundle = new ProjectDataBundle();
+        var service = new DriverMappingService();
+        var evt = new DiagnosticEvent(362, "[2026-02-23 07:36:52.423] Delay 200ms");
+
+        var line = service.Map(evt, bundle);
+
+        Assert.Equal("362 [2026-02-23 07:36:52.423] Driver Command (Internal): 'Delay 200ms.'", line.Text);
+        Assert.False(line.IsUnresolved);
+    }
+
+    [Fact]
+    public void DriverMappingServiceMapsRtiInternalSerialCommand()
+    {
+        var bundle = new ProjectDataBundle();
+        var service = new DriverMappingService();
+        var evt = new DiagnosticEvent(37, "Serial - Port:'XP-8v','CP-1650 Zones 1-8' Command:'POWER ON\\r' Sustain:NO");
+
+        var line = service.Map(evt, bundle);
+
+        Assert.Equal("37 Serial Command (Internal): 'POWER ON -> XP-8v: CP-1650 Zones 1-8'", line.Text);
+        Assert.False(line.IsUnresolved);
+    }
+
+    [Fact]
+    public void DriverMappingServiceMapsTimestampedRtiInternalSerialCommand()
+    {
+        var bundle = new ProjectDataBundle();
+        var service = new DriverMappingService();
+        var evt = new DiagnosticEvent(38, "[2026-02-23 07:25:34.196] Serial - Port:'XP-8v','CP-1650 Zones 1-8' Command:'POWER ON\\r' Sustain:NO");
+
+        var line = service.Map(evt, bundle);
+
+        Assert.Equal("38 [2026-02-23 07:25:34.196] Serial Command (Internal): 'POWER ON -> XP-8v: CP-1650 Zones 1-8'", line.Text);
+        Assert.False(line.IsUnresolved);
+    }
+
+    [Fact]
     public void DriverMappingServiceClaimsRtiDiagnosticsPrimaryProcessorLine()
     {
         var bundle = new ProjectDataBundle();
@@ -564,6 +672,19 @@ public sealed class ProcessingEngineMappingTests
     }
 
     [Fact]
+    public void DriverMappingServiceTreatsLutronUpdateLinesAsProfilePassthrough()
+    {
+        var bundle = new ProjectDataBundle();
+        var service = new DriverMappingService();
+        var evt = new DiagnosticEvent(15, "Lutron Upper - ID 10, Set Dimmer Level to 100, with a fade rate of 00:00:02");
+
+        var line = service.Map(evt, bundle);
+
+        Assert.Equal("15 Lutron Upper - ID 10, Set Dimmer Level to 100, with a fade rate of 00:00:02", line.Text);
+        Assert.False(line.IsUnresolved);
+    }
+
+    [Fact]
     public void DriverMappingServiceFormatsDscPowerSeriesDriverEvent()
     {
         var bundle = new ProjectDataBundle();
@@ -577,6 +698,19 @@ public sealed class ProcessingEngineMappingTests
     }
 
     [Fact]
+    public void DriverMappingServiceFormatsDscPowerSeriesNumberKeyCommand()
+    {
+        var bundle = new ProjectDataBundle();
+        var service = new DriverMappingService();
+        var evt = new DiagnosticEvent(204, "[2026-02-23 07:36:52.423] Driver - Command:'DSC PowerSeries\\Keypad\\Number Keys(2)' Sustain:YES Rate:100");
+
+        var line = service.Map(evt, bundle);
+
+        Assert.Equal("204 [2026-02-23 07:36:52.423] Driver Command (DSC PowerSeries): 'Number 2 key pressed on keypad.'", line.Text);
+        Assert.False(line.IsUnresolved);
+    }
+
+    [Fact]
     public void DriverMappingServiceFormatsVenstarColorTouchDriverEvent()
     {
         var bundle = new ProjectDataBundle();
@@ -586,6 +720,58 @@ public sealed class ProcessingEngineMappingTests
         var line = service.Map(evt, bundle);
 
         Assert.Equal("22 [2026-02-21 10:14:44.112] Driver Event (Venstar ColorTouch): 'When Garage (Stat 2) - Operating State Change.'", line.Text);
+        Assert.False(line.IsUnresolved);
+    }
+
+    [Fact]
+    public void DriverMappingServiceTreatsVenstarConnectedUpdateAsProfilePassthrough()
+    {
+        var bundle = new ProjectDataBundle();
+        var service = new DriverMappingService();
+        var evt = new DiagnosticEvent(23, "Venstar ColorTouch - Master Bed is connected");
+
+        var line = service.Map(evt, bundle);
+
+        Assert.Equal("23 Venstar ColorTouch - Master Bed is connected", line.Text);
+        Assert.False(line.IsUnresolved);
+    }
+
+    [Fact]
+    public void DriverMappingServiceFormatsVhdxDriverUpdate()
+    {
+        var bundle = new ProjectDataBundle();
+        var service = new DriverMappingService();
+        var evt = new DiagnosticEvent(24, "VHDx - Failed to reach the matrix");
+
+        var line = service.Map(evt, bundle);
+
+        Assert.Equal("24 Driver Update (VHDx): 'Failed to reach the matrix'", line.Text);
+        Assert.False(line.IsUnresolved);
+    }
+
+    [Fact]
+    public void DriverMappingServiceFormatsRtiVipUhdCtrlConnectDriverUpdate()
+    {
+        var bundle = new ProjectDataBundle();
+        var service = new DriverMappingService();
+        var evt = new DiagnosticEvent(25, "RTI VIP-UHD-CTRL - OnConnectJSON");
+
+        var line = service.Map(evt, bundle);
+
+        Assert.Equal("25 Driver Update (RTI VIP-UHD-CTRL): 'OnConnectJSON'", line.Text);
+        Assert.False(line.IsUnresolved);
+    }
+
+    [Fact]
+    public void DriverMappingServiceFormatsRtiVipUhdCtrlDisconnectDriverUpdateWithTimestamp()
+    {
+        var bundle = new ProjectDataBundle();
+        var service = new DriverMappingService();
+        var evt = new DiagnosticEvent(26, "[2026-02-23 07:44:14.286] RTI VIP-UHD-CTRL - OnDisconnectJSON");
+
+        var line = service.Map(evt, bundle);
+
+        Assert.Equal("26 [2026-02-23 07:44:14.286] Driver Update (RTI VIP-UHD-CTRL): 'OnDisconnectJSON'", line.Text);
         Assert.False(line.IsUnresolved);
     }
 

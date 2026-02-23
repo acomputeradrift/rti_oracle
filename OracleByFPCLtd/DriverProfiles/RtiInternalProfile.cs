@@ -18,6 +18,9 @@ public static class RtiInternalProfile
     private static readonly Regex RelayTriggerPattern = new Regex(
         @"^(?:\[(?<timestamp>[^\]]+)\]\s*)?Relay/Trigger - Port:'(?<processor>[^']+)','(?<port>[^']+)' Action:(?<action>\S+)$",
         RegexOptions.IgnoreCase | RegexOptions.Compiled);
+    private static readonly Regex SerialPortPattern = new Regex(
+        @"^(?:\[(?<timestamp>[^\]]+)\]\s*)?Serial - Port:'(?<processor>[^']+)','(?<port>[^']+)' Command:'(?<command>[^']+)'(?:\s+Sustain:(?<sustain>\S+))?$",
+        RegexOptions.IgnoreCase | RegexOptions.Compiled);
     private static readonly Regex MacroStartEndPattern = new Regex(
         @"^(?:\[[^\]]+\]\s*)?Macro - (?:Start|End)$",
         RegexOptions.IgnoreCase | RegexOptions.Compiled);
@@ -38,6 +41,15 @@ public static class RtiInternalProfile
         RegexOptions.IgnoreCase | RegexOptions.Compiled);
     private static readonly Regex StopMacroPattern = new Regex(
         @"^(?:\[[^\]]+\]\s*)?Stop macro$",
+        RegexOptions.IgnoreCase | RegexOptions.Compiled);
+    private static readonly Regex SenseEventPattern = new Regex(
+        @"^(?:\[(?<timestamp>[^\]]+)\]\s*)?Sense event\s+'(?<event>When\s+[^']+)'\s*$",
+        RegexOptions.IgnoreCase | RegexOptions.Compiled);
+    private static readonly Regex ScheduledEventPattern = new Regex(
+        @"^(?:\[(?<timestamp>[^\]]+)\]\s*)?Scheduled event\s+'(?<event>[^']+)'\s*$",
+        RegexOptions.IgnoreCase | RegexOptions.Compiled);
+    private static readonly Regex DelayPattern = new Regex(
+        @"^(?:\[(?<timestamp>[^\]]+)\]\s*)?Delay\s+(?<duration>\d+ms)\s*$",
         RegexOptions.IgnoreCase | RegexOptions.Compiled);
     private static readonly Regex RelayIndexPattern = new Regex(
         @"\bRELAY\s+(?<index>\d+)\b",
@@ -137,6 +149,33 @@ ORDER BY d.DeviceId, p.PageOrder;
                 return false;
             }
 
+            var senseMatch = SenseEventPattern.Match(rawText);
+            if (senseMatch.Success)
+            {
+                var timestampPrefix = BuildTimestampPrefix(senseMatch.Groups["timestamp"].Value);
+                var senseEventText = senseMatch.Groups["event"].Value.Trim();
+                mappedText = $"{timestampPrefix}Sense Event (Internal): '{senseEventText}.'";
+                return true;
+            }
+
+            var scheduledMatch = ScheduledEventPattern.Match(rawText);
+            if (scheduledMatch.Success)
+            {
+                var timestampPrefix = BuildTimestampPrefix(scheduledMatch.Groups["timestamp"].Value);
+                var scheduleText = scheduledMatch.Groups["event"].Value.Trim();
+                mappedText = $"{timestampPrefix}Scheduled Event (Internal): 'When {scheduleText} happens.'";
+                return true;
+            }
+
+            var delayMatch = DelayPattern.Match(rawText);
+            if (delayMatch.Success)
+            {
+                var timestampPrefix = BuildTimestampPrefix(delayMatch.Groups["timestamp"].Value);
+                var duration = delayMatch.Groups["duration"].Value.Trim();
+                mappedText = $"{timestampPrefix}Driver Command (Internal): 'Delay {duration}.'";
+                return true;
+            }
+
             if (ButtonDownPattern.IsMatch(rawText))
             {
                 mappedText = ButtonDownTransportSuffixPattern.Replace(rawText, "");
@@ -187,6 +226,17 @@ ORDER BY d.DeviceId, p.PageOrder;
                 return true;
             }
 
+            var serialMatch = SerialPortPattern.Match(rawText);
+            if (serialMatch.Success)
+            {
+                var timestampPrefix = BuildTimestampPrefix(serialMatch.Groups["timestamp"].Value);
+                var processor = serialMatch.Groups["processor"].Value.Trim();
+                var port = serialMatch.Groups["port"].Value.Trim();
+                var command = NormalizeSerialCommand(serialMatch.Groups["command"].Value);
+                mappedText = $"{timestampPrefix}Serial Command (Internal): '{command} -> {processor}: {port}'";
+                return true;
+            }
+
             return false;
         }
 
@@ -204,6 +254,20 @@ ORDER BY d.DeviceId, p.PageOrder;
             }
 
             return IrNoiseSuffixPattern.Replace(command.Trim(), "").Trim();
+        }
+
+        private static string NormalizeSerialCommand(string command)
+        {
+            if (string.IsNullOrWhiteSpace(command))
+            {
+                return command;
+            }
+
+            return command
+                .Trim()
+                .Replace("\\r", "", StringComparison.OrdinalIgnoreCase)
+                .Replace("\r", "", StringComparison.Ordinal)
+                .Trim();
         }
 
         private static string MapRcm12RelayCommand(string command, ProjectDataBundle bundle, ref bool unresolved)

@@ -14,6 +14,9 @@ public static class LutronCasetaRa2SelectProfile
     private static readonly Regex DriverEventPattern = new Regex(
         "happens on\\s*'Lutron Caseta / RA2 Select\\\\",
         RegexOptions.IgnoreCase | RegexOptions.Compiled);
+    private static readonly Regex DriverUpdatePattern = new Regex(
+        "^Lutron\\s+(Upper|Lower)\\s+-\\s+ID\\s+\\d+\\s*,",
+        RegexOptions.IgnoreCase | RegexOptions.Compiled);
 
     public static IDriverProfileMapper Mapper { get; } = new LutronCasetaRa2SelectMapper();
 
@@ -39,7 +42,9 @@ public static class LutronCasetaRa2SelectProfile
                 return false;
             }
 
-            if (DriverCommandPattern.IsMatch(rawText) || DriverEventPattern.IsMatch(rawText))
+            if (DriverCommandPattern.IsMatch(rawText)
+                || DriverEventPattern.IsMatch(rawText)
+                || DriverUpdatePattern.IsMatch(rawText))
             {
                 return true;
             }

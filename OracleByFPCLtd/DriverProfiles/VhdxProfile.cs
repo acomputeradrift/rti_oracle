@@ -8,11 +8,17 @@ namespace OracleByFPCLtd.DriverProfiles;
 
 public static class VhdxProfile
 {
+    private static readonly Regex TimestampPrefixPattern = new Regex(
+        @"^\s*(?<timestamp>\[[^\]]+\])\s*(?<rest>.+)$",
+        RegexOptions.Compiled);
     private static readonly Regex DriverCommandPattern = new Regex(
         "Driver - Command:\\s*'VHDx\\\\",
         RegexOptions.IgnoreCase | RegexOptions.Compiled);
     private static readonly Regex DriverEventPattern = new Regex(
         "happens on\\s*'VHDx\\\\",
+        RegexOptions.IgnoreCase | RegexOptions.Compiled);
+    private static readonly Regex DriverUpdatePattern = new Regex(
+        @"^VHDx\s*-\s*(?<message>.+)$",
         RegexOptions.IgnoreCase | RegexOptions.Compiled);
 
     public static IDriverProfileMapper Mapper { get; } = new VhdxMapper();
@@ -44,7 +50,39 @@ public static class VhdxProfile
                 return true;
             }
 
+            if (TryBuildDriverUpdate(rawText, out var driverUpdate))
+            {
+                mappedText = driverUpdate;
+                return true;
+            }
+
             return false;
+        }
+
+        private static bool TryBuildDriverUpdate(string rawText, out string mappedText)
+        {
+            mappedText = rawText;
+            var candidate = rawText.Trim();
+            var timestamp = "";
+
+            var timestampMatch = TimestampPrefixPattern.Match(candidate);
+            if (timestampMatch.Success)
+            {
+                timestamp = timestampMatch.Groups["timestamp"].Value.Trim();
+                candidate = timestampMatch.Groups["rest"].Value.Trim();
+            }
+
+            var updateMatch = DriverUpdatePattern.Match(candidate);
+            if (!updateMatch.Success)
+            {
+                return false;
+            }
+
+            var message = updateMatch.Groups["message"].Value.Trim();
+            mappedText = string.IsNullOrWhiteSpace(timestamp)
+                ? $"Driver Update (VHDx): '{message}'"
+                : $"{timestamp} Driver Update (VHDx): '{message}'";
+            return true;
         }
     }
 }

@@ -174,6 +174,8 @@ public static class DriverMessageTemplateFormatter
                 return TryBuildJandySentence(actionName, out sentence);
             case "Vantage InFusion":
                 return TryBuildVantageInFusionSentence(actionName, args, out sentence);
+            case "DSC PowerSeries":
+                return TryBuildDscPowerSeriesSentence(actionName, args, out sentence);
             default:
                 return false;
         }
@@ -752,6 +754,18 @@ public static class DriverMessageTemplateFormatter
         if (actionName.Equals("Execute Task", StringComparison.OrdinalIgnoreCase) && args.Count >= 2)
         {
             sentence = $"Task {args[0]} is executed ({args[1]})";
+            return true;
+        }
+
+        return false;
+    }
+
+    private static bool TryBuildDscPowerSeriesSentence(string actionName, IReadOnlyList<string> args, out string sentence)
+    {
+        sentence = "";
+        if (actionName.Equals("Number Keys", StringComparison.OrdinalIgnoreCase) && args.Count >= 1)
+        {
+            sentence = $"Number {args[0]} key pressed on keypad";
             return true;
         }
 

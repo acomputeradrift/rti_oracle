@@ -69,7 +69,9 @@ public static class ProcessedLineClassifier
             return ProcessedLineCategory.SystemMacro;
         }
 
-        if (content.Contains("Driver Event", StringComparison.OrdinalIgnoreCase))
+        if (content.Contains("Driver Event", StringComparison.OrdinalIgnoreCase)
+            || content.Contains("Sense Event", StringComparison.OrdinalIgnoreCase)
+            || content.Contains("Scheduled Event", StringComparison.OrdinalIgnoreCase))
         {
             return ProcessedLineCategory.DriverEvent;
         }

@@ -8,6 +8,9 @@ namespace OracleByFPCLtd.DriverProfiles;
 
 public static class DscPowerSeriesProfile
 {
+    private static readonly Regex DriverCommandPattern = new Regex(
+        "Driver - Command:\\s*'DSC PowerSeries\\\\",
+        RegexOptions.IgnoreCase | RegexOptions.Compiled);
     private static readonly Regex DriverEventPattern = new Regex(
         "Driver event",
         RegexOptions.IgnoreCase | RegexOptions.Compiled);
@@ -37,6 +40,11 @@ public static class DscPowerSeriesProfile
             if (string.IsNullOrWhiteSpace(rawText))
             {
                 return false;
+            }
+
+            if (DriverCommandPattern.IsMatch(rawText))
+            {
+                return true;
             }
 
             return DriverEventPattern.IsMatch(rawText) && DscAttributionPattern.IsMatch(rawText);

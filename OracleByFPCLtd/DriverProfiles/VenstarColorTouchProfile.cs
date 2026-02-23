@@ -14,6 +14,9 @@ public static class VenstarColorTouchProfile
     private static readonly Regex VenstarAttributionPattern = new Regex(
         "happens on\\s*'Venstar ColorTouch\\\\",
         RegexOptions.IgnoreCase | RegexOptions.Compiled);
+    private static readonly Regex DriverUpdatePattern = new Regex(
+        "^Venstar ColorTouch\\s+-\\s+.+\\s+is\\s+connected\\s*$",
+        RegexOptions.IgnoreCase | RegexOptions.Compiled);
 
     public static IDriverProfileMapper Mapper { get; } = new VenstarColorTouchMapper();
 
@@ -39,7 +42,12 @@ public static class VenstarColorTouchProfile
                 return false;
             }
 
-            return DriverEventPattern.IsMatch(rawText) && VenstarAttributionPattern.IsMatch(rawText);
+            if (DriverEventPattern.IsMatch(rawText) && VenstarAttributionPattern.IsMatch(rawText))
+            {
+                return true;
+            }
+
+            return DriverUpdatePattern.IsMatch(rawText);
         }
     }
 }

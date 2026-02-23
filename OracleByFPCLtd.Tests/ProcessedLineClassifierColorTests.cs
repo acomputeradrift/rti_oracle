@@ -13,6 +13,8 @@ public sealed class ProcessedLineClassifierColorTests
     [InlineData("ir command: Apple TV Play", ProcessedLineCategory.DriverCommand)]
     [InlineData("Driver Event: Trigger fired", ProcessedLineCategory.DriverEvent)]
     [InlineData("driver event: Zone changed", ProcessedLineCategory.DriverEvent)]
+    [InlineData("Sense Event (Internal): 'When [Sense 1] Gate opens.'", ProcessedLineCategory.DriverEvent)]
+    [InlineData("Scheduled Event (Internal): 'When Every day at sunrise happens.'", ProcessedLineCategory.DriverEvent)]
     [InlineData("Command: volume up", ProcessedLineCategory.Default)]
     [InlineData("Event: Trigger fired", ProcessedLineCategory.Default)]
     [InlineData("Button: Volume Up", ProcessedLineCategory.Button)]
