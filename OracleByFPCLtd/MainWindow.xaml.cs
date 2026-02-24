@@ -4802,7 +4802,8 @@ public partial class MainWindow : Window
     {
         _requiredAdditionalInfoSchemas = AdditionalInfoTemplatePlanner.DetermineSchemas(
                 result.ApexDiscoveryPreload.DriverConfigMap.Values,
-                result.ApexDiscoveryPreload.ExpansionDeviceTypes)
+                result.ApexDiscoveryPreload.ExpansionDeviceTypes,
+                result.ApexDiscoveryPreload.RelayPorts)
             .ToList();
         DownloadAdditionalInfoTemplateMenuItem.IsEnabled = _requiredAdditionalInfoSchemas.Count > 0;
 

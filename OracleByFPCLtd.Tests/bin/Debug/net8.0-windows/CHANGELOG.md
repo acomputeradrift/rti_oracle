@@ -1,5 +1,19 @@
 # Changelog
 
+## [1.2] - 2026-02-24
+
+### Added
+- Driver profile coverage was expanded again, including additional HVAC-oriented command handling.
+
+### Changed
+- Additional Info template generation now avoids fixed, hard-coded relay assumptions so project data reflects the actual system data.
+- Driver and System Manager mapping rules were refined further for clearer source-name and event output wording.
+
+### Fixed
+- Page mapping now resolves correctly for cloned devices in processed output.
+- Project Data preview reliability was improved for updated mapping and profile scenarios.
+- Status area progress no longer jumps by 100 during update flows.
+
 ## [1.1.9] - 2026-02-23
 
 ### Added

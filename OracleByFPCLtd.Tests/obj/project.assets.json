@@ -1355,11 +1355,11 @@
   "project": {
     "version": "1.0.0",
     "restore": {
-      "projectUniqueName": "\\\\Mac\\Home\\Desktop\\Development\\Oracle\\OracleByFPCLtd.Tests\\OracleByFPCLtd.Tests.csproj",
+      "projectUniqueName": "\\\\mac\\Home\\Desktop\\Development\\Oracle\\OracleByFPCLtd.Tests\\OracleByFPCLtd.Tests.csproj",
       "projectName": "OracleByFPCLtd.Tests",
-      "projectPath": "\\\\Mac\\Home\\Desktop\\Development\\Oracle\\OracleByFPCLtd.Tests\\OracleByFPCLtd.Tests.csproj",
+      "projectPath": "\\\\mac\\Home\\Desktop\\Development\\Oracle\\OracleByFPCLtd.Tests\\OracleByFPCLtd.Tests.csproj",
       "packagesPath": "C:\\Users\\jamiefeeny\\.nuget\\packages\\",
-      "outputPath": "\\\\Mac\\Home\\Desktop\\Development\\Oracle\\OracleByFPCLtd.Tests\\obj\\",
+      "outputPath": "\\\\mac\\Home\\Desktop\\Development\\Oracle\\OracleByFPCLtd.Tests\\obj\\",
       "projectStyle": "PackageReference",
       "configFilePaths": [
         "C:\\Users\\jamiefeeny\\AppData\\Roaming\\NuGet\\NuGet.Config"
@@ -1374,8 +1374,8 @@
         "net8.0-windows7.0": {
           "targetAlias": "net8.0-windows",
           "projectReferences": {
-            "\\\\Mac\\Home\\Desktop\\Development\\Oracle\\OracleByFPCLtd\\OracleByFPCLtd.csproj": {
-              "projectPath": "\\\\Mac\\Home\\Desktop\\Development\\Oracle\\OracleByFPCLtd\\OracleByFPCLtd.csproj"
+            "\\\\mac\\Home\\Desktop\\Development\\Oracle\\OracleByFPCLtd\\OracleByFPCLtd.csproj": {
+              "projectPath": "\\\\mac\\Home\\Desktop\\Development\\Oracle\\OracleByFPCLtd\\OracleByFPCLtd.csproj"
             }
           }
         }

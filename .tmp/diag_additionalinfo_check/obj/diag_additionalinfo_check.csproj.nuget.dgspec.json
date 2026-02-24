@@ -1,0 +1,141 @@
+{
+  "format": 1,
+  "restore": {
+    "\\\\mac\\Home\\Desktop\\Development\\Oracle\\.tmp\\diag_additionalinfo_check\\diag_additionalinfo_check.csproj": {}
+  },
+  "projects": {
+    "\\\\mac\\Home\\Desktop\\Development\\Oracle\\.tmp\\diag_additionalinfo_check\\diag_additionalinfo_check.csproj": {
+      "version": "1.0.0",
+      "restore": {
+        "projectUniqueName": "\\\\mac\\Home\\Desktop\\Development\\Oracle\\.tmp\\diag_additionalinfo_check\\diag_additionalinfo_check.csproj",
+        "projectName": "diag_additionalinfo_check",
+        "projectPath": "\\\\mac\\Home\\Desktop\\Development\\Oracle\\.tmp\\diag_additionalinfo_check\\diag_additionalinfo_check.csproj",
+        "packagesPath": "C:\\Users\\jamiefeeny\\.nuget\\packages\\",
+        "outputPath": "\\\\mac\\Home\\Desktop\\Development\\Oracle\\.tmp\\diag_additionalinfo_check\\obj\\",
+        "projectStyle": "PackageReference",
+        "configFilePaths": [
+          "C:\\Users\\jamiefeeny\\AppData\\Roaming\\NuGet\\NuGet.Config"
+        ],
+        "originalTargetFrameworks": [
+          "net8.0-windows"
+        ],
+        "sources": {
+          "https://api.nuget.org/v3/index.json": {}
+        },
+        "frameworks": {
+          "net8.0-windows7.0": {
+            "targetAlias": "net8.0-windows",
+            "projectReferences": {
+              "\\\\mac\\Home\\Desktop\\Development\\Oracle\\OracleByFPCLtd\\OracleByFPCLtd.csproj": {
+                "projectPath": "\\\\mac\\Home\\Desktop\\Development\\Oracle\\OracleByFPCLtd\\OracleByFPCLtd.csproj"
+              }
+            }
+          }
+        },
+        "warningProperties": {
+          "warnAsError": [
+            "NU1605"
+          ]
+        },
+        "restoreAuditProperties": {
+          "enableAudit": "true",
+          "auditLevel": "low",
+          "auditMode": "direct"
+        }
+      },
+      "frameworks": {
+        "net8.0-windows7.0": {
+          "targetAlias": "net8.0-windows",
+          "imports": [
+            "net461",
+            "net462",
+            "net47",
+            "net471",
+            "net472",
+            "net48",
+            "net481"
+          ],
+          "assetTargetFallback": true,
+          "warn": true,
+          "frameworkReferences": {
+            "Microsoft.NETCore.App": {
+              "privateAssets": "all"
+            }
+          },
+          "runtimeIdentifierGraphPath": "C:\\Program Files\\dotnet\\sdk\\8.0.416/PortableRuntimeIdentifierGraph.json"
+        }
+      }
+    },
+    "\\\\mac\\Home\\Desktop\\Development\\Oracle\\OracleByFPCLtd\\OracleByFPCLtd.csproj": {
+      "version": "1.0.0",
+      "restore": {
+        "projectUniqueName": "\\\\mac\\Home\\Desktop\\Development\\Oracle\\OracleByFPCLtd\\OracleByFPCLtd.csproj",
+        "projectName": "OracleByFPCLtd",
+        "projectPath": "\\\\mac\\Home\\Desktop\\Development\\Oracle\\OracleByFPCLtd\\OracleByFPCLtd.csproj",
+        "packagesPath": "C:\\Users\\jamiefeeny\\.nuget\\packages\\",
+        "outputPath": "\\\\mac\\Home\\Desktop\\Development\\Oracle\\OracleByFPCLtd\\obj\\",
+        "projectStyle": "PackageReference",
+        "configFilePaths": [
+          "C:\\Users\\jamiefeeny\\AppData\\Roaming\\NuGet\\NuGet.Config"
+        ],
+        "originalTargetFrameworks": [
+          "net8.0-windows"
+        ],
+        "sources": {
+          "https://api.nuget.org/v3/index.json": {}
+        },
+        "frameworks": {
+          "net8.0-windows7.0": {
+            "targetAlias": "net8.0-windows",
+            "projectReferences": {}
+          }
+        },
+        "warningProperties": {
+          "warnAsError": [
+            "NU1605"
+          ]
+        },
+        "restoreAuditProperties": {
+          "enableAudit": "true",
+          "auditLevel": "low",
+          "auditMode": "direct"
+        }
+      },
+      "frameworks": {
+        "net8.0-windows7.0": {
+          "targetAlias": "net8.0-windows",
+          "dependencies": {
+            "Microsoft.Data.Sqlite": {
+              "target": "Package",
+              "version": "[8.0.5, )"
+            },
+            "PdfSharpCore": {
+              "target": "Package",
+              "version": "[1.3.52, )"
+            }
+          },
+          "imports": [
+            "net461",
+            "net462",
+            "net47",
+            "net471",
+            "net472",
+            "net48",
+            "net481"
+          ],
+          "assetTargetFallback": true,
+          "warn": true,
+          "frameworkReferences": {
+            "Microsoft.NETCore.App": {
+              "privateAssets": "all"
+            },
+            "Microsoft.WindowsDesktop.App.WPF": {
+              "privateAssets": "none"
+            }
+          },
+          "runtimeIdentifierGraphPath": "C:\\Program Files\\dotnet\\sdk\\8.0.416/PortableRuntimeIdentifierGraph.json"
+        }
+      }
+    }
+  }
+}

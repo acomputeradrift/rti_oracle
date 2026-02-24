@@ -48,4 +48,22 @@ public sealed class AdditionalInfoTemplatePlannerTests
 
         Assert.Contains(schemas, schema => schema.SheetName == "RTI RCM-12 Relay Module");
     }
+
+    [Fact]
+    public void PlannerIncludesRcm12SchemaWhenRelayPortsShowRcm12EvenIfExpansionTypesMissing()
+    {
+        var drivers = new List<DriverConfigEntry>
+        {
+            new("Clipsal C-Bus", "Clipsal C-Bus", new Dictionary<string, string>())
+        };
+
+        var relayPorts = new List<RelayPortEntry>
+        {
+            new("XP-8s", "7", "Theatre", "Relay 1", "Relay", "Toggle")
+        };
+
+        var schemas = AdditionalInfoTemplatePlanner.DetermineSchemas(drivers, new[] { 3, 5, 6 }, relayPorts);
+
+        Assert.Contains(schemas, schema => schema.SheetName == "RTI RCM-12 Relay Module");
+    }
 }

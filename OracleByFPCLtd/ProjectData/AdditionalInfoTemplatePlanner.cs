@@ -20,7 +20,8 @@ public static class AdditionalInfoTemplatePlanner
 
     public static IReadOnlyList<AdditionalInfoSheetSchema> DetermineSchemas(
         IEnumerable<DriverConfigEntry> drivers,
-        IEnumerable<int>? expansionDeviceTypes = null)
+        IEnumerable<int>? expansionDeviceTypes = null,
+        IEnumerable<RelayPortEntry>? relayPorts = null)
     {
         if (drivers is null)
         {
@@ -39,6 +40,7 @@ public static class AdditionalInfoTemplatePlanner
         var expansionTypes = expansionDeviceTypes == null
             ? new HashSet<int>()
             : new HashSet<int>(expansionDeviceTypes);
+        var hasRcm12RelayPort = HasRcm12RelayPorts(relayPorts);
 
         foreach (var driver in drivers)
         {
@@ -61,7 +63,7 @@ public static class AdditionalInfoTemplatePlanner
                     continue;
                 }
 
-                if (!ShouldIncludeInternalSchema(schema.SheetName, expansionTypes))
+                if (!ShouldIncludeInternalSchema(schema.SheetName, expansionTypes, hasRcm12RelayPort))
                 {
                     continue;
                 }
@@ -89,7 +91,7 @@ public static class AdditionalInfoTemplatePlanner
                     continue;
                 }
 
-                if (!ShouldIncludeInternalSchema(schema.SheetName, expansionTypes))
+                if (!ShouldIncludeInternalSchema(schema.SheetName, expansionTypes, hasRcm12RelayPort))
                 {
                     continue;
                 }
@@ -109,14 +111,37 @@ public static class AdditionalInfoTemplatePlanner
         return schemas;
     }
 
-    private static bool ShouldIncludeInternalSchema(string sheetName, ISet<int> expansionTypes)
+    private static bool ShouldIncludeInternalSchema(string sheetName, ISet<int> expansionTypes, bool hasRcm12RelayPort)
     {
         if (string.Equals(sheetName, RtiRcm12RelayModuleSheet, StringComparison.OrdinalIgnoreCase))
         {
-            return expansionTypes.Contains(Rcm12DeviceType);
+            return expansionTypes.Contains(Rcm12DeviceType) || hasRcm12RelayPort;
         }
 
         return true;
+    }
+
+    private static bool HasRcm12RelayPorts(IEnumerable<RelayPortEntry>? relayPorts)
+    {
+        if (relayPorts is null)
+        {
+            return false;
+        }
+
+        foreach (var relayPort in relayPorts)
+        {
+            if (relayPort is null)
+            {
+                continue;
+            }
+
+            if (string.Equals(relayPort.ExpanderDeviceType, Rcm12DeviceType.ToString(), StringComparison.OrdinalIgnoreCase))
+            {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private static void LogStructuredEvent(
