@@ -4062,14 +4062,9 @@ public partial class MainWindow : Window
                     _processingEngine,
                     (current, max) =>
                     {
-                        if (max > 0 && current != max && current % 100 != 0)
-                        {
-                            return;
-                        }
-
                         if (showReprocessingOverlay)
                         {
-                            Dispatcher.Invoke(() => UpdateReprocessingOverlay(current, max));
+                            Dispatcher.BeginInvoke(() => UpdateReprocessingOverlay(current, max));
                         }
                     }));
         }
