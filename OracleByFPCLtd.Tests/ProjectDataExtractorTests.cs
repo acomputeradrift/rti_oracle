@@ -150,6 +150,20 @@ public sealed class ProjectDataExtractorTests
         }
     }
 
+    [Fact]
+    public void DiagnosticsMappingIncludesCloneDevicePagesViaCloneSourceAddress()
+    {
+        var path = GetCloneFixturePath();
+        var result = CreateExtractor().Extract(path);
+
+        Assert.Contains(result.DiagnosticsMapping, entry =>
+            entry.DeviceId == 338
+            && entry.DeviceDisplayName == "iPhone (Jennifer)"
+            && entry.PageIndex == 109
+            && entry.PageNumber == 110
+            && entry.PageName == "Climate Overview");
+    }
+
     private static string GetFixturePath()
     {
         var path = Path.Combine(AppContext.BaseDirectory, "Fixtures", "TEST - System Manager v10.apex");
@@ -165,6 +179,27 @@ public sealed class ProjectDataExtractorTests
     private static IProjectDataExtractor CreateExtractor()
     {
         return new ProjectDataExtractor();
+    }
+
+    private static string GetCloneFixturePath()
+    {
+        var path = Path.GetFullPath(Path.Combine(
+            AppContext.BaseDirectory,
+            "..",
+            "..",
+            "..",
+            "..",
+            "ApexDiscovery",
+            "Assets",
+            "Verrier Home FEENY EDIT v55.1 (Debug Set CBUS Moved Test Page).apex"));
+        Assert.True(File.Exists(path), $"Clone fixture missing at {path}");
+        var cachePath = ProjectDataCacheStore.GetCachePath(path);
+        if (File.Exists(cachePath))
+        {
+            File.Delete(cachePath);
+        }
+
+        return path;
     }
 
     private static bool IsSorted<T>(System.Collections.Generic.IEnumerable<T> items) where T : IComparable<T>

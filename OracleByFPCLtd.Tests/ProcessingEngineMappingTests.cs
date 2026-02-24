@@ -103,6 +103,7 @@ public sealed class ProcessingEngineMappingTests
     [InlineData("Output Mute(Toggle, 13)", "Output Mute(Toggle, Gym)")]
     [InlineData("Output Off(13)", "Output Off(Gym)")]
     [InlineData("Volume Up(13)", "Volume Up(Gym)")]
+    [InlineData("Volume Down(13)", "Volume Down(Gym)")]
     public void DriverMappingServiceMapsVauxOutputIndex(string input, string expected)
     {
         var bundle = BuildBundleWithVaux();
@@ -152,7 +153,7 @@ public sealed class ProcessingEngineMappingTests
 
         var line = service.Map(evt, bundle);
 
-        Assert.Equal("92 [2026-02-23 07:25:34.196] Driver Event (Clipsal C-Bus): 'When West Bedroom North Recessed turns Off.'", line.Text);
+        Assert.Equal("92 [2026-02-23 07:25:34.196] Driver Event (Clipsal C-Bus): 'When West Bedroom North Recessed turned Off.'", line.Text);
         Assert.False(line.IsUnresolved);
     }
 
@@ -528,7 +529,7 @@ public sealed class ProcessingEngineMappingTests
 
         var line = service.Map(evt, bundle);
 
-        Assert.Equal("35 Scheduled Event (Internal): 'When Every day at sunrise happens.'", line.Text);
+        Assert.Equal("35 Scheduled Event (Internal): 'When Every day at sunrise happened.'", line.Text);
         Assert.False(line.IsUnresolved);
     }
 
@@ -542,7 +543,7 @@ public sealed class ProcessingEngineMappingTests
 
         var line = service.Map(evt, bundle);
 
-        Assert.Equal("36 [2026-02-23 07:25:34.196] Scheduled Event (Internal): 'When Every day at sunset happens.'", line.Text);
+        Assert.Equal("36 [2026-02-23 07:25:34.196] Scheduled Event (Internal): 'When Every day at sunset happened.'", line.Text);
         Assert.False(line.IsUnresolved);
     }
 
@@ -595,6 +596,32 @@ public sealed class ProcessingEngineMappingTests
         var line = service.Map(evt, bundle);
 
         Assert.Equal("38 [2026-02-23 07:25:34.196] Serial Command (Internal): 'POWER ON -> XP-8v: CP-1650 Zones 1-8'", line.Text);
+        Assert.False(line.IsUnresolved);
+    }
+
+    [Fact]
+    public void DriverMappingServiceMapsRtiInternalSerialPortConfigLine()
+    {
+        var bundle = new ProjectDataBundle();
+        var service = new DriverMappingService();
+        var evt = new DiagnosticEvent(39, "Serial - Port:'XP-8v','CP-1650 Zones 1-8' Baud:9600 StopBits:1 DataBits:8 Parity:None");
+
+        var line = service.Map(evt, bundle);
+
+        Assert.Equal("39 Serial Command (Internal): 'Port set to Baud 9600, StopBits 1, DataBits 8, Parity None -> XP-8v: CP-1650 Zones 1-8'", line.Text);
+        Assert.False(line.IsUnresolved);
+    }
+
+    [Fact]
+    public void DriverMappingServiceMapsTimestampedRtiInternalSerialPortDataHexLine()
+    {
+        var bundle = new ProjectDataBundle();
+        var service = new DriverMappingService();
+        var evt = new DiagnosticEvent(40, "[2026-02-23 07:25:34.196] Serial - Port:'XP-8v','CP-1650 Zones 1-8' Data:0x50 0x4F 0x57 0x45 0x52 0x20 0x4F 0x4E 0x0D");
+
+        var line = service.Map(evt, bundle);
+
+        Assert.Equal("40 [2026-02-23 07:25:34.196] Serial Command (Internal): 'POWER ON -> XP-8v: CP-1650 Zones 1-8'", line.Text);
         Assert.False(line.IsUnresolved);
     }
 
@@ -672,6 +699,19 @@ public sealed class ProcessingEngineMappingTests
     }
 
     [Fact]
+    public void DriverMappingServiceTreatsMacroEventAsRtiInternalPassthrough()
+    {
+        var bundle = new ProjectDataBundle();
+        var service = new DriverMappingService();
+        var evt = new DiagnosticEvent(121, "Macro event");
+
+        var line = service.Map(evt, bundle);
+
+        Assert.Equal("121 Macro event", line.Text);
+        Assert.False(line.IsUnresolved);
+    }
+
+    [Fact]
     public void DriverMappingServiceTreatsActivitiesDriverEventsAsProfile()
     {
         var bundle = new ProjectDataBundle();
@@ -745,7 +785,7 @@ public sealed class ProcessingEngineMappingTests
 
         var line = service.Map(evt, bundle);
 
-        Assert.Equal("22 [2026-02-21 10:14:44.112] Driver Event (Venstar ColorTouch): 'When Garage (Stat 2) - Operating State Change.'", line.Text);
+        Assert.Equal("22 [2026-02-21 10:14:44.112] Driver Event (Venstar ColorTouch): 'When Garage (Stat 2) - Operating State Changed.'", line.Text);
         Assert.False(line.IsUnresolved);
     }
 

@@ -11,6 +11,8 @@ public sealed class ApexDiscoveryPreloadTests
 {
     private static string ApexPath =>
         Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "ApexDiscovery", "Assets", "Verrier Home FEENY EDIT v49.apex"));
+    private static string ApexClonePath =>
+        Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "ApexDiscovery", "Assets", "Verrier Home FEENY EDIT v55.1 (Debug Set CBUS Moved Test Page).apex"));
 
     [Fact]
     public void PageIndexMapIncludesDevicePageNames()
@@ -20,6 +22,15 @@ public sealed class ApexDiscoveryPreloadTests
 
         Assert.True(result.PageIndexMap.TryGetValue("81|0", out var pageName));
         Assert.Equal("Room Select", pageName);
+    }
+
+    [Fact]
+    public void PageIndexMapIncludesClonedDevicePageNamesFromCloneSourceAddress()
+    {
+        var result = ApexDiscoveryPreloadExtractor.Extract(ApexClonePath);
+
+        Assert.True(result.PageIndexMap.TryGetValue("338|109", out var pageName));
+        Assert.Equal("Climate Overview", pageName);
     }
 
     [Fact]

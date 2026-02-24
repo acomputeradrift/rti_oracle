@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Text;
 using System.Text.RegularExpressions;
 using OracleByFPCLtd.DriverProfiles.Models;
 using OracleByFPCLtd.ProjectData.Models;
@@ -20,6 +21,12 @@ public static class RtiInternalProfile
         RegexOptions.IgnoreCase | RegexOptions.Compiled);
     private static readonly Regex SerialPortPattern = new Regex(
         @"^(?:\[(?<timestamp>[^\]]+)\]\s*)?Serial - Port:'(?<processor>[^']+)','(?<port>[^']+)' Command:'(?<command>[^']+)'(?:\s+Sustain:(?<sustain>\S+))?$",
+        RegexOptions.IgnoreCase | RegexOptions.Compiled);
+    private static readonly Regex SerialPortConfigPattern = new Regex(
+        @"^(?:\[(?<timestamp>[^\]]+)\]\s*)?Serial - Port:'(?<processor>[^']+)','(?<port>[^']+)'\s+Baud:(?<baud>\S+)\s+StopBits:(?<stopBits>\S+)\s+DataBits:(?<dataBits>\S+)\s+Parity:(?<parity>\S+)\s*$",
+        RegexOptions.IgnoreCase | RegexOptions.Compiled);
+    private static readonly Regex SerialPortDataPattern = new Regex(
+        @"^(?:\[(?<timestamp>[^\]]+)\]\s*)?Serial - Port:'(?<processor>[^']+)','(?<port>[^']+)'\s+Data:(?<data>.+)\s*$",
         RegexOptions.IgnoreCase | RegexOptions.Compiled);
     private static readonly Regex MacroStartEndPattern = new Regex(
         @"^(?:\[[^\]]+\]\s*)?Macro - (?:Start|End)$",
@@ -50,6 +57,9 @@ public static class RtiInternalProfile
         RegexOptions.IgnoreCase | RegexOptions.Compiled);
     private static readonly Regex DelayPattern = new Regex(
         @"^(?:\[(?<timestamp>[^\]]+)\]\s*)?Delay\s+(?<duration>\d+ms)\s*$",
+        RegexOptions.IgnoreCase | RegexOptions.Compiled);
+    private static readonly Regex MacroEventPattern = new Regex(
+        @"^(?:\[[^\]]+\]\s*)?Macro event$",
         RegexOptions.IgnoreCase | RegexOptions.Compiled);
     private static readonly Regex RelayIndexPattern = new Regex(
         @"\bRELAY\s+(?<index>\d+)\b",
@@ -163,7 +173,7 @@ ORDER BY d.DeviceId, p.PageOrder;
             {
                 var timestampPrefix = BuildTimestampPrefix(scheduledMatch.Groups["timestamp"].Value);
                 var scheduleText = scheduledMatch.Groups["event"].Value.Trim();
-                mappedText = $"{timestampPrefix}Scheduled Event (Internal): 'When {scheduleText} happens.'";
+                mappedText = $"{timestampPrefix}Scheduled Event (Internal): 'When {scheduleText} happened.'";
                 return true;
             }
 
@@ -186,7 +196,8 @@ ORDER BY d.DeviceId, p.PageOrder;
                 || ButtonUpPattern.IsMatch(rawText)
                 || DeviceConnectedDisconnectedPattern.IsMatch(rawText)
                 || SystemMacroStartEndPattern.IsMatch(rawText)
-                || StopMacroPattern.IsMatch(rawText))
+                || StopMacroPattern.IsMatch(rawText)
+                || MacroEventPattern.IsMatch(rawText))
             {
                 return true;
             }
@@ -237,6 +248,32 @@ ORDER BY d.DeviceId, p.PageOrder;
                 return true;
             }
 
+            var serialConfigMatch = SerialPortConfigPattern.Match(rawText);
+            if (serialConfigMatch.Success)
+            {
+                var timestampPrefix = BuildTimestampPrefix(serialConfigMatch.Groups["timestamp"].Value);
+                var processor = serialConfigMatch.Groups["processor"].Value.Trim();
+                var port = serialConfigMatch.Groups["port"].Value.Trim();
+                var baud = serialConfigMatch.Groups["baud"].Value.Trim();
+                var stopBits = serialConfigMatch.Groups["stopBits"].Value.Trim();
+                var dataBits = serialConfigMatch.Groups["dataBits"].Value.Trim();
+                var parity = serialConfigMatch.Groups["parity"].Value.Trim();
+                mappedText =
+                    $"{timestampPrefix}Serial Command (Internal): 'Port set to Baud {baud}, StopBits {stopBits}, DataBits {dataBits}, Parity {parity} -> {processor}: {port}'";
+                return true;
+            }
+
+            var serialDataMatch = SerialPortDataPattern.Match(rawText);
+            if (serialDataMatch.Success)
+            {
+                var timestampPrefix = BuildTimestampPrefix(serialDataMatch.Groups["timestamp"].Value);
+                var processor = serialDataMatch.Groups["processor"].Value.Trim();
+                var port = serialDataMatch.Groups["port"].Value.Trim();
+                var payload = NormalizeSerialDataPayload(serialDataMatch.Groups["data"].Value);
+                mappedText = $"{timestampPrefix}Serial Command (Internal): '{payload} -> {processor}: {port}'";
+                return true;
+            }
+
             return false;
         }
 
@@ -268,6 +305,42 @@ ORDER BY d.DeviceId, p.PageOrder;
                 .Replace("\\r", "", StringComparison.OrdinalIgnoreCase)
                 .Replace("\r", "", StringComparison.Ordinal)
                 .Trim();
+        }
+
+        private static string NormalizeSerialDataPayload(string data)
+        {
+            var raw = (data ?? "").Trim();
+            if (string.IsNullOrWhiteSpace(raw))
+            {
+                return raw;
+            }
+
+            var tokens = raw.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+            var bytes = new List<byte>();
+            foreach (var token in tokens)
+            {
+                var value = token.Trim();
+                if (!value.StartsWith("0x", StringComparison.OrdinalIgnoreCase)
+                    || value.Length != 4
+                    || !byte.TryParse(value.Substring(2), System.Globalization.NumberStyles.HexNumber, null, out var parsed))
+                {
+                    return raw;
+                }
+
+                bytes.Add(parsed);
+            }
+
+            if (bytes.Count == 0)
+            {
+                return raw;
+            }
+
+            var decoded = Encoding.ASCII.GetString(bytes.ToArray())
+                .Replace("\r", "", StringComparison.Ordinal)
+                .Replace("\n", "", StringComparison.Ordinal)
+                .Trim();
+
+            return string.IsNullOrWhiteSpace(decoded) ? raw : decoded;
         }
 
         private static string MapRcm12RelayCommand(string command, ProjectDataBundle bundle, ref bool unresolved)

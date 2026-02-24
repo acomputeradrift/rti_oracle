@@ -52,7 +52,9 @@ public static class ProcessedLineClassifier
         }
 
         if (content.Contains("Driver Command", StringComparison.OrdinalIgnoreCase)
-            || content.Contains("IR Command", StringComparison.OrdinalIgnoreCase))
+            || content.Contains("IR Command", StringComparison.OrdinalIgnoreCase)
+            || content.Contains("Relay/Trigger Command", StringComparison.OrdinalIgnoreCase)
+            || content.Contains("Serial Command", StringComparison.OrdinalIgnoreCase))
         {
             return ProcessedLineCategory.DriverCommand;
         }
@@ -71,7 +73,8 @@ public static class ProcessedLineClassifier
 
         if (content.Contains("Driver Event", StringComparison.OrdinalIgnoreCase)
             || content.Contains("Sense Event", StringComparison.OrdinalIgnoreCase)
-            || content.Contains("Scheduled Event", StringComparison.OrdinalIgnoreCase))
+            || content.Contains("Scheduled Event", StringComparison.OrdinalIgnoreCase)
+            || content.Contains("Macro event", StringComparison.OrdinalIgnoreCase))
         {
             return ProcessedLineCategory.DriverEvent;
         }

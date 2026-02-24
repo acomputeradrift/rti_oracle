@@ -123,6 +123,7 @@ public sealed class ProjectDataExtractor : IProjectDataExtractor
             var deviceById = devices.ToDictionary(entry => entry.DeviceId);
             var pageNameById = pageNames.ToDictionary(entry => entry.PageNameId, entry => entry.PageName);
             var rtiAddressByDeviceId = rtiDeviceData.ToDictionary(entry => entry.DeviceId, entry => entry.RtiAddress);
+            var effectiveRtiAddressByDeviceId = rtiDeviceData.ToDictionary(entry => entry.DeviceId, entry => entry.EffectiveRtiAddress);
 
             foreach (var page in rtiDevicePages)
             {
@@ -133,7 +134,12 @@ public sealed class ProjectDataExtractor : IProjectDataExtractor
                         continue;
                     }
 
-                    if (rtiAddress != page.RtiAddress)
+                    if (!effectiveRtiAddressByDeviceId.TryGetValue(device.DeviceId, out var effectiveRtiAddress))
+                    {
+                        effectiveRtiAddress = rtiAddress;
+                    }
+
+                    if (effectiveRtiAddress != page.RtiAddress)
                     {
                         continue;
                     }
@@ -457,8 +463,11 @@ public sealed class ProjectDataExtractor : IProjectDataExtractor
     private static List<RtiDeviceRow> LoadRtiDeviceData(SqliteConnection connection)
     {
         var results = new List<RtiDeviceRow>();
+        var hasCloneAddress = HasColumn(connection, "RTIDeviceData", "CloneRTIAddress");
         using var command = connection.CreateCommand();
-        command.CommandText = "SELECT DeviceId, RTIAddress FROM RTIDeviceData ORDER BY DeviceId";
+        command.CommandText = hasCloneAddress
+            ? "SELECT DeviceId, RTIAddress, CloneRTIAddress FROM RTIDeviceData ORDER BY DeviceId"
+            : "SELECT DeviceId, RTIAddress FROM RTIDeviceData ORDER BY DeviceId";
         using var reader = command.ExecuteReader();
         while (reader.Read())
         {
@@ -467,9 +476,40 @@ public sealed class ProjectDataExtractor : IProjectDataExtractor
                 continue;
             }
 
-            results.Add(new RtiDeviceRow(reader.GetInt32(0), reader.GetInt32(1)));
+            var deviceId = reader.GetInt32(0);
+            var rtiAddress = reader.GetInt32(1);
+            var cloneRtiAddress = hasCloneAddress || reader.FieldCount >= 3
+                ? (reader.IsDBNull(2) ? (int?)null : reader.GetInt32(2))
+                : null;
+            var effectiveRtiAddress = cloneRtiAddress.HasValue && cloneRtiAddress.Value > 0
+                ? cloneRtiAddress.Value
+                : rtiAddress;
+
+            results.Add(new RtiDeviceRow(deviceId, rtiAddress, effectiveRtiAddress));
         }
         return results;
+    }
+
+    private static bool HasColumn(SqliteConnection connection, string tableName, string columnName)
+    {
+        using var command = connection.CreateCommand();
+        command.CommandText = $"PRAGMA table_info({tableName});";
+        using var reader = command.ExecuteReader();
+        while (reader.Read())
+        {
+            if (reader.IsDBNull(1))
+            {
+                continue;
+            }
+
+            var name = reader.GetString(1);
+            if (string.Equals(name, columnName, StringComparison.OrdinalIgnoreCase))
+            {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private static List<RtiDevicePageRow> LoadRtiDevicePages(SqliteConnection connection)
@@ -548,7 +588,7 @@ public sealed class ProjectDataExtractor : IProjectDataExtractor
     private sealed record RoomRow(int RoomId, string Name, int HomePageId, int RoomOrder);
     private sealed record PortLabelRow(int PortLabelId, int RtiAddress, int LabelKey, string LabelName);
     private sealed record PageNameRow(int PageNameId, string PageName);
-    private sealed record RtiDeviceRow(int DeviceId, int RtiAddress);
+    private sealed record RtiDeviceRow(int DeviceId, int RtiAddress, int EffectiveRtiAddress);
     private sealed record RtiDevicePageRow(int RtiAddress, int PageId, int PageNameId, int PageIndex);
     private sealed record SourceLabelRow(int SourceLabelId, int RtiAddress, int LabelIndex, string LabelName);
     private sealed record LayerRow(int PageId, int SharedLayerId, int? SourceId);

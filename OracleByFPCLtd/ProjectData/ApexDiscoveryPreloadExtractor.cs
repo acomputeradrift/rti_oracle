@@ -209,8 +209,26 @@ public static class ApexDiscoveryPreloadExtractor
             return;
         }
 
+        var hasCloneAddress = HasColumn(connection, "RTIDeviceData", "CloneRTIAddress");
         using var command = connection.CreateCommand();
-        command.CommandText = """
+        command.CommandText = hasCloneAddress
+            ? """
+SELECT
+  d.DeviceId AS DeviceId,
+  p.PageOrder AS PageIndex,
+  n.PageName AS PageName
+FROM RTIDeviceData d
+JOIN Devices dv ON d.DeviceId = dv.DeviceId
+LEFT JOIN RTIDevicePageData p
+  ON p.RTIAddress = CASE
+      WHEN d.CloneRTIAddress IS NOT NULL AND d.CloneRTIAddress > 0
+        THEN d.CloneRTIAddress
+      ELSE d.RTIAddress
+    END
+LEFT JOIN PageNames n ON p.PageNameId = n.PageNameId
+ORDER BY d.DeviceId, p.PageOrder;
+"""
+            : """
 SELECT
   d.DeviceId AS DeviceId,
   p.PageOrder AS PageIndex,
@@ -239,6 +257,28 @@ ORDER BY d.DeviceId, p.PageOrder;
             var pageName = reader.IsDBNull(2) ? "" : reader.GetString(2);
             map[$"{deviceId}|{pageIndex}"] = pageName;
         }
+    }
+
+    private static bool HasColumn(SqliteConnection connection, string tableName, string columnName)
+    {
+        using var command = connection.CreateCommand();
+        command.CommandText = $"PRAGMA table_info({tableName});";
+        using var reader = command.ExecuteReader();
+        while (reader.Read())
+        {
+            if (reader.IsDBNull(1))
+            {
+                continue;
+            }
+
+            var name = reader.GetString(1);
+            if (string.Equals(name, columnName, StringComparison.OrdinalIgnoreCase))
+            {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private static void LoadDriverConfigMap(SqliteConnection connection, Dictionary<int, DriverConfigEntry> map)

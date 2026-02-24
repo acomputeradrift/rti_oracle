@@ -133,7 +133,7 @@ public sealed class DriverMessageTemplateFormatterTests
         var formatted = DriverMessageTemplateFormatter.TryFormatDriverEvent(mappedText, "Venstar ColorTouch", out var output);
 
         Assert.True(formatted);
-        Assert.Equal("[2026-02-21 10:14:44.112] Driver Event (Venstar ColorTouch): 'When Garage (Stat 2) - Operating State Change.'", output);
+        Assert.Equal("[2026-02-21 10:14:44.112] Driver Event (Venstar ColorTouch): 'When Garage (Stat 2) - Operating State Changed.'", output);
     }
 
     [Fact]
@@ -177,7 +177,7 @@ public sealed class DriverMessageTemplateFormatterTests
         var formatted = DriverMessageTemplateFormatter.TryFormatDriverEvent(mappedText, "Clipsal C-Bus", out var output);
 
         Assert.True(formatted);
-        Assert.Equal("[2026-02-23 07:25:34.196] Driver Event (Clipsal C-Bus): 'When West Bedroom North Recessed turns Off.'", output);
+        Assert.Equal("[2026-02-23 07:25:34.196] Driver Event (Clipsal C-Bus): 'When West Bedroom North Recessed turned Off.'", output);
     }
 
     [Fact]
@@ -199,7 +199,7 @@ public sealed class DriverMessageTemplateFormatterTests
         var formatted = DriverMessageTemplateFormatter.TryFormatDriverEvent(mappedText, "Lutron Caseta / RA2 Select", out var output);
 
         Assert.True(formatted);
-        Assert.Equal("[2026-02-23 07:25:34.196] Driver Event (Lutron Caseta / RA2 Select): 'When Master - East Pendant turns Off.'", output);
+        Assert.Equal("[2026-02-23 07:25:34.196] Driver Event (Lutron Caseta / RA2 Select): 'When Master - East Pendant turned Off.'", output);
     }
 
     [Fact]

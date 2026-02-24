@@ -102,6 +102,13 @@ public static class VauxLattisMatrixProfile
                     mappedArgs[0] = ResolveOutputName(driverData, mappedArgs[0], ref unresolved);
                 }
             }
+            else if (name.Equals("Volume Down", StringComparison.OrdinalIgnoreCase))
+            {
+                if (mappedArgs.Count >= 1)
+                {
+                    mappedArgs[0] = ResolveOutputName(driverData, mappedArgs[0], ref unresolved);
+                }
+            }
             else
             {
                 return false;

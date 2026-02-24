@@ -132,6 +132,10 @@ public static class DriverMessageTemplateFormatter
         {
             sentence = NormalizeLutronEventSentence(sentence);
         }
+        else if (driverName.Equals("Venstar ColorTouch", StringComparison.OrdinalIgnoreCase))
+        {
+            sentence = NormalizeVenstarEventSentence(sentence);
+        }
 
         sentence = $"When {sentence}";
 
@@ -839,7 +843,7 @@ public static class DriverMessageTemplateFormatter
             return sentence;
         }
 
-        return $"{target} turns {state}";
+        return $"{target} turned {state}";
     }
 
     private static string NormalizeLutronEventSentence(string sentence)
@@ -857,7 +861,17 @@ public static class DriverMessageTemplateFormatter
             return sentence;
         }
 
-        return $"{target} turns {state}";
+        return $"{target} turned {state}";
+    }
+
+    private static string NormalizeVenstarEventSentence(string sentence)
+    {
+        if (sentence.EndsWith("Operating State Change", StringComparison.OrdinalIgnoreCase))
+        {
+            return sentence[..^"Operating State Change".Length] + "Operating State Changed";
+        }
+
+        return sentence;
     }
 
     private static bool TryExtractTimestampAndBody(string rawText, out string timestamp, out string body)
