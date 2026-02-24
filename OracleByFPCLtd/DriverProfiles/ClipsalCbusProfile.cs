@@ -46,8 +46,7 @@ public static class ClipsalCbusProfile
             }),
             new("Clipsal C-Bus HVAC", new List<AdditionalInfoColumn>
             {
-                new("Groupld", AdditionalInfoColumnRole.GroupId),
-                new("GroupName", AdditionalInfoColumnRole.GroupName),
+                new("GroupID", AdditionalInfoColumnRole.GroupId),
                 new("ZoneID", AdditionalInfoColumnRole.ZoneId),
                 new("ZoneName", AdditionalInfoColumnRole.ZoneName)
             })
@@ -134,10 +133,8 @@ public static class ClipsalCbusProfile
             {
                 if (mappedArgs.Count >= 2)
                 {
-                    var groupIdText = mappedArgs[0];
-                    var zoneText = mappedArgs[1];
-                    mappedArgs[0] = MapHvacGroup(driverData, groupIdText, ref unresolved, out var groupId);
-                    mappedArgs[1] = MapHvacZone(driverData, groupId, zoneText, ref unresolved);
+                    mappedArgs[0] = MapHvacZone(driverData, mappedArgs[0], mappedArgs[1], ref unresolved);
+                    mappedArgs.RemoveAt(1);
                 }
             }
             else
@@ -317,33 +314,12 @@ public static class ClipsalCbusProfile
             return $"{groupIdText} [No Map!]";
         }
 
-        private static string MapHvacGroup(AdditionalDriverData data, string groupIdText, ref bool unresolved, out int? groupId)
+        private static string MapHvacZone(AdditionalDriverData data, string groupIdText, string zoneText, ref bool unresolved)
         {
-            groupId = null;
-            if (!TryParseIndex(groupIdText, out var groupIdValue))
+            if (!TryParseIndex(groupIdText, out var groupId))
             {
                 unresolved = true;
                 return $"{groupIdText} [No Map!]";
-            }
-
-            groupId = groupIdValue;
-            var entry = data.CbusHvacZones.FirstOrDefault(kvp => kvp.Key.GroupId == groupIdValue);
-            if (entry.Equals(default(KeyValuePair<(int GroupId, int ZoneId), CbusHvacEntry>)))
-            {
-                unresolved = true;
-                return $"{groupIdText} [No Map!]";
-            }
-
-            var name = entry.Value.GroupName;
-            return string.IsNullOrWhiteSpace(name) ? $"{groupIdText} [No Map!]" : name;
-        }
-
-        private static string MapHvacZone(AdditionalDriverData data, int? groupId, string zoneText, ref bool unresolved)
-        {
-            if (groupId is null)
-            {
-                unresolved = true;
-                return $"{zoneText} [No Map!]";
             }
 
             var match = ZoneIdPattern.Match(zoneText);
@@ -354,10 +330,16 @@ public static class ClipsalCbusProfile
                 return $"{zoneText} [No Map!]";
             }
 
-            if (data.CbusHvacZones.TryGetValue((groupId.Value, zoneId), out var entry))
+            if (data.CbusHvacZones.TryGetValue((groupId, zoneId), out var entry))
             {
                 var name = entry.ZoneName;
-                return string.IsNullOrWhiteSpace(name) ? $"{zoneText} [No Map!]" : MarkUnknownState(zoneText, ref unresolved);
+                if (!string.IsNullOrWhiteSpace(name))
+                {
+                    return name;
+                }
+
+                unresolved = true;
+                return $"{zoneText} [No Map!]";
             }
 
             unresolved = true;
@@ -377,20 +359,6 @@ public static class ClipsalCbusProfile
             }
 
             return $"{entry.GroupRoom} {entry.GroupName}";
-        }
-
-        private static string MarkUnknownState(string zoneText, ref bool unresolved)
-        {
-            var match = ZoneIdPattern.Match(zoneText);
-            if (!match.Success)
-            {
-                unresolved = true;
-                return $"{zoneText} [Unknown State!]";
-            }
-
-            unresolved = true;
-            var number = match.Groups["zone"].Value;
-            return zoneText.Replace($"({number})", $"({number} [Unknown State!])", StringComparison.Ordinal);
         }
 
         private static bool TryParseIndex(string value, out int index)

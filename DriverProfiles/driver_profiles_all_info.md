@@ -1,4 +1,4 @@
-﻿- Scope: Driver profile parsing and mapping rules apply to C-Bus and Vaux logs.
+- Scope: Driver profile parsing and mapping rules apply to C-Bus and Vaux logs.
   Value: Implemented
   Evidence: ..\OracleByFPCLtd\DriverProfiles\Catalog\DriverProfileCatalog.cs :: DriverProfileCatalog.All
 - Scope: Output formatting rules cover both resolved and unresolved mappings.
@@ -17,10 +17,10 @@
 - Driver Device Name Match Rules: A non-matching sheet is ignored and records an error.
   Value: Implemented
   Evidence: ..\OracleByFPCLtd\ProjectData\Extractors\AdditionalDataExtractor.cs :: AdditionalDataExtractor.Extract
-- C-Bus General Immediate Switch Parsing Rule: The tuple is parsed as `State`, `GroupId`, and `AppId`.
+- C-Bus General Immediate Switch Parsing Rule: The tuple is parsed as `State`, `GroupID`, and `AppId`.
   Value: Implemented
   Evidence: ..\OracleByFPCLtd\DriverProfiles\ClipsalCbusProfile.cs :: ClipsalCbusMapper.TryMapCommand
-- C-Bus General Immediate Switch Mapping Rule: The mapper looks up `AppId` and `GroupId` in the Clipsal C-Bus sheet.
+- C-Bus General Immediate Switch Mapping Rule: The mapper looks up `AppId` and `GroupID` in the Clipsal C-Bus sheet.
   Value: Implemented
   Evidence: ..\OracleByFPCLtd\DriverProfiles\ClipsalCbusProfile.cs :: ClipsalCbusMapper.MapCbusGroup
 - C-Bus General Immediate Switch Mapping Rule: Output always includes both `GroupRoom` and `GroupName`.
@@ -34,22 +34,22 @@
   Evidence: ..\OracleByFPCLtd\DriverProfiles\ClipsalCbusProfile.cs :: ClipsalCbusMapper.MapImmediateSwitchState
 - C-Bus General Immediate Switch Open Item: State values `121` and `255` still need defined meanings.
 - C-Bus General Ramp to Level Parsing Rule: Parameter meanings are not yet defined.
-- C-Bus General Ramp to Level Mapping Rule: Encoding for `AppId`, `GroupId`, and level still requires analysis.
+- C-Bus General Ramp to Level Mapping Rule: Encoding for `AppId`, `GroupID`, and level still requires analysis.
 - C-Bus General Ramp to Level Output Format: Output remains a placeholder until parameter meanings are confirmed.
-- C-Bus HVAC Zone Setpoint Up Parsing Rule: The tuple is parsed as `GroupId` and `ZoneId`.
+- C-Bus HVAC Zone Setpoint Up Parsing Rule: The tuple is parsed as `GroupID` and `ZoneId`.
   Value: Implemented
   Evidence: ..\OracleByFPCLtd\DriverProfiles\ClipsalCbusProfile.cs :: ClipsalCbusMapper.TryMapCommand
-- C-Bus HVAC Zone Setpoint Up Mapping Rule: The mapper looks up `GroupId` and `ZoneId` in the HVAC sheet.
+- C-Bus HVAC Zone Setpoint Up Mapping Rule: The mapper looks up `GroupID` and `ZoneId` in the HVAC sheet.
   Value: Implemented
   Evidence: ..\OracleByFPCLtd\DriverProfiles\ClipsalCbusProfile.cs :: ClipsalCbusMapper.MapHvacZone
 - C-Bus HVAC Zone Setpoint Up Mapping Rule: Output always includes both `GroupName` and `ZoneName`.
   Value: Implemented
   Evidence: ..\OracleByFPCLtd.Tests\ProcessingEngineMappingTests.cs :: ProcessingEngineMappingTests.DriverMappingServiceMapsCbusHvacSetpointUpUnknownState
 - C-Bus HVAC Zone Setpoint Up Open Item: Output phrasing for HVAC commands still needs confirmation.
-- C-Bus Driver Event App Group Off Parsing Rule: Event text extraction includes `AppId`, `GroupId`, and state.
+- C-Bus Driver Event App Group Off Parsing Rule: Event text extraction includes `AppId`, `GroupID`, and state.
   Value: Implemented
   Evidence: ..\OracleByFPCLtd\DriverProfiles\ClipsalCbusProfile.cs :: ClipsalCbusMapper.TryMapEvent
-- C-Bus Driver Event App Group Off Mapping Rule: The mapper looks up `AppId` and `GroupId` in the C-Bus sheet.
+- C-Bus Driver Event App Group Off Mapping Rule: The mapper looks up `AppId` and `GroupID` in the C-Bus sheet.
   Value: Implemented
   Evidence: ..\OracleByFPCLtd\DriverProfiles\ClipsalCbusProfile.cs :: ClipsalCbusMapper.ResolveGroupReplacement
 - C-Bus Driver Event App Group Off Mapping Rule: Output always includes both `GroupRoom` and `GroupName`.
@@ -58,10 +58,10 @@
 - C-Bus Driver Event App Group Off State Mapping: Off maps to Off and On maps to On.
   Value: Implemented
   Evidence: ..\OracleByFPCLtd\DriverProfiles\ClipsalCbusProfile.cs :: ClipsalCbusMapper.TryMapEvent
-- C-Bus Driver Event App Group On Parsing Rule: Event text extraction includes `AppId`, `GroupId`, and state.
+- C-Bus Driver Event App Group On Parsing Rule: Event text extraction includes `AppId`, `GroupID`, and state.
   Value: Implemented
   Evidence: ..\OracleByFPCLtd\DriverProfiles\ClipsalCbusProfile.cs :: ClipsalCbusMapper.TryMapEvent
-- C-Bus Driver Event App Group On Mapping Rule: The mapper looks up `AppId` and `GroupId` in the C-Bus sheet.
+- C-Bus Driver Event App Group On Mapping Rule: The mapper looks up `AppId` and `GroupID` in the C-Bus sheet.
   Value: Implemented
   Evidence: ..\OracleByFPCLtd\DriverProfiles\ClipsalCbusProfile.cs :: ClipsalCbusMapper.ResolveGroupReplacement
 - C-Bus Driver Event App Group On Mapping Rule: Output always includes both `GroupRoom` and `GroupName`.

@@ -158,17 +158,32 @@ public sealed class ProcessingEngineMappingTests
     }
 
     [Fact]
-    public void DriverMappingServiceMapsCbusHvacSetpointUpUnknownState()
+    public void DriverMappingServiceMapsCbusHvacSetpointUpUsingGroupAndZoneIds()
     {
         var bundle = BuildBundleWithCbus();
-        bundle.Additional.Drivers["Clipsal C-Bus"].CbusHvacZones[(1, 0)] = new CbusHvacEntry("Garage", "Unswitched");
+        bundle.Additional.Drivers["Clipsal C-Bus"].CbusHvacZones[(6, 0)] = new CbusHvacEntry("", "Guest Loft");
+        bundle.Additional.Drivers["Clipsal C-Bus"].CbusHvacZones[(6, 1)] = new CbusHvacEntry("", "Garage");
         var service = new DriverMappingService();
-        var evt = new DiagnosticEvent(6, "Driver - Command:'Clipsal C-Bus\\HVAC\\HVAC Zone Setpoint Up(1, Unswitched (0))' Sustain:NO  Sent to 'WorkShop Slave'");
+        var evt = new DiagnosticEvent(6, "Driver - Command:'Clipsal C-Bus\\HVAC\\HVAC Zone Setpoint Up(6, Garage (1))' Sustain:NO  Sent to 'WorkShop Slave'");
 
         var line = service.Map(evt, bundle);
 
-        Assert.Equal("6 Driver - Command:'Clipsal C-Bus\\HVAC\\HVAC Zone Setpoint Up(Garage, Unswitched (0 [Unknown State!]))' Sustain:NO  Sent to 'WorkShop Slave'", line.Text);
-        Assert.True(line.IsUnresolved);
+        Assert.Equal("6 Driver - Command:'Clipsal C-Bus\\HVAC\\HVAC Zone Setpoint Up(Garage)' Sustain:NO  Sent to 'WorkShop Slave'", line.Text);
+        Assert.False(line.IsUnresolved);
+    }
+
+    [Fact]
+    public void DriverMappingServiceFormatsTimestampedCbusHvacSetpointUp()
+    {
+        var bundle = BuildBundleWithCbus();
+        bundle.Additional.Drivers["Clipsal C-Bus"].CbusHvacZones[(6, 1)] = new CbusHvacEntry("", "Garage");
+        var service = new DriverMappingService();
+        var evt = new DiagnosticEvent(7, "[2026-02-24 09:00:00.000] Driver - Command:'Clipsal C-Bus\\HVAC\\HVAC Zone Setpoint Up(6, Garage (1))' Sustain:NO  Sent to 'WorkShop Slave'");
+
+        var line = service.Map(evt, bundle);
+
+        Assert.Equal("7 [2026-02-24 09:00:00.000] Driver Command (Clipsal C-Bus): 'Garage setpoint increased.'", line.Text);
+        Assert.False(line.IsUnresolved);
     }
 
     [Fact]

@@ -17,7 +17,7 @@ public sealed class AdditionalInfoDisplayBuilderTests
         driverData.IntegerNames[3] = "Integer 3";
         driverData.RelayNames[4] = "Relay 4";
         driverData.CbusGroups[(56, 25)] = new CbusGroupEntry("Living Room", "Pendant");
-        driverData.CbusHvacZones[(1, 0)] = new CbusHvacEntry("HVAC Group", "Zone A");
+        driverData.CbusHvacZones[(1, 0)] = new CbusHvacEntry("", "Zone A");
         driverData.CbusScenes[(202, 33, 0)] = new CbusSceneEntry("Lower Floor On");
         data.Drivers["Driver A"] = driverData;
 
@@ -29,7 +29,7 @@ public sealed class AdditionalInfoDisplayBuilderTests
         Assert.Contains(entries, entry => entry.DriverName == "Driver A" && entry.MapType == "Integer" && entry.Index == 3 && entry.Name == "Integer 3");
         Assert.Contains(entries, entry => entry.DriverName == "Driver A" && entry.MapType == "Relay" && entry.Index == 4 && entry.Name == "Relay 4");
         Assert.Contains(entries, entry => entry.DriverName == "Driver A" && entry.MapType == "C-Bus Group" && entry.Index == 25 && entry.Name == "Living Room Pendant");
-        Assert.Contains(entries, entry => entry.DriverName == "Driver A" && entry.MapType == "C-Bus HVAC" && entry.Index == 0 && entry.Name == "HVAC Group Zone A");
+        Assert.Contains(entries, entry => entry.DriverName == "Driver A" && entry.MapType == "C-Bus HVAC" && entry.Index == 0 && entry.Name == "Zone A");
         Assert.Contains(entries, entry => entry.DriverName == "Driver A" && entry.MapType == "C-Bus Scene" && entry.Index == 33 && entry.Name == "Lower Floor On");
     }
 

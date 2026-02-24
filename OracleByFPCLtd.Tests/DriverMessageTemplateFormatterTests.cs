@@ -17,6 +17,17 @@ public sealed class DriverMessageTemplateFormatterTests
     }
 
     [Fact]
+    public void TryFormatDriverCommandFormatsClipsalHvacSetpointIncreased()
+    {
+        var mappedText = "[2026-02-24 09:00:00.000] Driver - Command:'Clipsal C-Bus\\HVAC\\HVAC Zone Setpoint Up(Garage)' Sustain:NO  Sent to 'WorkShop Slave'";
+
+        var formatted = DriverMessageTemplateFormatter.TryFormatDriverCommand(mappedText, "Clipsal C-Bus", out var output);
+
+        Assert.True(formatted);
+        Assert.Equal("[2026-02-24 09:00:00.000] Driver Command (Clipsal C-Bus): 'Garage setpoint increased.'", output);
+    }
+
+    [Fact]
     public void TryFormatDriverCommandFormatsAvproCecHex()
     {
         var mappedText = "[2026-02-10 21:29:42.669] Driver - Command:'AVProEdge MXNet_1G\\CEC\\CEC (Hex)(1, 4F821000)' Sustain:NO";

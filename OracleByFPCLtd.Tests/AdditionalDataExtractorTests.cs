@@ -90,10 +90,10 @@ public sealed class AdditionalDataExtractorTests
         {
             new object[] { 202.0, 33.0, 0.0, "Lower Floor On" }
         };
-        var hvacHeaders = new[] { "Groupld", "GroupName", "ZoneID", "ZoneName" };
+        var hvacHeaders = new[] { "GroupID", "ZoneID", "ZoneName" };
         var hvacRows = new List<object[]>
         {
-            new object[] { 1.0, "HVAC Group", 0.0, "Zone A" }
+            new object[] { 1.0, 0.0, "Zone A" }
         };
 
         var path = CreateWorkbookWithSheets(new List<(string Name, IReadOnlyList<string> Headers, IReadOnlyList<object[]> Rows)>
@@ -111,8 +111,11 @@ public sealed class AdditionalDataExtractorTests
             Assert.Equal("Living Room", driverData.CbusGroups[(56, 25)].GroupRoom);
             Assert.Equal("Pendant", driverData.CbusGroups[(56, 25)].GroupName);
             Assert.Equal("Lower Floor On", driverData.CbusScenes[(202, 33, 0)].SceneName);
-            Assert.Equal("HVAC Group", driverData.CbusHvacZones[(1, 0)].GroupName);
+            Assert.Equal("", driverData.CbusHvacZones[(1, 0)].GroupName);
             Assert.Equal("Zone A", driverData.CbusHvacZones[(1, 0)].ZoneName);
+            Assert.Contains(driverData.PreviewEntries, entry =>
+                entry.MapType == "Clipsal C-Bus HVAC"
+                && entry.Name == "Zone A");
         }
         finally
         {

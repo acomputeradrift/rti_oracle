@@ -229,9 +229,9 @@ public static class DriverMessageTemplateFormatter
             return true;
         }
 
-        if (actionName.Equals("HVAC Zone Setpoint Up", StringComparison.OrdinalIgnoreCase) && args.Count >= 2)
+        if (actionName.Equals("HVAC Zone Setpoint Up", StringComparison.OrdinalIgnoreCase) && args.Count >= 1)
         {
-            sentence = $"{args[0]} HVAC zone setpoint set to {args[1]}";
+            sentence = $"{args[0]} setpoint increased";
             return true;
         }
 

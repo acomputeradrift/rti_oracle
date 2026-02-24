@@ -33,6 +33,20 @@ Done criteria:
 - Preserve timestamp when reconstructing mapped text.
 - Set unresolved flags honestly when mapping cannot be completed.
 
+Clipsal C-Bus HVAC rule:
+- For `Clipsal C-Bus\HVAC\HVAC Zone Setpoint Up(<GroupID>, <ZoneLabel> (<ZoneId>))`, parse:
+  - `<GroupID>` as `GroupID`.
+  - trailing integer in `<ZoneLabel> (<ZoneId>)` as `ZoneId`.
+- Resolve zone using composite key `(GroupID, ZoneId)` from the HVAC mapping sheet.
+- Use resolved `ZoneName` in output text.
+- Output format:
+  - `Driver Command (Clipsal C-Bus): '<ZoneName> setpoint increased.'`
+
+Example:
+- Input: `Driver - Command:'Clipsal C-Bus\HVAC\HVAC Zone Setpoint Up(1, Unswitched (0))' Sustain:NO  Sent to 'WorkShop Slave'`
+- Parsed: `GroupID=1`, `ZoneId=0`
+- If `(6,1) -> Garage`, output: `Driver Command (Clipsal C-Bus): 'Garage setpoint increased.'`
+
 Done criteria:
 - Supported line patterns map correctly.
 - Unsupported patterns are intentionally rejected (or tagged as incomplete at pipeline level).
@@ -41,6 +55,14 @@ Done criteria:
 - Add `AdditionalInfoSchemas` to the profile.
 - Use explicit headers and roles (`InputIndex`, `InputName`, `RelayIndex`, `RelayName`, etc.).
 - Ensure schema sheet names are stable and documented.
+
+Clipsal C-Bus HVAC Additional Info template:
+- Sheet name: `Clipsal C-Bus HVAC` (or exact profile-defined equivalent).
+- Required headers:
+  - `GroupID`
+  - `ZoneId`
+  - `ZoneName`
+- Mapping key is `(GroupID, ZoneId)` and value is `ZoneName`.
 
 Done criteria:
 - Schema exists in profile and matches expected spreadsheet headers.

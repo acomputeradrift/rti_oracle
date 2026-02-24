@@ -25,10 +25,10 @@ Example:
 - Driver - Command:'Clipsal C-Bus\General\Immediate Switch(255, 22, 48)' Sustain:NO  Sent to 'WorkShop Slave'
 
 Parsing rule:
-- Tuple is (State, GroupId, AppId).
+- Tuple is (State, GroupID, AppId).
 
 Mapping rule:
-- Lookup (AppId, GroupId) in the Clipsal C-Bus sheet.
+- Lookup (AppId, GroupID) in the Clipsal C-Bus sheet.
 - Always include GroupRoom and GroupName in output.
 - State mapping:
   - 1 -> Off
@@ -48,23 +48,23 @@ Parsing rule:
 - Parameters are not yet defined.
 
 Mapping rule:
-- Requires analysis to determine how AppId, GroupId, and level are encoded.
+- Requires analysis to determine how AppId, GroupID, and level are encoded.
 
 Output format:
 - Placeholder until parameter meaning is confirmed.
 
 Needs decision:
-- Provide parameter definitions for Ramp to level to map into AppId/GroupId and level.
+- Provide parameter definitions for Ramp to level to map into AppId/GroupID and level.
 
 ### HVAC - HVAC Zone Setpoint Up
 Example:
 - Driver - Command:'Clipsal C-Bus\HVAC\HVAC Zone Setpoint Up(1, Unswitched (0))' Sustain:NO  Sent to 'WorkShop Slave'
 
 Parsing rule:
-- Tuple is (GroupId, ZoneId).
+- Tuple is (GroupID, ZoneId).
 
 Mapping rule:
-- Lookup (GroupId, ZoneId) in the Clipsal C-Bus HVAC sheet.
+- Lookup (GroupID, ZoneId) in the Clipsal C-Bus HVAC sheet.
 - Always include GroupName and ZoneName in output.
 
 Output format example:
@@ -78,10 +78,10 @@ Example:
 - Driver event 'When 'App 56, Group 4 Off' happens on 'Clipsal C-Bus\App 56, Group Off''
 
 Parsing rule:
-- Extract AppId, GroupId, and state from the event text.
+- Extract AppId, GroupID, and state from the event text.
 
 Mapping rule:
-- Lookup (AppId, GroupId) in the Clipsal C-Bus sheet.
+- Lookup (AppId, GroupID) in the Clipsal C-Bus sheet.
 - Always include GroupRoom and GroupName in output.
 - State mapping:
   - Off -> Off
@@ -95,10 +95,10 @@ Example:
 - Driver event 'When 'App 56, Group 32 On' happens on 'Clipsal C-Bus\App 56 Group On''
 
 Parsing rule:
-- Extract AppId, GroupId, and state from the event text.
+- Extract AppId, GroupID, and state from the event text.
 
 Mapping rule:
-- Lookup (AppId, GroupId) in the Clipsal C-Bus sheet.
+- Lookup (AppId, GroupID) in the Clipsal C-Bus sheet.
 - Always include GroupRoom and GroupName in output.
 - State mapping:
   - On -> On
