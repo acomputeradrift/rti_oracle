@@ -11,12 +11,16 @@ namespace OracleByFPCLtd.ProjectData;
 
 public static class AdditionalInfoTemplatePlanner
 {
+    private const string RtiRcm12RelayModuleSheet = "RTI RCM-12 Relay Module";
+    private const int Rcm12DeviceType = 7;
     private static readonly CentralLogger CentralLogger = new(new CentralLoggerOptions
     {
         LogFilePath = BuildStructuredLogPath()
     });
 
-    public static IReadOnlyList<AdditionalInfoSheetSchema> DetermineSchemas(IEnumerable<DriverConfigEntry> drivers)
+    public static IReadOnlyList<AdditionalInfoSheetSchema> DetermineSchemas(
+        IEnumerable<DriverConfigEntry> drivers,
+        IEnumerable<int>? expansionDeviceTypes = null)
     {
         if (drivers is null)
         {
@@ -32,6 +36,9 @@ public static class AdditionalInfoTemplatePlanner
         var matcher = new DriverProfileMatcher();
         var schemas = new List<AdditionalInfoSheetSchema>();
         var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var expansionTypes = expansionDeviceTypes == null
+            ? new HashSet<int>()
+            : new HashSet<int>(expansionDeviceTypes);
 
         foreach (var driver in drivers)
         {
@@ -50,6 +57,11 @@ public static class AdditionalInfoTemplatePlanner
             foreach (var schema in profile.AdditionalInfoSchemas)
             {
                 if (schema == null)
+                {
+                    continue;
+                }
+
+                if (!ShouldIncludeInternalSchema(schema.SheetName, expansionTypes))
                 {
                     continue;
                 }
@@ -77,6 +89,11 @@ public static class AdditionalInfoTemplatePlanner
                     continue;
                 }
 
+                if (!ShouldIncludeInternalSchema(schema.SheetName, expansionTypes))
+                {
+                    continue;
+                }
+
                 if (seen.Add(schema.SheetName))
                 {
                     schemas.Add(schema);
@@ -90,6 +107,16 @@ public static class AdditionalInfoTemplatePlanner
             "Additional info schemas determined.",
             new Dictionary<string, string> { ["count"] = schemas.Count.ToString() });
         return schemas;
+    }
+
+    private static bool ShouldIncludeInternalSchema(string sheetName, ISet<int> expansionTypes)
+    {
+        if (string.Equals(sheetName, RtiRcm12RelayModuleSheet, StringComparison.OrdinalIgnoreCase))
+        {
+            return expansionTypes.Contains(Rcm12DeviceType);
+        }
+
+        return true;
     }
 
     private static void LogStructuredEvent(

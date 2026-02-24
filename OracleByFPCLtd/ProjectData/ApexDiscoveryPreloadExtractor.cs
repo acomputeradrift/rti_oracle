@@ -27,6 +27,7 @@ public sealed class ApexDiscoveryPreloadResult
     public List<SourceCatalogEntry> SourceCatalog { get; } = new();
     public List<SystemManagerSourceCatalogEntry> SystemManagerSourceCatalog { get; } = new();
     public List<DriverTemplateVariableEntry> DriverTemplateVariables { get; } = new();
+    public HashSet<int> ExpansionDeviceTypes { get; } = new();
 }
 
 public sealed record SysVarRefEntry(int? DriverDeviceId, string? DriverName, string? VariableName, int? DeviceId);
@@ -138,6 +139,7 @@ public static class ApexDiscoveryPreloadExtractor
 
         LoadPageIndexMap(connection, result.PageIndexMap);
         LoadDriverConfigMap(connection, result.DriverConfigMap);
+        LoadExpansionDeviceTypes(connection, result.ExpansionDeviceTypes);
         LoadSysVarRefMap(connection, result.SysVarRefMap);
         LoadPageMappings(connection, result.PageMappings);
         LoadRelayPorts(connection, result.RelayPorts);
@@ -168,7 +170,8 @@ public static class ApexDiscoveryPreloadExtractor
                 ["roomMappings"] = result.RoomMappings.Count.ToString(CultureInfo.InvariantCulture),
                 ["sourceCatalog"] = result.SourceCatalog.Count.ToString(CultureInfo.InvariantCulture),
                 ["systemManagerSourceCatalog"] = result.SystemManagerSourceCatalog.Count.ToString(CultureInfo.InvariantCulture),
-                ["driverTemplateVariables"] = result.DriverTemplateVariables.Count.ToString(CultureInfo.InvariantCulture)
+                ["driverTemplateVariables"] = result.DriverTemplateVariables.Count.ToString(CultureInfo.InvariantCulture),
+                ["expansionDeviceTypes"] = result.ExpansionDeviceTypes.Count.ToString(CultureInfo.InvariantCulture)
             });
         return result;
     }
@@ -256,6 +259,28 @@ ORDER BY d.DeviceId, p.PageOrder;
             var pageIndex = reader.GetInt32(1);
             var pageName = reader.IsDBNull(2) ? "" : reader.GetString(2);
             map[$"{deviceId}|{pageIndex}"] = pageName;
+        }
+    }
+
+    private static void LoadExpansionDeviceTypes(SqliteConnection connection, HashSet<int> types)
+    {
+        using var command = connection.CreateCommand();
+        command.CommandText =
+            """
+SELECT DISTINCT DeviceType
+FROM ExpansionDevices
+WHERE RTIAddress = 0;
+""";
+
+        using var reader = command.ExecuteReader();
+        while (reader.Read())
+        {
+            if (reader.IsDBNull(0))
+            {
+                continue;
+            }
+
+            types.Add(reader.GetInt32(0));
         }
     }
 

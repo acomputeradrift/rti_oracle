@@ -4800,7 +4800,9 @@ public partial class MainWindow : Window
 
     private void UpdateAdditionalInfoTemplateAvailability(ProjectDataExtractionResult result)
     {
-        _requiredAdditionalInfoSchemas = AdditionalInfoTemplatePlanner.DetermineSchemas(result.ApexDiscoveryPreload.DriverConfigMap.Values)
+        _requiredAdditionalInfoSchemas = AdditionalInfoTemplatePlanner.DetermineSchemas(
+                result.ApexDiscoveryPreload.DriverConfigMap.Values,
+                result.ApexDiscoveryPreload.ExpansionDeviceTypes)
             .ToList();
         DownloadAdditionalInfoTemplateMenuItem.IsEnabled = _requiredAdditionalInfoSchemas.Count > 0;
 

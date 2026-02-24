@@ -221,6 +221,17 @@ public sealed class ApexDiscoveryPreloadTests
             ("Format", "B:Off:On")));
     }
 
+    [Fact]
+    public void ExpansionDeviceTypesExposeDetectedModelTypes()
+    {
+        var result = ApexDiscoveryPreloadExtractor.Extract(ApexClonePath);
+
+        Assert.Contains(3, result.ExpansionDeviceTypes);
+        Assert.Contains(5, result.ExpansionDeviceTypes);
+        Assert.Contains(6, result.ExpansionDeviceTypes);
+        Assert.DoesNotContain(7, result.ExpansionDeviceTypes);
+    }
+
     private static object[] GetEntries(ApexDiscoveryPreloadResult result, string propertyName)
     {
         var property = typeof(ApexDiscoveryPreloadResult).GetProperty(propertyName);

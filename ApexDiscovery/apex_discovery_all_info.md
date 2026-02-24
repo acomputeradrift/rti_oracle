@@ -169,6 +169,22 @@
 - Controller name resolves through `RTIDeviceData` and `Devices` at `RTIAddress = 0`.
   Value: Implemented
   Evidence: ProjectData/ApexDiscoveryPreloadExtractor.cs :: ApexDiscoveryPreloadExtractor.LoadRelayPorts
+- Expansion module model detection must use `ExpansionDevices.DeviceType` as the primary signal.
+  Value: Required
+- Expansion module display/sheet naming should use `ExpansionDevices.Name`.
+  Value: Required
+- Expansion model names from editable labels (`Devices.Name`, `PortLabels.LabelName`) are secondary corroboration only and must not be the primary classifier.
+  Value: Required
+- Additional Info export should generate mapping sheets only for expansion models that require manual mapping.
+  Value: Required
+- Current scope: include `RCM-12` mapping sheets; do not generate `RCM-4` mapping sheets because `RCM-4` ports are mapped in the main processor port list.
+  Value: Required
+- `RCM-12` mapping sheet creation must be conditional on detected presence in the `.apex` data (no static/pre-created sheet when detected count is zero).
+  Value: Required
+- When multiple `RCM-12` instances are detected, export all instances in the `RCM-12` mapping output using stable ordering by `ExpanderId` and include each instance display name from `ExpansionDevices.Name`.
+  Value: Required
+- Unknown `DeviceType` values must be exported explicitly as `Unknown DeviceType <value>` and must not be dropped.
+  Value: Required
 
 ## Ports - Relay
 - Internal XP-8v relay labels come from `LabelKey` range `-64768..-64761`.
@@ -183,6 +199,16 @@
   Value: Implemented
   Evidence: ProjectData/ApexDiscoveryPreloadExtractor.cs :: ApexDiscoveryPreloadExtractor.LoadRelayPorts
 - XP-6 relay type/mode DB masks exist but may be out of scope for this setup.
+- Expansion device model mapping for Additional Info should use a maintained `DeviceType` lookup.
+  Value: Required
+- `RCM-12` presence for Additional Info gating should be determined by `ExpansionDevices` rows at `RTIAddress = 0` where `DeviceType = 7`.
+  Value: Required
+- Current observed mapping set:
+  - `DeviceType 5` -> `RCM-4`
+  - `DeviceType 7` -> `RCM-12`
+  - `DeviceType 3` -> `ESC-2`
+  - `DeviceType 6` -> `XP-6`
+  Value: Provisional (observed in local project corpus)
 
 ## Ports - MPIO/IR
 - Internal XP-8v MPIO/IR labels come from `LabelKey` range `-65536..-65529`.

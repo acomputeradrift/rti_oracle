@@ -24,14 +24,27 @@ public sealed class AdditionalInfoTemplatePlannerTests
     }
 
     [Fact]
-    public void PlannerIncludesRtiInternalSchemasEvenWhenInternalDriverIsNotInConfigList()
+    public void PlannerDoesNotIncludeRcm12SchemaWhenRcm12ExpansionTypeIsMissing()
     {
         var drivers = new List<DriverConfigEntry>
         {
             new("Clipsal C-Bus", "Clipsal C-Bus", new Dictionary<string, string>())
         };
 
-        var schemas = AdditionalInfoTemplatePlanner.DetermineSchemas(drivers);
+        var schemas = AdditionalInfoTemplatePlanner.DetermineSchemas(drivers, new[] { 3, 5, 6 });
+
+        Assert.DoesNotContain(schemas, schema => schema.SheetName == "RTI RCM-12 Relay Module");
+    }
+
+    [Fact]
+    public void PlannerIncludesRcm12SchemaWhenRcm12ExpansionTypeIsPresent()
+    {
+        var drivers = new List<DriverConfigEntry>
+        {
+            new("Clipsal C-Bus", "Clipsal C-Bus", new Dictionary<string, string>())
+        };
+
+        var schemas = AdditionalInfoTemplatePlanner.DetermineSchemas(drivers, new[] { 7 });
 
         Assert.Contains(schemas, schema => schema.SheetName == "RTI RCM-12 Relay Module");
     }
