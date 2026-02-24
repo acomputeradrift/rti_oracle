@@ -93,6 +93,9 @@ public partial class MainWindow : Window
     private static readonly Color ProcessedFocusMatchColor = Color.FromRgb(255, 165, 0);
     private static readonly Regex TaggedDriverCommandPattern = new Regex("Driver - Command:\\s*'(?<driver>[^\\\\']+)", RegexOptions.IgnoreCase | RegexOptions.Compiled);
     private static readonly Regex TaggedDriverEventPattern = new Regex("happens on\\s*'(?<driver>[^\\\\']+)", RegexOptions.IgnoreCase | RegexOptions.Compiled);
+    private static readonly Regex TaggedFormattedDriverCommandPattern = new Regex("^Driver Command\\s*\\((?<driver>[^\\)]+)\\):", RegexOptions.IgnoreCase | RegexOptions.Compiled);
+    private static readonly Regex TaggedFormattedDriverEventPattern = new Regex("^Driver Event\\s*\\((?<driver>[^\\)]+)\\):", RegexOptions.IgnoreCase | RegexOptions.Compiled);
+    private static readonly Regex TaggedFormattedDriverUpdatePattern = new Regex("^Driver Update\\s*\\((?<driver>[^\\)]+)\\):", RegexOptions.IgnoreCase | RegexOptions.Compiled);
     private static readonly string[] DiagnosticTags =
     {
         "[No Profile!]",
@@ -4585,7 +4588,25 @@ public partial class MainWindow : Window
 
     private static string ExtractTaggedDriverName(string rawText)
     {
-        var match = TaggedDriverCommandPattern.Match(rawText);
+        var match = TaggedFormattedDriverCommandPattern.Match(rawText);
+        if (match.Success)
+        {
+            return match.Groups["driver"].Value.Trim();
+        }
+
+        match = TaggedFormattedDriverEventPattern.Match(rawText);
+        if (match.Success)
+        {
+            return match.Groups["driver"].Value.Trim();
+        }
+
+        match = TaggedFormattedDriverUpdatePattern.Match(rawText);
+        if (match.Success)
+        {
+            return match.Groups["driver"].Value.Trim();
+        }
+
+        match = TaggedDriverCommandPattern.Match(rawText);
         if (match.Success)
         {
             return match.Groups["driver"].Value.Trim();

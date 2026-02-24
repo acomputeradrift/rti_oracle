@@ -9,17 +9,17 @@ namespace OracleByFPCLtd.DriverProfiles;
 public static class JandyIAqualinkProfile
 {
     private static readonly Regex DriverCommandPattern = new Regex(
-        "Driver - Command:\\s*'Jandy iAquaLink\\\\",
+        "Driver - Command:\\s*'Jandy (?:iAquaLink|AquaLink RS)\\\\",
         RegexOptions.IgnoreCase | RegexOptions.Compiled);
     private static readonly Regex DriverEventPattern = new Regex(
-        "happens on\\s*'Jandy iAquaLink\\\\",
+        "happens on\\s*'Jandy (?:iAquaLink|AquaLink RS)\\\\",
         RegexOptions.IgnoreCase | RegexOptions.Compiled);
 
     public static IDriverProfileMapper Mapper { get; } = new JandyIAqualinkMapper();
 
     public static DriverProfileDefinition Definition { get; } = new DriverProfileDefinition(
         "Jandy iAquaLink",
-        Array.Empty<string>(),
+        new[] { "Jandy AquaLink RS" },
         Array.Empty<string>(),
         Array.Empty<string>(),
         new List<DriverProfileDiscoveryRule>(),

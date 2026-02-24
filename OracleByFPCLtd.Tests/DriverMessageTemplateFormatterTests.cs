@@ -28,14 +28,14 @@ public sealed class DriverMessageTemplateFormatterTests
     }
 
     [Fact]
-    public void TryFormatDriverCommandKeepsNoFormatForSystemManagerRouteCommands()
+    public void TryFormatDriverCommandFormatsSystemManagerRouteCommandsAsDriverUpdateWithoutNoFormatTag()
     {
         var mappedText = "[2026-02-10 19:15:33.701] Driver - Command:'System Manager\\[Hide]\\Route Command(2, 1, 3)' Sustain:NO";
 
         var formatted = DriverMessageTemplateFormatter.TryFormatDriverCommand(mappedText, "System Manager", out var output);
 
         Assert.True(formatted);
-        Assert.Equal("[2026-02-10 19:15:33.701] Driver Command (System Manager): 'System Manager\\[Hide]\\Route Command(2, 1, 3)' [No Format!]", output);
+        Assert.Equal("[2026-02-10 19:15:33.701] Driver Update (System Manager): 'System Manager\\[Hide]\\Route Command(2, 1, 3)'", output);
     }
 
     [Fact]
@@ -148,6 +148,17 @@ public sealed class DriverMessageTemplateFormatterTests
     }
 
     [Fact]
+    public void TryFormatDriverCommandFormatsJandySpaOff()
+    {
+        var mappedText = "[2026-02-24 09:00:00.000] Driver - Command:'Jandy AquaLink RS\\Spa Control\\Spa Off' Sustain:NO";
+
+        var formatted = DriverMessageTemplateFormatter.TryFormatDriverCommand(mappedText, "Jandy iAquaLink", out var output);
+
+        Assert.True(formatted);
+        Assert.Equal("[2026-02-24 09:00:00.000] Driver Command (Jandy iAquaLink): 'Spa turned Off.'", output);
+    }
+
+    [Fact]
     public void TryFormatDriverEventFormatsVantageInFusionLampEvent()
     {
         var mappedText = "[2026-02-22 12:11:00.000] Driver event 'When 'SE Lamp (VID 178) On' happens on 'Vantage InFusion\\Button LEDs (1-100)''";
@@ -200,5 +211,49 @@ public sealed class DriverMessageTemplateFormatterTests
 
         Assert.True(formatted);
         Assert.Equal("[2026-02-23 07:25:34.196] Driver Command (Lutron Caseta / RA2 Select): 'Master - East Pendant turned Off.'", output);
+    }
+
+    [Fact]
+    public void TryFormatDriverCommandFormatsVauxVolumeDownAsDecreased()
+    {
+        var mappedText = "[2026-02-24 09:00:00.000] Driver - Command:'Vaux Lattis Matrix\\Output Settings\\Volume Down(Gym)' Sustain:YES";
+
+        var formatted = DriverMessageTemplateFormatter.TryFormatDriverCommand(mappedText, "Vaux Lattis Matrix", out var output);
+
+        Assert.True(formatted);
+        Assert.Equal("[2026-02-24 09:00:00.000] Driver Command (Vaux Lattis Matrix): 'Gym volume decreased.'", output);
+    }
+
+    [Fact]
+    public void TryFormatDriverCommandFormatsRtiAd64VolumeDownAsDecreased()
+    {
+        var mappedText = "[2026-02-24 09:00:00.000] Driver - Command:'RTI AD-64\\Zone A\\Volume Down(Zone A)' Sustain:YES";
+
+        var formatted = DriverMessageTemplateFormatter.TryFormatDriverCommand(mappedText, "RTI AD-64", out var output);
+
+        Assert.True(formatted);
+        Assert.Equal("[2026-02-24 09:00:00.000] Driver Command (RTI AD-64): 'Zone A volume decreased.'", output);
+    }
+
+    [Fact]
+    public void TryFormatDriverCommandFormatsRtiAd64ZoneGroupVolumeUpAsIncreased()
+    {
+        var mappedText = "[2026-02-24 09:00:00.000] Driver - Command:'RTI AD-64\\Zone A\\Zone/Group Volume Up(Zone A)' Sustain:YES";
+
+        var formatted = DriverMessageTemplateFormatter.TryFormatDriverCommand(mappedText, "RTI AD-64", out var output);
+
+        Assert.True(formatted);
+        Assert.Equal("[2026-02-24 09:00:00.000] Driver Command (RTI AD-64): 'Zone A zone/group volume increased.'", output);
+    }
+
+    [Fact]
+    public void TryFormatDriverCommandFormatsYamahaVolumeDownAsDecreased()
+    {
+        var mappedText = "[2026-02-24 09:00:00.000] Driver - Command:'Yamaha AVENTAGE\\Main Zone\\Volume Down(1.0 dB)' Sustain:YES";
+
+        var formatted = DriverMessageTemplateFormatter.TryFormatDriverCommand(mappedText, "Yamaha AVENTAGE", out var output);
+
+        Assert.True(formatted);
+        Assert.Equal("[2026-02-24 09:00:00.000] Driver Command (Yamaha AVENTAGE): 'Main volume decreased by 1.0 dB.'", output);
     }
 }

@@ -32,9 +32,16 @@ public static class DriverMessageTemplateFormatter
             return false;
         }
 
-        if (!command.StartsWith(driverName + "\\", StringComparison.OrdinalIgnoreCase))
+        if (!IsCommandAttributedToDriver(command, driverName))
         {
             return false;
+        }
+
+        if (driverName.Equals("System Manager", StringComparison.OrdinalIgnoreCase)
+            && IsSystemManagerHiddenUpdateCommand(command))
+        {
+            formattedText = $"[{timestamp}] Driver Update ({driverName}): '{command}'";
+            return true;
         }
 
         if (!TryBuildSentence(driverName, command, out var sentence, out var extraInfo, out var skipPeriod))
@@ -57,6 +64,28 @@ public static class DriverMessageTemplateFormatter
         }
 
         return true;
+    }
+
+    private static bool IsSystemManagerHiddenUpdateCommand(string command)
+    {
+        return command.StartsWith("System Manager\\[Hide]\\Route Command(", StringComparison.OrdinalIgnoreCase)
+            || command.Equals("System Manager\\[Hide]\\Room Off", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static bool IsCommandAttributedToDriver(string command, string driverName)
+    {
+        if (command.StartsWith(driverName + "\\", StringComparison.OrdinalIgnoreCase))
+        {
+            return true;
+        }
+
+        if (driverName.Equals("Jandy iAquaLink", StringComparison.OrdinalIgnoreCase)
+            && command.StartsWith("Jandy AquaLink RS\\", StringComparison.OrdinalIgnoreCase))
+        {
+            return true;
+        }
+
+        return false;
     }
 
     public static bool TryFormatDriverEvent(string mappedText, string driverName, out string formattedText)
@@ -310,13 +339,13 @@ public static class DriverMessageTemplateFormatter
 
         if (actionName.Equals("Volume Up", StringComparison.OrdinalIgnoreCase) && args.Count >= 1)
         {
-            sentence = $"Main volume adjusted by +{args[0]}";
+            sentence = $"Main volume increased by {args[0]}";
             return true;
         }
 
         if (actionName.Equals("Volume Down", StringComparison.OrdinalIgnoreCase) && args.Count >= 1)
         {
-            sentence = $"Main volume adjusted by -{args[0]}";
+            sentence = $"Main volume decreased by {args[0]}";
             return true;
         }
 
@@ -401,15 +430,6 @@ public static class DriverMessageTemplateFormatter
         sentence = "";
         extraInfo = "";
         skipPeriod = false;
-
-        if (command.StartsWith("System Manager\\[Hide]\\Route Command(", StringComparison.OrdinalIgnoreCase)
-            || command.Equals("System Manager\\[Hide]\\Room Off", StringComparison.OrdinalIgnoreCase))
-        {
-            sentence = command;
-            extraInfo = "[No Format!]";
-            skipPeriod = true;
-            return true;
-        }
 
         if (command.Equals("System Manager\\[Hide]\\System Off", StringComparison.OrdinalIgnoreCase))
         {
@@ -525,25 +545,25 @@ public static class DriverMessageTemplateFormatter
 
         if (actionName.Equals("Volume Up", StringComparison.OrdinalIgnoreCase) && args.Count >= 1)
         {
-            sentence = $"{NormalizeZoneName(args[0])} zone volume adjusted Up";
+            sentence = $"{NormalizeZoneName(args[0])} volume increased";
             return true;
         }
 
         if (actionName.Equals("Volume Down", StringComparison.OrdinalIgnoreCase) && args.Count >= 1)
         {
-            sentence = $"{NormalizeZoneName(args[0])} zone volume adjusted Down";
+            sentence = $"{NormalizeZoneName(args[0])} volume decreased";
             return true;
         }
 
         if (actionName.Equals("Zone/Group Volume Up", StringComparison.OrdinalIgnoreCase) && args.Count >= 1)
         {
-            sentence = $"{NormalizeZoneName(args[0])} zone/group volume adjusted Up";
+            sentence = $"{NormalizeZoneName(args[0])} zone/group volume increased";
             return true;
         }
 
         if (actionName.Equals("Zone/Group Volume Down", StringComparison.OrdinalIgnoreCase) && args.Count >= 1)
         {
-            sentence = $"{NormalizeZoneName(args[0])} zone/group volume adjusted Down";
+            sentence = $"{NormalizeZoneName(args[0])} zone/group volume decreased";
             return true;
         }
 
@@ -580,6 +600,12 @@ public static class DriverMessageTemplateFormatter
         if (actionName.Equals("Volume Up", StringComparison.OrdinalIgnoreCase) && args.Count >= 1)
         {
             sentence = $"{args[0]} volume increased";
+            return true;
+        }
+
+        if (actionName.Equals("Volume Down", StringComparison.OrdinalIgnoreCase) && args.Count >= 1)
+        {
+            sentence = $"{args[0]} volume decreased";
             return true;
         }
 
@@ -739,9 +765,15 @@ public static class DriverMessageTemplateFormatter
     private static bool TryBuildJandySentence(string actionName, out string sentence)
     {
         sentence = "";
+        if (actionName.Equals("Spa Off", StringComparison.OrdinalIgnoreCase))
+        {
+            sentence = "Spa turned Off";
+            return true;
+        }
+
         if (actionName.Equals("Spa Pump Off", StringComparison.OrdinalIgnoreCase))
         {
-            sentence = "Spa pump set to Off";
+            sentence = "Spa pump turned Off";
             return true;
         }
 

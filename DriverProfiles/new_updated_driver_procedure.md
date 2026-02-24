@@ -95,3 +95,107 @@ When relay-name mapping depends on `RTI Internal` Additional Info schema:
 - Mapping expected but lookup missing: `[No Map!]`.
 - Resolver failed without specific no-map context: `[Unresolved!]`.
 - Formatting path missing sentence rule: `[No Format!]`.
+
+## Readability Formatting Rules
+
+### Purpose
+Define consistent, driver-agnostic wording for processed diagnostic output so similar actions read the same across driver profiles.
+
+### Scope
+- Applies to readability formatting output only.
+- Does not change mapping logic, unresolved tagging, or profile matching behavior.
+- Intended to be updated incrementally as new patterns are confirmed.
+
+### Core Principles
+- Prefer short, plain-language sentences.
+- Keep sentence structure stable across drivers.
+- Use one action verb style per intent.
+- Keep unresolved data explicit; do not guess names.
+- End formatted sentences with a period.
+
+### Canonical Sentence Shape
+- `<Target> <action phrase>.`
+
+Examples:
+- `Gym volume decreased.`
+- `Master Pendant turned Off.`
+- `Source set to Apple TV.`
+
+### Canonical Intents And Wording
+
+#### 1. Binary Power / Switch / Relay
+- On: `turned On`
+- Off: `turned Off`
+- Toggle: `toggled`
+
+Examples:
+- `Spa turned Off.`
+- `Entry Lights turned On.`
+- `Garage Relay toggled.`
+
+#### 2. Volume (Delta)
+- Increase: `volume increased`
+- Decrease: `volume decreased`
+- With amount: `volume increased by <amount>` / `volume decreased by <amount>`
+
+Examples:
+- `Zone A volume increased.`
+- `Main volume decreased by 1.0 dB.`
+
+#### 3. Volume (Absolute)
+- `volume set to <value>`
+
+Examples:
+- `Main volume set to -30 dB.`
+
+#### 4. Source / Input / Routing
+- `source set to <source>`
+- `input set to <input>`
+
+Examples:
+- `Source set to Apple TV.`
+- `Theater input set to HDMI 2.`
+
+#### 5. Dimming / Level
+- Absolute: `dimmed to <level>`
+- Ramp: `ramped to <level> over <duration>`
+
+Examples:
+- `Kitchen Pendants dimmed to 50%.`
+- `Hallway ramped to 100% over 2 seconds.`
+
+#### 6. Mute
+- Absolute: `mute set to On|Off`
+- Toggle: `mute toggled`
+
+Examples:
+- `Gym mute toggled.`
+- `Main mute set to Off.`
+
+#### 7. Scene / Task / Trigger
+- Scene: `scene <name> activated`
+- Task: `task <name> executed`
+
+Examples:
+- `Scene Evening activated.`
+- `Task AUDIO - Hallway Button LED OFF executed.`
+
+### Unresolved And Tagging Rules
+- Formatting should not inject diagnostic tags as readability placeholders.
+- Tags such as `[No Map!]`, `[Unknown State!]`, `[No Profile!]`, `[Incomplete Profile!]` reflect mapping/profile state and remain separate from sentence wording.
+- Preserve unresolved identifiers when lookup data is missing.
+
+### Consistency Rules
+- Use `increased/decreased` for directional adjustments.
+- Use `set to` only for absolute assignment.
+- Use `turned On/Off` for binary state transitions.
+- Do not mix equivalent verbs for the same intent in different profiles.
+
+### Driver-Specific Exceptions
+- If a driver command has unique semantics that do not fit canonical intents, document the exception in this procedure before implementation.
+
+### Change Process
+1. Add/adjust tests first for expected wording.
+2. Update formatter behavior.
+3. Validate no regressions in existing formatter and mapping tests.
+4. Record any approved exception in this procedure.

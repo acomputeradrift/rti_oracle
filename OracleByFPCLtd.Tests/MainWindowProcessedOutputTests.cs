@@ -189,6 +189,30 @@ public sealed class MainWindowProcessedOutputTests
     }
 
     [Fact]
+    public void ExtractTaggedDriverNameParsesFormattedDriverCommand()
+    {
+        var driver = InvokeExtractTaggedDriverName("Driver Command (System Manager): 'Source for Gym set to 9.'");
+
+        Assert.Equal("System Manager", driver);
+    }
+
+    [Fact]
+    public void ExtractTaggedDriverNameParsesFormattedDriverEvent()
+    {
+        var driver = InvokeExtractTaggedDriverName("Driver Event (Clipsal C-Bus): 'When Group 13 turns Off.'");
+
+        Assert.Equal("Clipsal C-Bus", driver);
+    }
+
+    [Fact]
+    public void ExtractTaggedDriverNameParsesFormattedDriverUpdate()
+    {
+        var driver = InvokeExtractTaggedDriverName("Driver Update (System Manager): 'System Manager\\[Hide]\\Route Command(16849773)'");
+
+        Assert.Equal("System Manager", driver);
+    }
+
+    [Fact]
     public void TransportErrorStartsReconnectStatus()
     {
         RunOnSta(() =>
@@ -798,6 +822,13 @@ public sealed class MainWindowProcessedOutputTests
         var method = typeof(MainWindow).GetMethod("BuildLogLevelAckKey", BindingFlags.Static | BindingFlags.NonPublic);
         Assert.NotNull(method);
         return (string)method!.Invoke(null, new object[] { dName })!;
+    }
+
+    private static string InvokeExtractTaggedDriverName(string line)
+    {
+        var method = typeof(MainWindow).GetMethod("ExtractTaggedDriverName", BindingFlags.Static | BindingFlags.NonPublic);
+        Assert.NotNull(method);
+        return (string)method!.Invoke(null, new object[] { line })!;
     }
 
     private static Task<bool> InvokeWaitForLogLevelAck(MainWindow window, string dName, int level, int retryCount, int timeoutMs)

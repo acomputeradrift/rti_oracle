@@ -232,7 +232,7 @@ public sealed class ProcessingEngineMappingTests
     }
 
     [Fact]
-    public void DriverMappingServiceKeepsNoFormatTagForTimestampedSystemManagerRouteCommand()
+    public void DriverMappingServiceFormatsTimestampedSystemManagerRouteCommandAsDriverUpdateWithoutNoFormatTag()
     {
         var bundle = new ProjectDataBundle();
         var service = new DriverMappingService();
@@ -240,7 +240,7 @@ public sealed class ProcessingEngineMappingTests
 
         var line = service.Map(evt, bundle);
 
-        Assert.Equal("15 [2026-02-10 19:15:33.701] Driver Command (System Manager): 'System Manager\\[Hide]\\Route Command(2, 1, 3)' [No Format!]", line.Text);
+        Assert.Equal("15 [2026-02-10 19:15:33.701] Driver Update (System Manager): 'System Manager\\[Hide]\\Route Command(2, 1, 3)'", line.Text);
         Assert.False(line.IsUnresolved);
     }
 
@@ -759,6 +759,19 @@ public sealed class ProcessingEngineMappingTests
         var line = service.Map(evt, bundle);
 
         Assert.Equal("23 Venstar ColorTouch - Master Bed is connected", line.Text);
+        Assert.False(line.IsUnresolved);
+    }
+
+    [Fact]
+    public void DriverMappingServiceFormatsJandyAqualinkRsSpaOffCommand()
+    {
+        var bundle = new ProjectDataBundle();
+        var service = new DriverMappingService();
+        var evt = new DiagnosticEvent(24, "[2026-02-24 09:00:00.000] Driver - Command:'Jandy AquaLink RS\\Spa Control\\Spa Off' Sustain:NO");
+
+        var line = service.Map(evt, bundle);
+
+        Assert.Equal("24 [2026-02-24 09:00:00.000] Driver Command (Jandy iAquaLink): 'Spa turned Off.'", line.Text);
         Assert.False(line.IsUnresolved);
     }
 
