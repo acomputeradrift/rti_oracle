@@ -284,6 +284,32 @@ public sealed class ProcessingEngineMappingTests
     }
 
     [Fact]
+    public void DriverMappingServiceUsesSystemManagerSourceCatalogForSetSourceWhenBothCatalogsExist()
+    {
+        var bundle = BuildBundleWithConflictingSystemManagerCatalogs();
+        var service = new DriverMappingService();
+        var evt = new DiagnosticEvent(3, "[2026-02-11 14:29:23.662] Driver - Command:'System Manager\\Routing\\Set Source(7)' Sustain:NO");
+
+        var line = service.Map(evt, bundle);
+
+        Assert.Equal("3 [2026-02-11 14:29:23.662] Driver Command (System Manager): 'Source set to New Method Source 7.'", line.Text);
+        Assert.False(line.IsUnresolved);
+    }
+
+    [Fact]
+    public void DriverMappingServiceUsesSourceCatalogForSetSourceByRoomWhenBothCatalogsExist()
+    {
+        var bundle = BuildBundleWithConflictingSystemManagerCatalogs();
+        var service = new DriverMappingService();
+        var evt = new DiagnosticEvent(5, "[2026-02-11 14:29:23.662] Driver - Command:'System Manager\\Routing\\Set Source By Room(Gym, 7)' Sustain:NO");
+
+        var line = service.Map(evt, bundle);
+
+        Assert.Equal("5 [2026-02-11 14:29:23.662] Driver Command (System Manager): 'Source for Gym set to Old Method Source 7.'", line.Text);
+        Assert.False(line.IsUnresolved);
+    }
+
+    [Fact]
     public void DriverMappingServiceMarksNoMapForSystemManagerSetSourceWithNumericSource()
     {
         var bundle = new ProjectDataBundle();
@@ -964,7 +990,7 @@ public sealed class ProcessingEngineMappingTests
     private static ProjectDataBundle BuildBundleWithSystemManagerSourceCatalog()
     {
         var bundle = new ProjectDataBundle();
-        bundle.System.SourceCatalog.AddRange(new[]
+        var sourceEntries = new[]
         {
             new SourceCatalogEntry(1, 0, 5, "Home (Global)", "Home (Global)"),
             new SourceCatalogEntry(7, 1, 5, "Home (Room 1)", "Home (Room 1)"),
@@ -995,7 +1021,29 @@ public sealed class ProcessingEngineMappingTests
             new SourceCatalogEntry(34, 3, 5, "Other Source (Room 3)", "Other Source (Room 3)"),
             new SourceCatalogEntry(35, 4, 5, "Other Source (Room 4)", "Other Source (Room 4)"),
             new SourceCatalogEntry(36, 5, 5, "Other Source (Room 5)", "Other Source (Room 5)")
-        });
+        };
+
+        bundle.System.SourceCatalog.AddRange(sourceEntries);
+        var ordered = sourceEntries.OrderBy(entry => entry.DeviceId).ToList();
+        for (var i = 0; i < ordered.Count; i++)
+        {
+            bundle.System.SystemManagerSourceCatalog.Add(new SystemManagerSourceCatalogEntry(
+                i,
+                string.IsNullOrWhiteSpace(ordered[i].SourceDisplayName) ? ordered[i].SourceName : ordered[i].SourceDisplayName));
+        }
+
+        return bundle;
+    }
+
+    private static ProjectDataBundle BuildBundleWithConflictingSystemManagerCatalogs()
+    {
+        var bundle = new ProjectDataBundle();
+        for (var i = 0; i <= 10; i++)
+        {
+            bundle.System.SourceCatalog.Add(new SourceCatalogEntry(100 + i, 0, 5, $"Old Method Source {i}", $"Old Method Source {i}"));
+            bundle.System.SystemManagerSourceCatalog.Add(new SystemManagerSourceCatalogEntry(i, $"New Method Source {i}"));
+        }
+
         return bundle;
     }
 }

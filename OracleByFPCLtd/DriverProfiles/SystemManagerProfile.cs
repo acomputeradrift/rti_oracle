@@ -184,7 +184,11 @@ public static class SystemManagerProfile
                 return false;
             }
 
-            if (!TryResolveSystemManagerSourceIndex(bundle, args[sourceArgIndex], out var sourceName))
+            var resolved = isSetSource
+                ? TryResolveSystemManagerSourceIndexFromSystemManagerCatalog(bundle, args[sourceArgIndex], out var sourceName)
+                : TryResolveSystemManagerSourceIndexFromSourceCatalog(bundle, args[sourceArgIndex], out sourceName);
+
+            if (!resolved)
             {
                 unresolved = true;
                 return true;
@@ -199,7 +203,7 @@ public static class SystemManagerProfile
             return true;
         }
 
-        private static bool TryResolveSystemManagerSourceIndex(ProjectDataBundle bundle, string rawIndex, out string sourceName)
+        private static bool TryResolveSystemManagerSourceIndexFromSystemManagerCatalog(ProjectDataBundle bundle, string rawIndex, out string sourceName)
         {
             sourceName = "";
             if (!int.TryParse(rawIndex, out var zeroBasedIndex))
@@ -212,23 +216,35 @@ public static class SystemManagerProfile
                 return false;
             }
 
-            var indexedSources = bundle.System.SystemManagerSourceCatalog
-                .OrderBy(entry => entry.SourceIndex)
-                .ToList();
-            if (indexedSources.Count > 0)
+            var indexedSources = bundle.System.SystemManagerSourceCatalog.OrderBy(entry => entry.SourceIndex).ToList();
+            if (indexedSources.Count == 0)
             {
-                if (zeroBasedIndex >= indexedSources.Count)
-                {
-                    return false;
-                }
-
-                sourceName = indexedSources[zeroBasedIndex].SourceName;
-                return !string.IsNullOrWhiteSpace(sourceName);
+                return false;
             }
 
-            var orderedSources = bundle.System.SourceCatalog
-                .OrderBy(entry => entry.DeviceId)
-                .ToList();
+            if (zeroBasedIndex >= indexedSources.Count)
+            {
+                return false;
+            }
+
+            sourceName = indexedSources[zeroBasedIndex].SourceName;
+            return !string.IsNullOrWhiteSpace(sourceName);
+        }
+
+        private static bool TryResolveSystemManagerSourceIndexFromSourceCatalog(ProjectDataBundle bundle, string rawIndex, out string sourceName)
+        {
+            sourceName = "";
+            if (!int.TryParse(rawIndex, out var zeroBasedIndex))
+            {
+                return false;
+            }
+
+            if (zeroBasedIndex < 0)
+            {
+                return false;
+            }
+
+            var orderedSources = bundle.System.SourceCatalog.OrderBy(entry => entry.DeviceId).ToList();
             if (zeroBasedIndex >= orderedSources.Count)
             {
                 return false;

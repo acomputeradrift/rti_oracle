@@ -317,6 +317,9 @@
 - Source index mapping method (NEW): build System Manager source catalog by token range (`SourceInUse<N>` / `SourceName<N>`), prepend required prefix `SourceName*` driver-config entries when present, then append device catalog (`ControlType IN (5, 6)` ordered by `DeviceId`), and resolve `Set Source(N)` as zero-based.
   Value: Implemented
   Evidence: OracleByFPCLtd/ProjectData/ApexDiscoveryPreloadExtractor.cs :: `LoadSystemManagerSourceCatalog`
+- Runtime resolution split (current): `Set Source(N)` uses `SystemManagerSourceCatalog` (NEW method), while `Set Source By Room(<Room>, N)` uses device-ordered `SourceCatalog` (`ControlType IN (5,6)` sorted by `DeviceId`).
+  Value: Implemented
+  Evidence: OracleByFPCLtd/DriverProfiles/SystemManagerProfile.cs :: `TryResolveSourceIndexCommands`
 - System Manager display/source naming for categories beyond Source Names is not yet proven.
 - If no System Manager device row exists, use explicit literal driver naming rather than inferred device rows.
 

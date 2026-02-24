@@ -1,0 +1,190 @@
+{
+  "CreatedUtc": "2026-02-24T15:58:47.1251688Z",
+  "AppVersion": "1.1.9.0",
+  "Drivers": [
+    {
+      "DriverName": "Jandy AquaLink RS",
+      "Tags": [
+        {
+          "Tag": "[No Profile!]",
+          "Messages": [
+            "Driver - Command:'Jandy AquaLink RS\\Spa Control\\Spa Off' Sustain:NO"
+          ]
+        }
+      ]
+    },
+    {
+      "DriverName": "Uncategorized",
+      "Tags": [
+        {
+          "Tag": "[No Format!]",
+          "Messages": [
+            "Driver Command (System Manager): 'System Manager\\[Hide]\\Room Off'",
+            "Driver Command (System Manager): 'System Manager\\[Hide]\\Route Command(16849773)'",
+            "Driver Command (System Manager): 'System Manager\\[Hide]\\Route Command(16849823)'",
+            "Driver Command (System Manager): 'System Manager\\[Hide]\\Route Command(16849898)'"
+          ]
+        },
+        {
+          "Tag": "[No Map!]",
+          "Messages": [
+            "Driver Command (System Manager): 'Source for Gym set to 9.'",
+            "Driver Command (System Manager): 'Source for Rec Room set to 7.'",
+            "Driver Command (System Manager): 'Source for Theater set to 12.'",
+            "Driver Command (System Manager): 'Source set to 19.'",
+            "Driver Event (Clipsal C-Bus): 'When Group 13 turns Off.'",
+            "Driver Event (Clipsal C-Bus): 'When Group 13 turns On.'",
+            "Driver Event (Clipsal C-Bus): 'When Group 19 turns Off.'",
+            "Driver Event (Clipsal C-Bus): 'When Group 19 turns On.'"
+          ]
+        },
+        {
+          "Tag": "[No Profile!]",
+          "Messages": [
+            "Lutron Exterior - ID 2, Level is 0",
+            "Lutron Exterior - ID 2, Level is 100",
+            "Lutron Exterior - ID 2, Status On is false",
+            "Lutron Exterior - ID 2, Status On is true",
+            "Lutron Exterior - ID 2, Switch/Shade Command Off/Closed (3) Executed",
+            "Lutron Exterior - ID 2, Switch/Shade Command On/Open (2) Executed",
+            "Lutron Exterior - ID 3, Level is 0",
+            "Lutron Exterior - ID 3, Level is 100",
+            "Lutron Exterior - ID 3, Status On is false",
+            "Lutron Exterior - ID 3, Status On is true",
+            "Lutron Exterior - ID 3, Switch/Shade Command Off/Closed (3) Executed",
+            "Lutron Exterior - ID 3, Switch/Shade Command On/Open (2) Executed",
+            "Lutron Exterior - ID 4, Level is 0",
+            "Lutron Exterior - ID 4, Status On is false",
+            "Lutron Exterior - ID 4, Switch/Shade Command Off/Closed (3) Executed",
+            "Lutron Exterior - ID 5, Level is 0",
+            "Lutron Exterior - ID 5, Status On is false",
+            "Lutron Exterior - ID 5, Switch/Shade Command Off/Closed (3) Executed",
+            "Lutron Exterior - ID 6, Level is 0",
+            "Lutron Exterior - ID 6, Status On is false",
+            "Lutron Exterior - ID 6, Switch/Shade Command Off/Closed (3) Executed",
+            "Lutron Lower - ID 15, Level is 0",
+            "Lutron Lower - ID 15, Level is 100",
+            "Lutron Lower - ID 15, Status On is false",
+            "Lutron Lower - ID 15, Status On is true",
+            "Lutron Lower - ID 15, Switch/Shade Command Off/Closed (3) Executed",
+            "Lutron Lower - ID 15, Switch/Shade Command On/Open (2) Executed",
+            "Lutron Lower - ID 2, Level is 0",
+            "Lutron Lower - ID 2, Level is 100",
+            "Lutron Lower - ID 2, Set Dimmer Level to 0, with a fade rate of 00:00:02",
+            "Lutron Lower - ID 2, Set Dimmer Level to 100, with a fade rate of 00:00:02",
+            "Lutron Lower - ID 2, Status On is false",
+            "Lutron Lower - ID 2, Status On is true",
+            "Lutron Lower - ID 2, Switch/Shade Command Off/Closed (3) Executed",
+            "Lutron Lower - ID 2, Switch/Shade Command On/Open (2) Executed",
+            "Lutron Lower - ID 3, Level is 0",
+            "Lutron Lower - ID 3, Level is 100",
+            "Lutron Lower - ID 3, Set Dimmer Level to 0, with a fade rate of 00:00:02",
+            "Lutron Lower - ID 3, Set Dimmer Level to 100, with a fade rate of 00:00:02",
+            "Lutron Lower - ID 3, Status On is false",
+            "Lutron Lower - ID 3, Status On is true",
+            "Lutron Lower - ID 3, Switch/Shade Command Off/Closed (3) Executed",
+            "Lutron Lower - ID 5, Level is 0",
+            "Lutron Lower - ID 5, Level is 100",
+            "Lutron Lower - ID 5, Status On is false",
+            "Lutron Lower - ID 5, Status On is true",
+            "Lutron Lower - ID 5, Switch/Shade Command Off/Closed (3) Executed",
+            "Lutron Lower - ID 5, Switch/Shade Command On/Open (2) Executed",
+            "Lutron Lower - ID 8, Level is 0",
+            "Lutron Lower - ID 8, Level is 100",
+            "Lutron Lower - ID 8, Set Dimmer Level to 0, with a fade rate of 00:00:02",
+            "Lutron Lower - ID 8, Set Dimmer Level to 100, with a fade rate of 00:00:02",
+            "Lutron Lower - ID 8, Status On is false",
+            "Lutron Lower - ID 8, Status On is true",
+            "Lutron Lower - ID 8, Switch/Shade Command Off/Closed (3) Executed",
+            "Lutron Lower - ID 9, Level is 0",
+            "Lutron Lower - ID 9, Level is 100",
+            "Lutron Lower - ID 9, Set Dimmer Level to 0, with a fade rate of 00:00:02",
+            "Lutron Lower - ID 9, Set Dimmer Level to 100, with a fade rate of 00:00:02",
+            "Lutron Lower - ID 9, Status On is false",
+            "Lutron Lower - ID 9, Status On is true",
+            "Lutron Upper - ID 10, Level is 0",
+            "Lutron Upper - ID 10, Level is 100",
+            "Lutron Upper - ID 10, Set Dimmer Level to 0, with a fade rate of 00:00:02",
+            "Lutron Upper - ID 10, Set Dimmer Level to 100, with a fade rate of 00:00:02",
+            "Lutron Upper - ID 10, Status On is false",
+            "Lutron Upper - ID 10, Status On is true",
+            "Lutron Upper - ID 13, Level is 0",
+            "Lutron Upper - ID 13, Level is 100",
+            "Lutron Upper - ID 13, Status On is false",
+            "Lutron Upper - ID 13, Status On is true",
+            "Lutron Upper - ID 13, Switch/Shade Command Off/Closed (3) Executed",
+            "Lutron Upper - ID 13, Switch/Shade Command On/Open (2) Executed",
+            "Lutron Upper - ID 15, Level is 0",
+            "Lutron Upper - ID 15, Level is 100",
+            "Lutron Upper - ID 15, Set Dimmer Level to 0, with a fade rate of 00:00:02",
+            "Lutron Upper - ID 15, Set Dimmer Level to 100, with a fade rate of 00:00:02",
+            "Lutron Upper - ID 15, Status On is false",
+            "Lutron Upper - ID 15, Status On is true",
+            "Lutron Upper - ID 16, Level is 0",
+            "Lutron Upper - ID 16, Level is 100",
+            "Lutron Upper - ID 16, Set Dimmer Level to 0, with a fade rate of 00:00:02",
+            "Lutron Upper - ID 16, Set Dimmer Level to 100, with a fade rate of 00:00:02",
+            "Lutron Upper - ID 16, Status On is false",
+            "Lutron Upper - ID 16, Status On is true",
+            "Lutron Upper - ID 2, Level is 0",
+            "Lutron Upper - ID 2, Level is 100",
+            "Lutron Upper - ID 2, Set Dimmer Level to 0, with a fade rate of 00:00:02",
+            "Lutron Upper - ID 2, Set Dimmer Level to 100, with a fade rate of 00:00:02",
+            "Lutron Upper - ID 2, Status On is false",
+            "Lutron Upper - ID 2, Status On is true",
+            "Lutron Upper - ID 3, Level is 0",
+            "Lutron Upper - ID 3, Level is 100",
+            "Lutron Upper - ID 3, Set Dimmer Level to 0, with a fade rate of 00:00:02",
+            "Lutron Upper - ID 3, Set Dimmer Level to 100, with a fade rate of 00:00:02",
+            "Lutron Upper - ID 3, Status On is false",
+            "Lutron Upper - ID 3, Status On is true",
+            "Lutron Upper - ID 6, Level is 0",
+            "Lutron Upper - ID 6, Level is 100",
+            "Lutron Upper - ID 6, Status On is false",
+            "Lutron Upper - ID 6, Status On is true",
+            "Lutron Upper - ID 6, Switch/Shade Command Off/Closed (3) Executed",
+            "Lutron Upper - ID 6, Switch/Shade Command On/Open (2) Executed",
+            "Lutron Upper - ID 8, Level is 0",
+            "Lutron Upper - ID 8, Level is 100",
+            "Lutron Upper - ID 8, Set Dimmer Level to 0, with a fade rate of 00:00:02",
+            "Lutron Upper - ID 8, Set Dimmer Level to 100, with a fade rate of 00:00:02",
+            "Lutron Upper - ID 8, Status On is false",
+            "Lutron Upper - ID 8, Status On is true",
+            "Macro event",
+            "Venstar ColorTouch - East Bed is connected",
+            "Venstar ColorTouch - Garage is connected",
+            "Venstar ColorTouch - Guest Room is connected",
+            "Venstar ColorTouch - Hallway is connected",
+            "Venstar ColorTouch - Hobby Room is connected",
+            "Venstar ColorTouch - Laundry Room is connected",
+            "Venstar ColorTouch - Master Bath is connected",
+            "Venstar ColorTouch - Master Bed is connected",
+            "Venstar ColorTouch - Office is connected",
+            "Venstar ColorTouch - Rec Room is connected",
+            "Venstar ColorTouch - Theater is connected",
+            "Venstar ColorTouch - West Bed is connected"
+          ]
+        },
+        {
+          "Tag": "[Unknown State!]",
+          "Messages": [
+            "Driver Command (Clipsal C-Bus): 'Family/Living Room Fireplace turned 255.'",
+            "Driver Command (Clipsal C-Bus): 'Garage Recessed turned 121.'",
+            "Driver Command (Clipsal C-Bus): 'Master Bedroom Fireplace turned 255.'"
+          ]
+        }
+      ]
+    },
+    {
+      "DriverName": "Vaux Lattis Matrix",
+      "Tags": [
+        {
+          "Tag": "[Incomplete Profile!]",
+          "Messages": [
+            "Driver - Command:'Vaux Lattis Matrix\\Output Settings\\Volume Down(13)' Sustain:YES Rate:200"
+          ]
+        }
+      ]
+    }
+  ]
+}
