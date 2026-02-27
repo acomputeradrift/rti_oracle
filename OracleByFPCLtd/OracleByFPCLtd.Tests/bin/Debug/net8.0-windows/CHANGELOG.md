@@ -1,5 +1,38 @@
 # Changelog
 
+## [1.2] - 2026-02-24
+
+### Added
+- Driver profile coverage was expanded again, including additional HVAC-oriented command handling.
+
+### Changed
+- Additional Info template generation now avoids fixed, hard-coded relay assumptions so project data reflects the actual system data.
+- Driver and System Manager mapping rules were refined further for clearer source-name and event output wording.
+
+### Fixed
+- Page mapping now resolves correctly for cloned devices in processed output.
+- Project Data preview reliability was improved for updated mapping and profile scenarios.
+- Status area progress no longer jumps by 100 during update flows.
+
+## [1.1.9] - 2026-02-23
+
+### Added
+- Reprocessing progress overlay now appears when applying new Additional Info to large log sets, with live progress updates.
+- Tagged driver report export now groups unresolved output by tag type (for example, profile/mapping/state/format issues) and includes known-driver incomplete-profile cases.
+- Driver profile coverage was expanded with new profile support and broader parsing for additional devices.
+
+### Changed
+- System Manager source-name resolution now uses a dedicated indexed source catalog, improving source naming accuracy in mapped output.
+- Driver and event sentence wording was refined for clearer readability across additional device events and state transitions.
+- Unresolved mapping markers are now consistently shown as `[Unresolved!]`.
+- Existing driver profiles were updated with additional command/event mapping and driver-update handling.
+
+### Fixed
+- Project Data preview now accepts newly discovered drivers more reliably.
+- Additional Info loading for `RTI RCM-12 Relay Module` was corrected.
+- Project selection UI no longer shifts layout with long file names.
+- Unnecessary loading behavior was removed when opening project data that is already available in memory.
+
 ## [1.1.8] - 2026-02-22
 
 ### Added

@@ -165,6 +165,11 @@ public static class DriverMessageTemplateFormatter
             return false;
         }
 
+        if (driverName.StartsWith("System Variable Events", StringComparison.OrdinalIgnoreCase))
+        {
+            return TryBuildSystemVariableEventsSentence(command, out sentence);
+        }
+
         switch (driverName)
         {
             case "Clipsal C-Bus":
@@ -209,9 +214,29 @@ public static class DriverMessageTemplateFormatter
                 return TryBuildVantageInFusionSentence(actionName, args, out sentence);
             case "DSC PowerSeries":
                 return TryBuildDscPowerSeriesSentence(actionName, args, out sentence);
+            case "Print To Log":
+                return TryBuildPrintToLogSentence(actionName, args, out sentence);
             default:
                 return false;
         }
+    }
+
+    private static bool TryBuildSystemVariableEventsSentence(string command, out string sentence)
+    {
+        sentence = "";
+        if (string.IsNullOrWhiteSpace(command))
+        {
+            return false;
+        }
+
+        var firstSlash = command.IndexOf('\\');
+        if (firstSlash < 0 || firstSlash + 1 >= command.Length)
+        {
+            return false;
+        }
+
+        sentence = command.Substring(firstSlash + 1);
+        return !string.IsNullOrWhiteSpace(sentence);
     }
 
     private static bool TryBuildClipsalSentence(string actionName, IReadOnlyList<string> args, out string sentence)
@@ -300,6 +325,24 @@ public static class DriverMessageTemplateFormatter
         }
 
         return false;
+    }
+
+    private static bool TryBuildPrintToLogSentence(string actionName, IReadOnlyList<string> args, out string sentence)
+    {
+        sentence = "";
+        if (args.Count > 0)
+        {
+            sentence = string.Join(", ", args);
+            return true;
+        }
+
+        if (string.IsNullOrWhiteSpace(actionName))
+        {
+            return false;
+        }
+
+        sentence = actionName;
+        return true;
     }
 
     private static bool TryBuildYamahaSentence(string actionName, IReadOnlyList<string> args, out string sentence)

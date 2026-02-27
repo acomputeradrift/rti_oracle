@@ -217,10 +217,20 @@ public static class ClipsalCbusProfile
 
         private static string MapImmediateSwitchState(string stateText, ref bool unresolved)
         {
-            if (int.TryParse(stateText, NumberStyles.Integer, CultureInfo.InvariantCulture, out var state)
-                && state == 1)
+            if (!int.TryParse(stateText, NumberStyles.Integer, CultureInfo.InvariantCulture, out var state))
+            {
+                unresolved = true;
+                return $"{stateText} [Unknown State!]";
+            }
+
+            if (state == 1)
             {
                 return "Off";
+            }
+
+            if (state == 121 || state == 255)
+            {
+                return "On";
             }
 
             unresolved = true;

@@ -61,6 +61,9 @@ public static class RtiInternalProfile
     private static readonly Regex MacroEventPattern = new Regex(
         @"^(?:\[[^\]]+\]\s*)?Macro event$",
         RegexOptions.IgnoreCase | RegexOptions.Compiled);
+    private static readonly Regex DeviceSendFailedNotConnectedPattern = new Regex(
+        @"^(?:\[[^\]]+\]\s*)?'[^']+','[^']+'\s*-\s*Send failed,\s*device not connected$",
+        RegexOptions.IgnoreCase | RegexOptions.Compiled);
     private static readonly Regex RelayIndexPattern = new Regex(
         @"\bRELAY\s+(?<index>\d+)\b",
         RegexOptions.IgnoreCase | RegexOptions.Compiled);
@@ -195,6 +198,7 @@ ORDER BY d.DeviceId, p.PageOrder;
             if (MacroStartEndPattern.IsMatch(rawText)
                 || ButtonUpPattern.IsMatch(rawText)
                 || DeviceConnectedDisconnectedPattern.IsMatch(rawText)
+                || DeviceSendFailedNotConnectedPattern.IsMatch(rawText)
                 || SystemMacroStartEndPattern.IsMatch(rawText)
                 || StopMacroPattern.IsMatch(rawText)
                 || MacroEventPattern.IsMatch(rawText))

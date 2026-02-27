@@ -184,9 +184,10 @@ public static class SystemManagerProfile
                 return false;
             }
 
-            var resolved = isSetSource
-                ? TryResolveSystemManagerSourceIndexFromSystemManagerCatalog(bundle, args[sourceArgIndex], out var sourceName)
-                : TryResolveSystemManagerSourceIndexFromSourceCatalog(bundle, args[sourceArgIndex], out sourceName);
+            var resolved = TryResolveSystemManagerSourceIndex(
+                bundle,
+                args[sourceArgIndex],
+                out var sourceName);
 
             if (!resolved)
             {
@@ -253,6 +254,16 @@ public static class SystemManagerProfile
             var entry = orderedSources[zeroBasedIndex];
             sourceName = string.IsNullOrWhiteSpace(entry.SourceDisplayName) ? entry.SourceName : entry.SourceDisplayName;
             return !string.IsNullOrWhiteSpace(sourceName);
+        }
+
+        private static bool TryResolveSystemManagerSourceIndex(ProjectDataBundle bundle, string rawIndex, out string sourceName)
+        {
+            if (TryResolveSystemManagerSourceIndexFromSystemManagerCatalog(bundle, rawIndex, out sourceName))
+            {
+                return true;
+            }
+
+            return TryResolveSystemManagerSourceIndexFromSourceCatalog(bundle, rawIndex, out sourceName);
         }
 
         private static string RebuildCommandWithArgs(string originalCommand, IReadOnlyList<string> args)

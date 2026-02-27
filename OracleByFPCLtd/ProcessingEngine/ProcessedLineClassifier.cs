@@ -51,6 +51,11 @@ public static class ProcessedLineClassifier
             return ProcessedLineCategory.Disconnect;
         }
 
+        if (content.Contains("not connected", StringComparison.OrdinalIgnoreCase))
+        {
+            return ProcessedLineCategory.Disconnect;
+        }
+
         if (content.Contains("Driver Command", StringComparison.OrdinalIgnoreCase)
             || content.Contains("IR Command", StringComparison.OrdinalIgnoreCase)
             || content.Contains("Relay/Trigger Command", StringComparison.OrdinalIgnoreCase)

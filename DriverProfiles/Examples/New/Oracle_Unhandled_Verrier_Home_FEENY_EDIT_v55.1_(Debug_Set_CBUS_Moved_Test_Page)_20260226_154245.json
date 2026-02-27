@@ -1,0 +1,101 @@
+{
+  "CreatedUtc": "2026-02-26T22:42:45.8334153Z",
+  "AppVersion": "1.2.0.0",
+  "Drivers": [
+    {
+      "DriverName": "Clipsal C-Bus",
+      "Tags": [
+        {
+          "Tag": "[Unknown State!]",
+          "Messages": [
+            "Driver Command (Clipsal C-Bus): 'Garage Door 1 turned 121.'",
+            "Driver Command (Clipsal C-Bus): 'Garage Door 2 turned 121.'",
+            "Driver Command (Clipsal C-Bus): 'Garage Floor Heat turned 121.'",
+            "Driver Command (Clipsal C-Bus): 'Garage Main 1 turned 255.'",
+            "Driver Command (Clipsal C-Bus): 'Garage Soffit turned 255.'",
+            "Driver Command (Clipsal C-Bus): 'Kitchen/Dining Main Area turned 255.'",
+            "Driver Command (Clipsal C-Bus): 'Kitchen/Dining Sink Area turned 255.'",
+            "Driver Command (Clipsal C-Bus): 'Master Bed Cupboards turned 255.'",
+            "Driver Command (Clipsal C-Bus): 'Master Bed LED Strip turned 255.'",
+            "Driver Command (Clipsal C-Bus): 'Master Bed Main Fan - High turned 255.'",
+            "Driver Command (Clipsal C-Bus): 'Master Ensuite Shower turned 255.'",
+            "Driver Command (Clipsal C-Bus): 'Outside Garage Wall turned 121.'",
+            "Driver Command (Clipsal C-Bus): 'Outside Gate 1 Exit / Open turned 121.'",
+            "Driver Command (Clipsal C-Bus): 'Outside Gate 1 Hold Open turned 121.'",
+            "Driver Command (Clipsal C-Bus): 'Outside Kids Bed Wall turned 121.'",
+            "Driver Command (Clipsal C-Bus): 'Outside Light Level turned 121.'",
+            "Driver Command (Clipsal C-Bus): 'Outside Main Entry turned 121.'",
+            "Driver Command (Clipsal C-Bus): 'Theater Floor Heat turned 121.'",
+            "Driver Command (Clipsal C-Bus): 'Workshop Heater turned 121.'",
+            "Driver Command (Clipsal C-Bus): 'Workshop Outside Main Door turned 121.'",
+            "Driver Command (Clipsal C-Bus): 'Workshop Outside Main Lights turned 121.'"
+          ]
+        }
+      ]
+    },
+    {
+      "DriverName": "Print To Log",
+      "Tags": [
+        {
+          "Tag": "[No Profile!]",
+          "Messages": [
+            "Driver - Command:'Print To Log\\Print To Log(Setpoint 22 pressed in Garage, current temp is <I1>, Connections)' Sustain:NO"
+          ]
+        }
+      ]
+    },
+    {
+      "DriverName": "System Variable Events",
+      "Tags": [
+        {
+          "Tag": "[Incomplete Profile!]",
+          "Messages": [
+            "Driver - Command:'System Variable Events\\Integer 1 Event\\Disable' Sustain:NO",
+            "Driver - Command:'System Variable Events\\Integer 1 Event\\Enable' Sustain:NO",
+            "Driver - Command:'System Variable Events\\Integer 2 Event\\Disable' Sustain:NO",
+            "Driver - Command:'System Variable Events\\Integer 2 Event\\Enable' Sustain:NO",
+            "Driver - Command:'System Variable Events\\Integer 3 Event\\Disable' Sustain:NO",
+            "Driver - Command:'System Variable Events\\Integer 4 Event\\Disable' Sustain:NO"
+          ]
+        }
+      ]
+    },
+    {
+      "DriverName": "System Variable Events #2",
+      "Tags": [
+        {
+          "Tag": "[Incomplete Profile!]",
+          "Messages": [
+            "Driver - Command:'System Variable Events #2\\Integer 1 Event\\Disable' Sustain:NO",
+            "Driver - Command:'System Variable Events #2\\Integer 2 Event\\Disable' Sustain:NO",
+            "Driver - Command:'System Variable Events #2\\Integer 3 Event\\Disable' Sustain:NO",
+            "Driver - Command:'System Variable Events #2\\Integer 4 Event\\Disable' Sustain:NO"
+          ]
+        }
+      ]
+    },
+    {
+      "DriverName": "Uncategorized",
+      "Tags": [
+        {
+          "Tag": "[No Profile!]",
+          "Messages": [
+            "'Ensuite Tv ESC-2','Port 1' - Send failed, device not connected"
+          ]
+        },
+        {
+          "Tag": "[Unresolved!]",
+          "Messages": [
+            "Change to page 112 on device 'iPhone (Jennifer)'",
+            "Change to page 12 on device 'iPhone (Jennifer)'",
+            "Change to page 16 on device 'iPhone (Jennifer)'",
+            "Change to page 4 on device 'iPhone (Jennifer)'",
+            "Change to page 7 on device 'iPhone (Jennifer)'",
+            "Change to page 8 on device 'iPhone (Jennifer)'",
+            "Change to page 91 on device 'iPhone (Jennifer)'"
+          ]
+        }
+      ]
+    }
+  ]
+}

@@ -36,7 +36,8 @@ public static class DriverProfileCatalog
             DscPowerSeriesProfile.Definition,
             VenstarColorTouchProfile.Definition,
             VantageInFusionProfile.Definition,
-            SystemVariablesProfile.Definition
+            SystemVariablesProfile.Definition,
+            PrintToLogProfile.Definition
         };
     }
 

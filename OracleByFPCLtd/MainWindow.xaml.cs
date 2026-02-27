@@ -4724,29 +4724,19 @@ public partial class MainWindow : Window
         }
     }
 
-    private TaggedMessagesReport BuildTaggedMessagesReport()
+    private UnhandledTaggedReport BuildTaggedMessagesReport()
     {
-        var drivers = _taggedMessagesByDriver
-            .OrderBy(entry => entry.Key, StringComparer.OrdinalIgnoreCase)
-            .Select(entry => new TaggedDriverReport(
-                entry.Key,
-                entry.Value
-                    .OrderBy(group => group.Key, StringComparer.OrdinalIgnoreCase)
-                    .Select(group => new TaggedDriverTagReport(
-                        group.Key,
-                        group.Value.OrderBy(message => message, StringComparer.Ordinal).ToList()))
-                    .ToList()))
-            .ToList();
-
-        return new TaggedMessagesReport(
-            DateTime.UtcNow,
+        return UnhandledTaggedReportBuilder.Build(
+            _taggedMessagesByDriver,
+            _processedLogLines,
+            _rawLogLines,
             GetAppVersion(),
-            drivers);
+            DateTime.UtcNow);
     }
 
     private static string GetAppVersion()
     {
-        return typeof(MainWindow).Assembly.GetName().Version?.ToString() ?? "unknown";
+        return AppVersion.CurrentLabel();
     }
 
     private void OpenReportFolder(string reportPath)
@@ -4784,19 +4774,6 @@ public partial class MainWindow : Window
             AppendAppStatus("WARN", $"Saved report but could not open folder: {ex.Message}");
         }
     }
-
-    private sealed record TaggedMessagesReport(
-        DateTime CreatedUtc,
-        string AppVersion,
-        List<TaggedDriverReport> Drivers);
-
-    private sealed record TaggedDriverReport(
-        string DriverName,
-        List<TaggedDriverTagReport> Tags);
-
-    private sealed record TaggedDriverTagReport(
-        string Tag,
-        List<string> Messages);
 
     private void UpdateAdditionalInfoTemplateAvailability(ProjectDataExtractionResult result)
     {

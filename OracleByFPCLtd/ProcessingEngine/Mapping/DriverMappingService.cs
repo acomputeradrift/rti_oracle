@@ -61,11 +61,12 @@ public sealed class DriverMappingService
             // readability formatting changes the command shape.
             var hasTransition = TryExtractMappingTransition(rawText, mappedText, out var transition);
 
-            if (DriverMessageTemplateFormatter.TryFormatDriverCommand(mappedText, profile.DeviceName, out var formattedCommand))
+            var formatterDriverName = ResolveFormatterDriverName(profile.DeviceName, mappedText);
+            if (DriverMessageTemplateFormatter.TryFormatDriverCommand(mappedText, formatterDriverName, out var formattedCommand))
             {
                 mappedText = formattedCommand;
             }
-            else if (DriverMessageTemplateFormatter.TryFormatDriverEvent(mappedText, profile.DeviceName, out var formattedEvent))
+            else if (DriverMessageTemplateFormatter.TryFormatDriverEvent(mappedText, formatterDriverName, out var formattedEvent))
             {
                 mappedText = formattedEvent;
             }
@@ -254,6 +255,23 @@ public sealed class DriverMappingService
         }
 
         return false;
+    }
+
+    private static string ResolveFormatterDriverName(string profileDeviceName, string mappedText)
+    {
+        if (!profileDeviceName.Equals("System Variable Events", StringComparison.OrdinalIgnoreCase))
+        {
+            return profileDeviceName;
+        }
+
+        if (!TryExtractAttributedDriverName(mappedText, out var attributedDriverName))
+        {
+            return profileDeviceName;
+        }
+
+        return attributedDriverName.StartsWith("System Variable Events", StringComparison.OrdinalIgnoreCase)
+            ? attributedDriverName
+            : profileDeviceName;
     }
 
     private static bool HasAdditionalInfoData(ProjectDataBundle bundle, string driverName)

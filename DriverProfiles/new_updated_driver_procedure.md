@@ -90,6 +90,32 @@ When relay-name mapping depends on `RTI Internal` Additional Info schema:
 - Tags are correct (`[No Map!]`, `[Incomplete Profile!]`, `[Unresolved!]`, etc.).
 - Regression tests pass.
 
+## Unhandled Report Evidence Requirement
+
+### Purpose
+Ensure every unhandled/tagged processed message can be traced back to the exact raw diagnostic line used to produce it.
+
+### Required Output Shape
+- Unhandled report JSON must include `SchemaVersion: 2`.
+- Grouping remains by `DriverName` and `Tag`.
+- Each tag group must contain `Entries` (not duplicate `Messages` arrays).
+- Each entry must contain:
+  - `ProcessedMessage`
+  - `RawSamples` (0..n)
+- Each `RawSamples` item must include:
+  - `RawLineNumber`
+  - `RawText` (full raw text, no truncation)
+
+### Correlation Rules
+- Correlate processed tagged lines to raw lines by numbered log line index.
+- Preserve the complete raw line payload exactly as captured after the line number.
+- Deduplicate raw samples by `(RawLineNumber, RawText)` within each `ProcessedMessage`.
+- Do not guess or synthesize raw payloads when correlation is missing; leave `RawSamples` empty.
+
+### Done Criteria
+- A tagged processed line in the unhandled report can be traced to full raw line evidence.
+- Report reviewers can infer command arguments (for example app/group/state tuples) directly from `RawText`.
+
 ## Failure Patterns to Watch
 - Profile exists but no line pattern match: `[Incomplete Profile!]`.
 - Mapping expected but lookup missing: `[No Map!]`.
