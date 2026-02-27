@@ -232,38 +232,9 @@ public static class SystemManagerProfile
             return !string.IsNullOrWhiteSpace(sourceName);
         }
 
-        private static bool TryResolveSystemManagerSourceIndexFromSourceCatalog(ProjectDataBundle bundle, string rawIndex, out string sourceName)
-        {
-            sourceName = "";
-            if (!int.TryParse(rawIndex, out var zeroBasedIndex))
-            {
-                return false;
-            }
-
-            if (zeroBasedIndex < 0)
-            {
-                return false;
-            }
-
-            var orderedSources = bundle.System.SourceCatalog.OrderBy(entry => entry.DeviceId).ToList();
-            if (zeroBasedIndex >= orderedSources.Count)
-            {
-                return false;
-            }
-
-            var entry = orderedSources[zeroBasedIndex];
-            sourceName = string.IsNullOrWhiteSpace(entry.SourceDisplayName) ? entry.SourceName : entry.SourceDisplayName;
-            return !string.IsNullOrWhiteSpace(sourceName);
-        }
-
         private static bool TryResolveSystemManagerSourceIndex(ProjectDataBundle bundle, string rawIndex, out string sourceName)
         {
-            if (TryResolveSystemManagerSourceIndexFromSystemManagerCatalog(bundle, rawIndex, out sourceName))
-            {
-                return true;
-            }
-
-            return TryResolveSystemManagerSourceIndexFromSourceCatalog(bundle, rawIndex, out sourceName);
+            return TryResolveSystemManagerSourceIndexFromSystemManagerCatalog(bundle, rawIndex, out sourceName);
         }
 
         private static string RebuildCommandWithArgs(string originalCommand, IReadOnlyList<string> args)

@@ -1,5 +1,14 @@
 # Changelog
 
+## [1.2.1] - 2026-02-27
+
+### Changed
+- System Manager source-index resolution now uses one method for both `Set Source(N)` and `Set Source By Room(<Room>, N)`: resolve from `SystemManagerSourceCatalog` (zero-based token index catalog).
+- Legacy split-resolution behavior for `Set Source By Room` was removed; it no longer resolves from device-ordered `SourceCatalog`.
+
+### Fixed
+- Corrected wrong source-name mappings in Verrier-style `Set Source By Room` lines (for example, Garage/Living room source index cases) caused by legacy index-space selection.
+
 ## [1.2] - 2026-02-24
 
 ### Added

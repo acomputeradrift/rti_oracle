@@ -274,7 +274,7 @@ public sealed class ProcessingEngineMappingTests
     }
 
     [Fact]
-    public void DriverMappingServiceResolvesSystemManagerSetSourceByRoomWithSourceCatalogOffset()
+    public void DriverMappingServiceResolvesSystemManagerSetSourceByRoomWithSystemManagerSourceCatalog()
     {
         var bundle = BuildBundleWithSystemManagerSourceCatalog();
         var service = new DriverMappingService();
@@ -287,7 +287,7 @@ public sealed class ProcessingEngineMappingTests
     }
 
     [Fact]
-    public void DriverMappingServiceResolvesSystemManagerSetSourceWithSourceCatalogOffset()
+    public void DriverMappingServiceResolvesSystemManagerSetSourceWithSystemManagerSourceCatalog()
     {
         var bundle = BuildBundleWithSystemManagerSourceCatalog();
         var service = new DriverMappingService();
@@ -313,7 +313,7 @@ public sealed class ProcessingEngineMappingTests
     }
 
     [Fact]
-    public void DriverMappingServiceUsesSourceCatalogForSetSourceByRoomWhenBothCatalogsExist()
+    public void DriverMappingServiceUsesSystemManagerSourceCatalogForSetSourceByRoomWhenBothCatalogsExist()
     {
         var bundle = BuildBundleWithConflictingSystemManagerCatalogs();
         var service = new DriverMappingService();
@@ -321,7 +321,7 @@ public sealed class ProcessingEngineMappingTests
 
         var line = service.Map(evt, bundle);
 
-        Assert.Equal("5 [2026-02-11 14:29:23.662] Driver Command (System Manager): 'Source for Gym set to Old Method Source 7.'", line.Text);
+        Assert.Equal("5 [2026-02-11 14:29:23.662] Driver Command (System Manager): 'Source for Gym set to New Method Source 7.'", line.Text);
         Assert.False(line.IsUnresolved);
     }
 
@@ -335,6 +335,22 @@ public sealed class ProcessingEngineMappingTests
         var line = service.Map(evt, bundle);
 
         Assert.Equal("22 [2026-02-11 13:45:51.332] Driver Command (System Manager): 'Source set to 7.' [No Map!]", line.Text);
+        Assert.True(line.IsUnresolved);
+    }
+
+    [Fact]
+    public void DriverMappingServiceMarksNoMapForSetSourceByRoomWhenOnlyLegacySourceCatalogExists()
+    {
+        var bundle = new ProjectDataBundle();
+        bundle.System.SourceCatalog.Add(new SourceCatalogEntry(100, 1, 5, "Legacy Source 0", "Legacy Source 0"));
+        bundle.System.SourceCatalog.Add(new SourceCatalogEntry(101, 1, 5, "Legacy Source 1", "Legacy Source 1"));
+        bundle.System.SourceCatalog.Add(new SourceCatalogEntry(102, 1, 5, "Legacy Source 2", "Legacy Source 2"));
+        var service = new DriverMappingService();
+        var evt = new DiagnosticEvent(23, "[2026-02-11 13:45:52.332] Driver - Command:'System Manager\\Routing\\Set Source By Room(Room One, 2)' Sustain:NO");
+
+        var line = service.Map(evt, bundle);
+
+        Assert.Equal("23 [2026-02-11 13:45:52.332] Driver Command (System Manager): 'Source for Room One set to 2.' [No Map!]", line.Text);
         Assert.True(line.IsUnresolved);
     }
 

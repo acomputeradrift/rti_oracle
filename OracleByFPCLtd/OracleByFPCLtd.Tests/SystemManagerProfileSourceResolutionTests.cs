@@ -39,7 +39,7 @@ public sealed class SystemManagerProfileSourceResolutionTests
     }
 
     [Fact]
-    public void SetSource_FallsBackToLegacySourceCatalog_WhenSystemManagerCatalogMissing()
+    public void SetSource_MarksUnresolved_WhenSystemManagerCatalogMissing()
     {
         var bundle = BuildBundle(
             systemManagerSources: new string[0],
@@ -49,8 +49,8 @@ public sealed class SystemManagerProfileSourceResolutionTests
         var mapped = SystemManagerProfile.Mapper!.TryMap(raw, bundle, out var mappedText, out var unresolved);
 
         Assert.True(mapped);
-        Assert.False(unresolved);
-        Assert.Contains("Set Source(Legacy Two)", mappedText);
+        Assert.True(unresolved);
+        Assert.Equal(raw, mappedText);
     }
 
     [Fact]
