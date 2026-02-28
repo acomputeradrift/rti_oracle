@@ -97,10 +97,27 @@ public sealed class DriverMappingService
                         BuildWarningDetails(evt.RawLineNumber, profile.DeviceName, rawText, warningDetails));
                 }
 
+                MappingResolution? resolvedMapping = result.MappingResolution;
+                if (resolvedMapping is null
+                    && effectiveStatus == DriverProfileProcessingStatus.Resolved
+                    && TryExtractMappingTransition(rawText, result.Text ?? rawText, out var resultTransition))
+                {
+                    var transitionParts = resultTransition.Split(" -> ", 2, StringSplitOptions.None);
+                    var mappedFrom = transitionParts.Length > 0 ? transitionParts[0] : "";
+                    var mappedTo = transitionParts.Length > 1 ? transitionParts[1] : "";
+                    var mappingSource = HasAdditionalInfoData(bundle, profile.DeviceName) ? "Additional Info" : "Apex";
+                    resolvedMapping = new MappingResolution(
+                        DetermineMappingKind(profile.DeviceName, mappingSource),
+                        mappedFrom,
+                        mappedTo,
+                        mappingSource,
+                        Profile: profile.DeviceName);
+                }
+
                 return new ProcessedLine(
                     $"{evt.RawLineNumber} {resultText}",
                     resultUnresolved,
-                    result.MappingResolution);
+                    resolvedMapping);
             }
 
             var mapper = profile.Mapper;

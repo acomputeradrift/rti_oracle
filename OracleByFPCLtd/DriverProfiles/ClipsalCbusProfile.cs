@@ -4,6 +4,7 @@ using System.Globalization;
 using System.Linq;
 using System.Text.RegularExpressions;
 using OracleByFPCLtd.DriverProfiles.Models;
+using OracleByFPCLtd.ProcessingEngine.Models;
 using OracleByFPCLtd.ProjectData.Models;
 
 namespace OracleByFPCLtd.DriverProfiles;
@@ -18,7 +19,8 @@ public static class ClipsalCbusProfile
         RegexOptions.IgnoreCase | RegexOptions.Compiled);
     private static readonly Regex ZoneIdPattern = new Regex("\\((?<zone>\\d+)\\)", RegexOptions.Compiled);
 
-    public static IDriverProfileMapper Mapper { get; } = new ClipsalCbusMapper();
+    public static IDriverProfileResultMapper ResultMapper { get; } = new ClipsalCbusResultMapper();
+    public static IDriverProfileMapper Mapper { get; } = new LegacyClipsalCbusMapper();
 
     public static DriverProfileDefinition Definition { get; } = new DriverProfileDefinition(
         "Clipsal C-Bus",
@@ -51,30 +53,47 @@ public static class ClipsalCbusProfile
                 new("ZoneName", AdditionalInfoColumnRole.ZoneName)
             })
         },
-        Mapper);
+        Mapper,
+        ResultMapper);
 
-    private sealed class ClipsalCbusMapper : IDriverProfileMapper
+    private sealed class LegacyClipsalCbusMapper : IDriverProfileMapper
     {
         public bool TryMap(string rawText, ProjectDataBundle bundle, out string mappedText, out bool unresolved)
         {
-            mappedText = rawText ?? "";
-            unresolved = false;
+            var result = ResultMapper.TryMap(rawText, bundle);
+            mappedText = result.Text;
+            unresolved = IsUnresolvedStatus(result.Status);
+            return result.Claimed;
+        }
+    }
+
+    private sealed class ClipsalCbusResultMapper : IDriverProfileResultMapper
+    {
+        public DriverProfileMapResult TryMap(string rawText, ProjectDataBundle bundle)
+        {
+            var defaultText = rawText ?? "";
             if (string.IsNullOrWhiteSpace(rawText) || bundle is null)
             {
-                return false;
+                return new DriverProfileMapResult(false, defaultText, DriverProfileProcessingStatus.NoProfile);
             }
 
-            if (TryMapCommand(rawText, bundle, out mappedText, out unresolved))
+            if (TryMapCommand(rawText, bundle, out var mappedCommandText, out var commandUnresolved))
             {
-                return true;
+                return new DriverProfileMapResult(
+                    true,
+                    mappedCommandText,
+                    DetermineStatus(rawText, mappedCommandText, commandUnresolved));
             }
 
-            if (TryMapEvent(rawText, bundle, out mappedText, out unresolved))
+            if (TryMapEvent(rawText, bundle, out var mappedEventText, out var eventUnresolved))
             {
-                return true;
+                return new DriverProfileMapResult(
+                    true,
+                    mappedEventText,
+                    DetermineStatus(rawText, mappedEventText, eventUnresolved));
             }
 
-            return false;
+            return new DriverProfileMapResult(false, defaultText, DriverProfileProcessingStatus.NoProfile);
         }
 
         private static bool TryMapCommand(string rawText, ProjectDataBundle bundle, out string mappedText, out bool unresolved)
@@ -398,5 +417,35 @@ public static class ClipsalCbusProfile
             index = (int)rounded;
             return true;
         }
+
+        private static DriverProfileProcessingStatus DetermineStatus(string rawText, string mappedText, bool unresolved)
+        {
+            if (mappedText.Contains("[Unknown State!]", StringComparison.Ordinal))
+            {
+                return DriverProfileProcessingStatus.UnknownState;
+            }
+
+            if (mappedText.Contains("[No Map!]", StringComparison.Ordinal))
+            {
+                return DriverProfileProcessingStatus.NoMap;
+            }
+
+            if (unresolved)
+            {
+                return DriverProfileProcessingStatus.Unresolved;
+            }
+
+            return string.Equals(rawText, mappedText, StringComparison.Ordinal)
+                ? DriverProfileProcessingStatus.PassThrough
+                : DriverProfileProcessingStatus.Resolved;
+        }
+    }
+
+    private static bool IsUnresolvedStatus(DriverProfileProcessingStatus status)
+    {
+        return status is DriverProfileProcessingStatus.NoFormat
+            or DriverProfileProcessingStatus.NoMap
+            or DriverProfileProcessingStatus.Unresolved
+            or DriverProfileProcessingStatus.UnknownState;
     }
 }
