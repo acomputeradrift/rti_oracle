@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Text;
 using System.Text.RegularExpressions;
 using OracleByFPCLtd.DriverProfiles.Models;
+using OracleByFPCLtd.ProcessingEngine.Models;
 using OracleByFPCLtd.ProjectData.Models;
 
 namespace OracleByFPCLtd.DriverProfiles;
@@ -71,7 +72,8 @@ public static class RtiInternalProfile
         @"\s*\[\s*/\s*/\s*\]\s*$",
         RegexOptions.Compiled);
 
-    public static IDriverProfileMapper Mapper { get; } = new RtiInternalMapper();
+    public static IDriverProfileResultMapper ResultMapper { get; } = new RtiInternalResultMapper();
+    public static IDriverProfileMapper Mapper { get; } = new LegacyRtiInternalMapper();
 
     public static DriverProfileDefinition Definition { get; } = new DriverProfileDefinition(
         "RTI Internal",
@@ -104,53 +106,82 @@ ORDER BY d.DeviceId, p.PageOrder;
                 new("RelayName", AdditionalInfoColumnRole.RelayName)
             })
         },
-        Mapper: Mapper);
+        Mapper: Mapper,
+        ResultMapper: ResultMapper);
 
-    private sealed class RtiInternalMapper : IDriverProfileMapper
+    private sealed class LegacyRtiInternalMapper : IDriverProfileMapper
     {
         public bool TryMap(string rawText, ProjectDataBundle bundle, out string mappedText, out bool unresolved)
         {
-            mappedText = rawText ?? "";
-            unresolved = false;
+            var result = ResultMapper.TryMap(rawText, bundle);
+            mappedText = result.Text;
+            unresolved = IsUnresolvedStatus(result.Status);
+            return result.Claimed;
+        }
+    }
+
+    private sealed class RtiInternalResultMapper : IDriverProfileResultMapper
+    {
+        public DriverProfileMapResult TryMap(string rawText, ProjectDataBundle bundle)
+        {
+            var defaultText = rawText ?? "";
             if (string.IsNullOrWhiteSpace(rawText))
             {
-                return false;
+                return new DriverProfileMapResult(false, defaultText, DriverProfileProcessingStatus.NoProfile);
             }
 
             var match = PagePattern.Match(rawText);
-            if (!match.Success)
+            if (match.Success)
             {
-                if (TryMapPortCommand(rawText, bundle, out mappedText, out unresolved))
+                if (!int.TryParse(match.Groups["page"].Value, out var pageNumber) || pageNumber <= 0)
                 {
-                    return true;
+                    return new DriverProfileMapResult(true, rawText, DriverProfileProcessingStatus.Unresolved);
                 }
 
-                return TryMapInternalLifecycle(rawText, out mappedText, out unresolved);
+                if (!TryBuildDeviceNameMap(bundle.System.DiagnosticsMapping, out var deviceNameToId)
+                    || !deviceNameToId.TryGetValue(match.Groups["device"].Value, out var deviceId))
+                {
+                    return new DriverProfileMapResult(true, rawText, DriverProfileProcessingStatus.Unresolved);
+                }
+
+                var pageIndex = pageNumber - 1;
+                var key = $"{deviceId}|{pageIndex}";
+                if (!bundle.System.PageIndexMap.TryGetValue(key, out var pageName) || string.IsNullOrWhiteSpace(pageName))
+                {
+                    return new DriverProfileMapResult(true, rawText, DriverProfileProcessingStatus.Unresolved);
+                }
+
+                var mappedText = $"{match.Groups["prefix"].Value}\"{pageName}\"{match.Groups["suffix"].Value}";
+                return new DriverProfileMapResult(
+                    true,
+                    mappedText,
+                    DriverProfileProcessingStatus.Resolved,
+                    new MappingResolution(
+                        "page",
+                        pageNumber.ToString(),
+                        pageName,
+                        "Apex",
+                        Profile: "RTI Internal",
+                        Device: match.Groups["device"].Value));
             }
 
-            if (!int.TryParse(match.Groups["page"].Value, out var pageNumber) || pageNumber <= 0)
+            if (TryMapPortCommand(rawText, bundle, out var portMappedText, out var portUnresolved))
             {
-                unresolved = true;
-                return true;
+                return new DriverProfileMapResult(
+                    true,
+                    portMappedText,
+                    portUnresolved ? DriverProfileProcessingStatus.Unresolved : DriverProfileProcessingStatus.Resolved);
             }
 
-            if (!TryBuildDeviceNameMap(bundle.System.DiagnosticsMapping, out var deviceNameToId)
-                || !deviceNameToId.TryGetValue(match.Groups["device"].Value, out var deviceId))
+            if (TryMapInternalLifecycle(rawText, out var lifecycleMappedText, out var lifecycleUnresolved))
             {
-                unresolved = true;
-                return true;
+                return new DriverProfileMapResult(
+                    true,
+                    lifecycleMappedText,
+                    DetermineLifecycleStatus(rawText, lifecycleMappedText, lifecycleUnresolved));
             }
 
-            var pageIndex = pageNumber - 1;
-            var key = $"{deviceId}|{pageIndex}";
-            if (!bundle.System.PageIndexMap.TryGetValue(key, out var pageName) || string.IsNullOrWhiteSpace(pageName))
-            {
-                unresolved = true;
-                return true;
-            }
-
-            mappedText = $"{match.Groups["prefix"].Value}\"{pageName}\"{match.Groups["suffix"].Value}";
-            return true;
+            return new DriverProfileMapResult(false, defaultText, DriverProfileProcessingStatus.NoProfile);
         }
 
         private static bool TryMapInternalLifecycle(string rawText, out string mappedText, out bool unresolved)
@@ -387,5 +418,28 @@ ORDER BY d.DeviceId, p.PageOrder;
 
             return deviceNameToId.Count > 0;
         }
+
+        private static DriverProfileProcessingStatus DetermineLifecycleStatus(
+            string rawText,
+            string mappedText,
+            bool unresolved)
+        {
+            if (unresolved)
+            {
+                return DriverProfileProcessingStatus.Unresolved;
+            }
+
+            return string.Equals(rawText, mappedText, StringComparison.Ordinal)
+                ? DriverProfileProcessingStatus.PassThrough
+                : DriverProfileProcessingStatus.Resolved;
+        }
+    }
+
+    private static bool IsUnresolvedStatus(DriverProfileProcessingStatus status)
+    {
+        return status is DriverProfileProcessingStatus.NoFormat
+            or DriverProfileProcessingStatus.NoMap
+            or DriverProfileProcessingStatus.Unresolved
+            or DriverProfileProcessingStatus.UnknownState;
     }
 }

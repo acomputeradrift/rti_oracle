@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using OracleByFPCLtd.ProcessingEngine.Models;
 using OracleByFPCLtd.ProjectData;
 using OracleByFPCLtd.ProjectData.Models;
 
@@ -33,6 +34,30 @@ public interface IDriverProfileMapper
     bool TryMap(string rawText, ProjectDataBundle bundle, out string mappedText, out bool unresolved);
 }
 
+public enum DriverProfileProcessingStatus
+{
+    NoProfile,
+    PassThrough,
+    NoFormat,
+    NoMap,
+    Unresolved,
+    UnknownState,
+    Resolved
+}
+
+public interface IDriverProfileResultMapper
+{
+    DriverProfileMapResult TryMap(string rawText, ProjectDataBundle bundle);
+}
+
+public sealed record DriverProfileMapResult(
+    bool Claimed,
+    string Text,
+    DriverProfileProcessingStatus Status,
+    MappingResolution? MappingResolution = null,
+    string? WarningMessage = null,
+    IReadOnlyDictionary<string, string>? WarningDetails = null);
+
 public sealed record DriverProfileDefinition(
     string DeviceName,
     IReadOnlyList<string> Aliases,
@@ -42,7 +67,8 @@ public sealed record DriverProfileDefinition(
     IReadOnlyList<DriverProfileAnalysisRule> AnalysisRules,
     IReadOnlyList<string> Notes,
     IReadOnlyList<AdditionalInfoSheetSchema>? AdditionalInfoSchemas = null,
-    IDriverProfileMapper? Mapper = null);
+    IDriverProfileMapper? Mapper = null,
+    IDriverProfileResultMapper? ResultMapper = null);
 
 public sealed record DriverProfileMatch(int DriverDeviceId, DriverConfigEntry DriverConfig, DriverProfileDefinition Profile);
 

@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text.RegularExpressions;
 using OracleByFPCLtd.DriverProfiles.Models;
+using OracleByFPCLtd.ProcessingEngine.Models;
 using OracleByFPCLtd.ProjectData.Models;
 
 namespace OracleByFPCLtd.DriverProfiles;
@@ -22,7 +23,8 @@ public static class SystemManagerProfile
         @"^(?:(?<timestamp>\[[^\]]+\])\s*)?System Manager -\s*(?<update>.+)$",
         RegexOptions.IgnoreCase | RegexOptions.Compiled);
 
-    public static IDriverProfileMapper Mapper { get; } = new SystemManagerMapper();
+    public static IDriverProfileResultMapper ResultMapper { get; } = new SystemManagerResultMapper();
+    public static IDriverProfileMapper Mapper { get; } = new LegacySystemManagerMapper();
 
     public static DriverProfileDefinition Definition { get; } = new DriverProfileDefinition(
         "System Manager",
@@ -33,30 +35,52 @@ public static class SystemManagerProfile
         new List<DriverProfileAnalysisRule>(),
         new List<string>(),
         Array.Empty<AdditionalInfoSheetSchema>(),
-        Mapper);
+        Mapper,
+        ResultMapper);
 
-    private sealed class SystemManagerMapper : IDriverProfileMapper
+    private sealed class LegacySystemManagerMapper : IDriverProfileMapper
     {
         public bool TryMap(string rawText, ProjectDataBundle bundle, out string mappedText, out bool unresolved)
         {
-            mappedText = rawText ?? "";
-            unresolved = false;
+            var result = ResultMapper.TryMap(rawText, bundle);
+            mappedText = result.Text;
+            unresolved = IsUnresolvedStatus(result.Status);
+            return result.Claimed;
+        }
+    }
+
+    private sealed class SystemManagerResultMapper : IDriverProfileResultMapper
+    {
+        public DriverProfileMapResult TryMap(string rawText, ProjectDataBundle bundle)
+        {
+            var defaultText = rawText ?? "";
             if (string.IsNullOrWhiteSpace(rawText))
             {
-                return false;
+                return new DriverProfileMapResult(false, defaultText, DriverProfileProcessingStatus.NoProfile);
             }
 
             if (DriverCommandPattern.IsMatch(rawText) || DriverEventPattern.IsMatch(rawText))
             {
-                if (TryResolveSourceIndexCommands(rawText, bundle, out var resolvedText, out var sourceUnresolved))
+                if (TryResolveSourceIndexCommands(rawText, bundle, out var resolvedText, out var sourceUnresolved, out var mappingResolution))
                 {
-                    mappedText = resolvedText;
-                    unresolved = sourceUnresolved;
-                    return true;
+                    if (sourceUnresolved)
+                    {
+                        return new DriverProfileMapResult(true, resolvedText, DriverProfileProcessingStatus.NoMap);
+                    }
+
+                    return new DriverProfileMapResult(
+                        true,
+                        resolvedText,
+                        DriverProfileProcessingStatus.Resolved,
+                        mappingResolution);
                 }
 
-                unresolved = HasUnresolvedSourceIndex(rawText);
-                return true;
+                if (HasUnresolvedSourceIndex(rawText))
+                {
+                    return new DriverProfileMapResult(true, rawText, DriverProfileProcessingStatus.NoMap);
+                }
+
+                return new DriverProfileMapResult(true, rawText, DriverProfileProcessingStatus.PassThrough);
             }
 
             var updateMatch = UpdatePattern.Match(rawText);
@@ -70,13 +94,13 @@ public static class SystemManagerProfile
                     updateText = updateText.TrimStart();
                 }
 
-                mappedText = string.IsNullOrWhiteSpace(timestamp)
+                var mappedText = string.IsNullOrWhiteSpace(timestamp)
                     ? $"Driver Update (System Manager): '{updateText}'"
                     : $"{timestamp} Driver Update (System Manager): '{updateText}'";
-                return true;
+                return new DriverProfileMapResult(true, mappedText, DriverProfileProcessingStatus.Resolved);
             }
 
-            return false;
+            return new DriverProfileMapResult(false, defaultText, DriverProfileProcessingStatus.NoProfile);
         }
 
         private static bool HasUnresolvedSourceIndex(string rawText)
@@ -154,10 +178,16 @@ public static class SystemManagerProfile
             return int.TryParse(value, out _);
         }
 
-        private static bool TryResolveSourceIndexCommands(string rawText, ProjectDataBundle bundle, out string resolvedText, out bool unresolved)
+        private static bool TryResolveSourceIndexCommands(
+            string rawText,
+            ProjectDataBundle bundle,
+            out string resolvedText,
+            out bool unresolved,
+            out MappingResolution? mappingResolution)
         {
             resolvedText = rawText;
             unresolved = false;
+            mappingResolution = null;
 
             var match = CommandCapturePattern.Match(rawText);
             if (!match.Success)
@@ -195,12 +225,19 @@ public static class SystemManagerProfile
                 return true;
             }
 
+            var rawIndex = args[sourceArgIndex];
             args[sourceArgIndex] = sourceName;
             var updatedCommand = RebuildCommandWithArgs(command, args);
             var replacementStart = match.Groups["command"].Index;
             resolvedText = rawText.Substring(0, replacementStart)
                 + updatedCommand
                 + rawText.Substring(replacementStart + match.Groups["command"].Length);
+            mappingResolution = new MappingResolution(
+                "source",
+                rawIndex,
+                sourceName,
+                "Apex",
+                Profile: "System Manager");
             return true;
         }
 
@@ -257,5 +294,13 @@ public static class SystemManagerProfile
             parts[^1] = $"{actionName}({string.Join(", ", args)})";
             return string.Join("\\", parts);
         }
+    }
+
+    private static bool IsUnresolvedStatus(DriverProfileProcessingStatus status)
+    {
+        return status is DriverProfileProcessingStatus.NoFormat
+            or DriverProfileProcessingStatus.NoMap
+            or DriverProfileProcessingStatus.Unresolved
+            or DriverProfileProcessingStatus.UnknownState;
     }
 }

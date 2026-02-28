@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using OracleByFPCLtd.DriverProfiles;
+using OracleByFPCLtd.DriverProfiles.Models;
 using OracleByFPCLtd.ProjectData;
 using OracleByFPCLtd.ProjectData.Models;
 using Xunit;

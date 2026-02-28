@@ -4,6 +4,7 @@ using System.IO;
 using System.Text.RegularExpressions;
 using OracleByFPCLtd.Logging;
 using OracleByFPCLtd.DriverProfiles.Catalog;
+using OracleByFPCLtd.DriverProfiles.Models;
 using OracleByFPCLtd.DriverProfiles.Services;
 using OracleByFPCLtd.ProcessingEngine.Models;
 using OracleByFPCLtd.ProjectData.Models;
@@ -52,6 +53,56 @@ public sealed class DriverMappingService
 
         foreach (var profile in DriverProfileCatalog.All())
         {
+            if (profile.ResultMapper is not null)
+            {
+                var result = profile.ResultMapper.TryMap(rawText, bundle);
+                if (!result.Claimed)
+                {
+                    continue;
+                }
+
+                var resultText = result.Text ?? rawText;
+                var resultFormatterDriverName = ResolveFormatterDriverName(profile.DeviceName, resultText);
+                if (DriverMessageTemplateFormatter.TryFormatDriverCommand(resultText, resultFormatterDriverName, out var resultFormattedCommand))
+                {
+                    resultText = resultFormattedCommand;
+                }
+                else if (DriverMessageTemplateFormatter.TryFormatDriverEvent(resultText, resultFormatterDriverName, out var resultFormattedEvent))
+                {
+                    resultText = resultFormattedEvent;
+                }
+
+                var effectiveStatus = result.Status;
+                var warningMessage = result.WarningMessage;
+                var warningDetails = result.WarningDetails;
+
+                if (effectiveStatus == DriverProfileProcessingStatus.PassThrough
+                    && string.Equals(resultText, rawText, StringComparison.Ordinal)
+                    && !IsAllowedClaimedPassthrough(profile.DeviceName, rawText)
+                    && IsClaimedDriverMessage(rawText))
+                {
+                    effectiveStatus = DriverProfileProcessingStatus.NoFormat;
+                    warningMessage ??= "Driver profile claimed line but no format rule matched.";
+                }
+
+                var resultUnresolved = IsUnresolvedStatus(effectiveStatus);
+                resultText = ApplyStatusTag(resultText, effectiveStatus);
+
+                if (!string.IsNullOrWhiteSpace(warningMessage))
+                {
+                    WriteEventLogEntry(
+                        SeverityLevel.Warn,
+                        "Processing:Formatting",
+                        warningMessage!,
+                        BuildWarningDetails(evt.RawLineNumber, profile.DeviceName, rawText, warningDetails));
+                }
+
+                return new ProcessedLine(
+                    $"{evt.RawLineNumber} {resultText}",
+                    resultUnresolved,
+                    result.MappingResolution);
+            }
+
             var mapper = profile.Mapper;
             if (mapper is null)
             {
@@ -150,6 +201,60 @@ public sealed class DriverMappingService
         }
 
         return new ProcessedLine($"{evt.RawLineNumber} {rawText} [No Profile!]", true);
+    }
+
+    private static string ApplyStatusTag(string mappedText, DriverProfileProcessingStatus status)
+    {
+        return status switch
+        {
+            DriverProfileProcessingStatus.NoFormat => AppendTag(mappedText, "[No Format!]"),
+            DriverProfileProcessingStatus.NoMap => AppendTag(mappedText, "[No Map!]"),
+            DriverProfileProcessingStatus.Unresolved => AppendTag(mappedText, "[Unresolved!]"),
+            DriverProfileProcessingStatus.UnknownState => AppendTag(mappedText, "[Unknown State!]"),
+            _ => mappedText
+        };
+    }
+
+    private static string AppendTag(string mappedText, string tag)
+    {
+        if (string.IsNullOrWhiteSpace(tag) || mappedText.Contains(tag, StringComparison.Ordinal))
+        {
+            return mappedText;
+        }
+
+        return mappedText + " " + tag;
+    }
+
+    private static bool IsUnresolvedStatus(DriverProfileProcessingStatus status)
+    {
+        return status is DriverProfileProcessingStatus.NoFormat
+            or DriverProfileProcessingStatus.NoMap
+            or DriverProfileProcessingStatus.Unresolved
+            or DriverProfileProcessingStatus.UnknownState;
+    }
+
+    private static IReadOnlyDictionary<string, string> BuildWarningDetails(
+        int rawLineNumber,
+        string profileName,
+        string rawText,
+        IReadOnlyDictionary<string, string>? details)
+    {
+        var logDetails = new Dictionary<string, string>(StringComparer.Ordinal)
+        {
+            ["line"] = rawLineNumber.ToString(),
+            ["profile"] = profileName,
+            ["rawText"] = rawText
+        };
+
+        if (details is not null)
+        {
+            foreach (var pair in details)
+            {
+                logDetails[pair.Key] = pair.Value;
+            }
+        }
+
+        return logDetails;
     }
 
     private static void WriteEventLogEntry(
