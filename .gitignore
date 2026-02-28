@@ -4,6 +4,7 @@ Assets/
 # Build outputs
 [Bb]in/
 [Oo]bj/
+artifacts/
 
 # Scratch/build temp areas
 .tmp/

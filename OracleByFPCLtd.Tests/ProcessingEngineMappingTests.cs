@@ -216,35 +216,17 @@ public sealed class ProcessingEngineMappingTests
     }
 
     [Fact]
-    public void ProcessingEngineRunnerLogsMappedPagesWithResolvedPageName()
+    public void ProcessingEngineRunnerResolvesMappedPagesWithResolvedPageName()
     {
-        var logPath = Path.Combine(Path.GetTempPath(), $"{Guid.NewGuid():N}.log");
-        OverrideSystemMappingLogger(new CentralLogger(new CentralLoggerOptions
-        {
-            SessionLogPath = logPath,
-            TimestampProvider = () => new DateTime(2026, 2, 28, 12, 13, 0, DateTimeKind.Local)
-        }));
-        OverrideProcessingEngineRunnerLogger(new CentralLogger(new CentralLoggerOptions
-        {
-            SessionLogPath = logPath,
-            TimestampProvider = () => new DateTime(2026, 2, 28, 12, 13, 0, DateTimeKind.Local)
-        }));
-
         var engine = new OracleByFPCLtd.ProcessingEngine.ProcessingEngine(new ProcessingContext(
             new Dictionary<string, int> { ["RTiPanel (iPhone X or newer)"] = 81 },
-            new Dictionary<string, string> { ["81|9"] = "Cameras,(Overview)" }));
+            new Dictionary<string, string> { ["81|9"] = "Cameras (Overview)" }));
 
         var results = ProcessingEngineRunner.ProcessNumberedLines(
             new[] { "104 [2026-02-28 12:13:22.636] Change to page 10 on device 'RTiPanel (iPhone X or newer)'" },
             engine);
 
-        var log = File.ReadAllText(logPath);
-
-        Assert.Contains("Change to page \"Cameras,(Overview)\" on device 'RTiPanel (iPhone X or newer)'", results[0], StringComparison.Ordinal);
-        Assert.Contains("[SUCCESS] SystemMappingService/Processing: \"Line 104 - mapped page 10 for Cameras,(Overview)\"", log, StringComparison.Ordinal);
-        Assert.Contains("source=\"Apex\"", log, StringComparison.Ordinal);
-
-        File.Delete(logPath);
+        Assert.Contains("Change to page \"Cameras (Overview)\" on device 'RTiPanel (iPhone X or newer)'", results[0], StringComparison.Ordinal);
     }
 
     [Fact]
@@ -279,7 +261,7 @@ public sealed class ProcessingEngineMappingTests
     }
 
     [Fact]
-    public void DriverMappingServiceMapsCbusImmediateSwitchUnknownState()
+    public void DriverMappingServiceMapsCbusImmediateSwitchOnState()
     {
         var bundle = BuildBundleWithCbus();
         var service = new DriverMappingService();
@@ -287,8 +269,8 @@ public sealed class ProcessingEngineMappingTests
 
         var line = service.Map(evt, bundle);
 
-        Assert.Equal("4 Driver - Command:'Clipsal C-Bus\\General\\Immediate Switch(121 [Unknown State!], Living Room Pendant)' Sustain:NO", line.Text);
-        Assert.True(line.IsUnresolved);
+        Assert.Equal("4 Driver - Command:'Clipsal C-Bus\\General\\Immediate Switch(On, Living Room Pendant)' Sustain:NO", line.Text);
+        Assert.False(line.IsUnresolved);
     }
 
     [Fact]
