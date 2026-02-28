@@ -4,6 +4,7 @@ using System.Globalization;
 using System.Linq;
 using System.Text.RegularExpressions;
 using OracleByFPCLtd.DriverProfiles.Models;
+using OracleByFPCLtd.ProcessingEngine.Models;
 using OracleByFPCLtd.ProjectData.Models;
 
 namespace OracleByFPCLtd.DriverProfiles;
@@ -14,7 +15,8 @@ public static class VauxLattisMatrixProfile
         "Driver - Command:\\s*'(?<command>[^']+)'",
         RegexOptions.IgnoreCase | RegexOptions.Compiled);
 
-    public static IDriverProfileMapper Mapper { get; } = new VauxLattisMatrixMapper();
+    public static IDriverProfileResultMapper ResultMapper { get; } = new VauxLattisMatrixResultMapper();
+    public static IDriverProfileMapper Mapper { get; } = new LegacyVauxLattisMatrixMapper();
 
     public static DriverProfileDefinition Definition { get; } = new DriverProfileDefinition(
         "Vaux Lattis Matrix",
@@ -34,45 +36,56 @@ public static class VauxLattisMatrixProfile
                 new("Audio Zone Output Name", AdditionalInfoColumnRole.OutputName)
             })
         },
-        Mapper);
+        Mapper,
+        ResultMapper);
 
-    private sealed class VauxLattisMatrixMapper : IDriverProfileMapper
+    private sealed class LegacyVauxLattisMatrixMapper : IDriverProfileMapper
     {
         public bool TryMap(string rawText, ProjectDataBundle bundle, out string mappedText, out bool unresolved)
         {
-            mappedText = rawText ?? "";
-            unresolved = false;
+            var result = ResultMapper.TryMap(rawText, bundle);
+            mappedText = result.Text;
+            unresolved = IsUnresolvedStatus(result.Status);
+            return result.Claimed;
+        }
+    }
+
+    private sealed class VauxLattisMatrixResultMapper : IDriverProfileResultMapper
+    {
+        public DriverProfileMapResult TryMap(string rawText, ProjectDataBundle bundle)
+        {
+            var defaultText = rawText ?? "";
             if (string.IsNullOrWhiteSpace(rawText) || bundle is null)
             {
-                return false;
+                return new DriverProfileMapResult(false, defaultText, DriverProfileProcessingStatus.NoProfile);
             }
 
             var match = CommandPattern.Match(rawText);
             if (!match.Success)
             {
-                return false;
+                return new DriverProfileMapResult(false, defaultText, DriverProfileProcessingStatus.NoProfile);
             }
 
             var commandText = match.Groups["command"].Value;
             const string prefix = "Vaux Lattis Matrix\\Output Settings\\";
             if (!commandText.StartsWith(prefix, StringComparison.OrdinalIgnoreCase))
             {
-                return false;
+                return new DriverProfileMapResult(false, defaultText, DriverProfileProcessingStatus.NoProfile);
             }
 
             var commandBody = commandText.Substring(prefix.Length);
             if (!TryParseCommand(commandBody, out var name, out var args))
             {
-                return false;
+                return new DriverProfileMapResult(false, defaultText, DriverProfileProcessingStatus.NoProfile);
             }
 
             if (!bundle.Additional.Drivers.TryGetValue(Definition.DeviceName, out var driverData))
             {
-                unresolved = true;
-                return true;
+                return new DriverProfileMapResult(true, rawText, DriverProfileProcessingStatus.NoMap);
             }
 
             var mappedArgs = args.ToList();
+            var unresolved = false;
             if (name.Equals("Source Select", StringComparison.OrdinalIgnoreCase))
             {
                 if (mappedArgs.Count >= 3)
@@ -111,17 +124,20 @@ public static class VauxLattisMatrixProfile
             }
             else
             {
-                return false;
+                return new DriverProfileMapResult(false, defaultText, DriverProfileProcessingStatus.NoProfile);
             }
 
             var updatedCommandBody = $"{name}({string.Join(", ", mappedArgs)})";
             var updatedCommandText = $"{prefix}{updatedCommandBody}";
 
             var replacementStart = match.Groups["command"].Index;
-            mappedText = rawText.Substring(0, replacementStart)
+            var mappedText = rawText.Substring(0, replacementStart)
                 + updatedCommandText
                 + rawText.Substring(replacementStart + match.Groups["command"].Length);
-            return true;
+            return new DriverProfileMapResult(
+                true,
+                mappedText,
+                unresolved ? DriverProfileProcessingStatus.NoMap : DriverProfileProcessingStatus.Resolved);
         }
 
         private static bool TryParseCommand(string commandBody, out string name, out string[] args)
@@ -205,5 +221,13 @@ public static class VauxLattisMatrixProfile
             index = (int)rounded;
             return true;
         }
+    }
+
+    private static bool IsUnresolvedStatus(DriverProfileProcessingStatus status)
+    {
+        return status is DriverProfileProcessingStatus.NoFormat
+            or DriverProfileProcessingStatus.NoMap
+            or DriverProfileProcessingStatus.Unresolved
+            or DriverProfileProcessingStatus.UnknownState;
     }
 }
