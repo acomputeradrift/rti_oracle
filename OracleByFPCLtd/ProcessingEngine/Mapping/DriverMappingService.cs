@@ -21,6 +21,12 @@ public sealed class DriverMappingService
     private static readonly Regex DriverEventAttributionPattern = new(
         "happens on\\s*'(?<driver>[^'\\\\]+)\\\\",
         RegexOptions.IgnoreCase | RegexOptions.Compiled);
+    private static readonly Regex RawPagePattern = new(
+        @"(?<prefix>.*?\bChange to page\s+)(?<page>\d+)(?<suffix>\s+on device\s+'(?<device>[^']+)'.*)",
+        RegexOptions.IgnoreCase | RegexOptions.Compiled);
+    private static readonly Regex ResolvedPagePattern = new(
+        @"(?<prefix>.*?\bChange to page\s+"")(?<pageName>[^""]+)(?<suffix>""\s+on device\s+'(?<device>[^']+)'.*)",
+        RegexOptions.IgnoreCase | RegexOptions.Compiled);
     private static CentralLogger CentralLogger = new(new CentralLoggerOptions
     {
         LogFilePath = BuildEventLogFilePathHint()
@@ -82,27 +88,27 @@ public sealed class DriverMappingService
 
             var resolvedSubstitution = hasTransition && !unresolved;
 
+            MappingResolution? mappingResolution = null;
             if (resolvedSubstitution)
             {
                 var transitionParts = transition.Split(" -> ", 2, StringSplitOptions.None);
                 var mappedFrom = transitionParts.Length > 0 ? transitionParts[0] : "";
                 var mappedTo = transitionParts.Length > 1 ? transitionParts[1] : "";
                 var mappingSource = HasAdditionalInfoData(bundle, profile.DeviceName) ? "Additional Info" : "Apex";
-                WriteEventLogEntry(
-                    SeverityLevel.Success,
-                    "Processing",
-                    BuildResolvedMappingMessage(profile.DeviceName, mappedFrom, mappedTo, mappingSource),
-                    new Dictionary<string, string>
-                    {
-                        ["profile"] = profile.DeviceName,
-                        ["line"] = evt.RawLineNumber.ToString(),
-                        ["mappedFrom"] = mappedFrom,
-                        ["mappedTo"] = mappedTo,
-                        ["source"] = mappingSource
-                    });
+                mappingResolution = new MappingResolution(
+                    DetermineMappingKind(profile.DeviceName, mappingSource),
+                    mappedFrom,
+                    mappedTo,
+                    mappingSource,
+                    Profile: profile.DeviceName);
+            }
+            else if (!unresolved
+                && TryBuildInlineMappingResolution(profile.DeviceName, rawText, mappedText, out var inlineMappingResolution))
+            {
+                mappingResolution = inlineMappingResolution;
             }
 
-            return new ProcessedLine($"{evt.RawLineNumber} {mappedText}", unresolved);
+            return new ProcessedLine($"{evt.RawLineNumber} {mappedText}", unresolved, mappingResolution);
         }
 
         WriteEventLogEntry(
@@ -153,15 +159,54 @@ public sealed class DriverMappingService
         CentralLogger = logger ?? throw new ArgumentNullException(nameof(logger));
     }
 
-    private static string BuildResolvedMappingMessage(string profileName, string mappedFrom, string mappedTo, string mappingSource)
+    private static string DetermineMappingKind(string profileName, string mappingSource)
     {
         if (string.Equals(mappingSource, "Apex", StringComparison.OrdinalIgnoreCase)
             && string.Equals(profileName, "System Manager", StringComparison.OrdinalIgnoreCase))
         {
-            return $"mapped source {mappedFrom} for {mappedTo}";
+            return "source";
         }
 
-        return $"mapped {mappedFrom} for {mappedTo}";
+        return "value";
+    }
+
+    private static bool TryBuildInlineMappingResolution(
+        string profileName,
+        string rawText,
+        string mappedText,
+        out MappingResolution mappingResolution)
+    {
+        mappingResolution = null!;
+
+        if (!string.Equals(profileName, "RTI Internal", StringComparison.OrdinalIgnoreCase))
+        {
+            return false;
+        }
+
+        var rawPageMatch = RawPagePattern.Match(rawText ?? "");
+        var resolvedPageMatch = ResolvedPagePattern.Match(mappedText ?? "");
+        if (!rawPageMatch.Success || !resolvedPageMatch.Success)
+        {
+            return false;
+        }
+
+        var rawPage = rawPageMatch.Groups["page"].Value.Trim();
+        var pageName = resolvedPageMatch.Groups["pageName"].Value.Trim();
+        var deviceName = resolvedPageMatch.Groups["device"].Value.Trim();
+        if (string.IsNullOrWhiteSpace(rawPage)
+            || string.IsNullOrWhiteSpace(pageName)
+            || string.IsNullOrWhiteSpace(deviceName))
+        {
+            return false;
+        }
+
+        mappingResolution = new MappingResolution(
+            "page",
+            rawPage,
+            pageName,
+            "Apex",
+            Driver: deviceName);
+        return true;
     }
 
     private static bool IsDriverCommandLine(string text)

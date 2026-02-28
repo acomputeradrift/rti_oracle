@@ -85,19 +85,15 @@ public sealed class SystemMappingService
         }
 
         var resolved = $"{match.Groups["prefix"].Value}\"{pageName}\"{match.Groups["suffix"].Value}";
-        WriteEventLogEntry(
-            SeverityLevel.Success,
-            "Processing",
-            $"mapped page {pageNumber} for {pageName}",
-            new Dictionary<string, string>
-            {
-                ["line"] = evt.RawLineNumber.ToString(),
-                ["device"] = deviceName,
-                ["mappedFrom"] = $"Page {pageNumber}",
-                ["mappedTo"] = pageName,
-                ["source"] = "Apex"
-            });
-        return new ProcessedLine($"{evt.RawLineNumber} {resolved}", false);
+        return new ProcessedLine(
+            $"{evt.RawLineNumber} {resolved}",
+            false,
+            new MappingResolution(
+                "page",
+                pageNumber.ToString(),
+                pageName,
+                "Apex",
+                Driver: deviceName));
     }
 
     private static void WriteEventLogEntry(

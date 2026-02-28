@@ -148,7 +148,7 @@ A test that hides uncertainty is worse than no test.
 - Flaky tests are treated as failures  
 - Test failures block progress until resolved or explicitly waived  
 - Test runs for the WPF solution must execute sequentially; parallel `dotnet test` runs against the same project are invalid because generated XAML outputs share the same `obj/` tree
-- Generated test/build output (`bin/`, `obj/`, `artifacts/`) must be deleted before and after every test run
+- Generated test/build output (`bin/`, `obj/`, `artifacts/`) and test-created temp logs under `%TEMP%\\OracleByFPCLtd.Tests` must be deleted before and after every test run
 - Test results are not considered confirmed until the run completes and the post-test cleanup completes
 - The standard local test entry point is `powershell -ExecutionPolicy Bypass -File .\run_test_sequence.ps1`; ad hoc test commands must still follow the same pre-run and post-run cleanup discipline
 

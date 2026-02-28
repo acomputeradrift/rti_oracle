@@ -95,7 +95,7 @@ public sealed class MainWindowProcessedOutputTests
     {
         RunOnSta(() =>
         {
-            var logPath = Path.Combine(Path.GetTempPath(), $"{Guid.NewGuid():N}.log");
+            var logPath = TestTempPaths.CreateFilePath(".log");
             var logger = new CentralLogger(new CentralLoggerOptions
             {
                 SessionLogPath = logPath,
@@ -124,7 +124,7 @@ public sealed class MainWindowProcessedOutputTests
     {
         RunOnSta(() =>
         {
-            var logPath = Path.Combine(Path.GetTempPath(), $"{Guid.NewGuid():N}.log");
+            var logPath = TestTempPaths.CreateFilePath(".log");
             var logger = new CentralLogger(new CentralLoggerOptions
             {
                 SessionLogPath = logPath,
@@ -499,7 +499,8 @@ public sealed class MainWindowProcessedOutputTests
             var transport = new FakeDiagnosticsTransport
             {
                 IsConnected = true,
-                AutoAckCommands = true
+                AutoAckCommands = true,
+                ShouldAck = (index, _, _) => index != 1
             };
             InvokeSetTransport(window, transport, false);
             SetForceProtectedPreconditions(window, "192.168.1.143", "DRIVER//6");

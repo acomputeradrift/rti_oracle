@@ -7,13 +7,15 @@ $ErrorActionPreference = "Stop"
 
 $repoRoot = Split-Path -Parent $MyInvocation.MyCommand.Path
 $testProject = Join-Path $repoRoot "OracleByFPCLtd.Tests\OracleByFPCLtd.Tests.csproj"
+$testTempRoot = Join-Path ([System.IO.Path]::GetTempPath()) "OracleByFPCLtd.Tests"
 $generatedDirectories = @(
     (Join-Path $repoRoot "OracleByFPCLtd\bin"),
     (Join-Path $repoRoot "OracleByFPCLtd\obj"),
     (Join-Path $repoRoot "OracleByFPCLtd\artifacts"),
     (Join-Path $repoRoot "OracleByFPCLtd.Tests\bin"),
     (Join-Path $repoRoot "OracleByFPCLtd.Tests\obj"),
-    (Join-Path $repoRoot "OracleByFPCLtd.Tests\artifacts")
+    (Join-Path $repoRoot "OracleByFPCLtd.Tests\artifacts"),
+    $testTempRoot
 )
 
 function Remove-GeneratedDirectory {
@@ -23,12 +25,31 @@ function Remove-GeneratedDirectory {
         return
     }
 
-    [System.IO.Directory]::Delete($Path, $true)
+    $delayMs = 100
+    for ($attempt = 0; $attempt -lt 3; $attempt++) {
+        try {
+            [System.IO.Directory]::Delete($Path, $true)
+            return
+        }
+        catch {
+            if ($attempt -ge 2) {
+                throw
+            }
+
+            Start-Sleep -Milliseconds $delayMs
+            $delayMs *= 2
+        }
+    }
 }
 
 function Invoke-Cleanup {
     foreach ($path in $generatedDirectories) {
-        Remove-GeneratedDirectory -Path $path
+        try {
+            Remove-GeneratedDirectory -Path $path
+        }
+        catch {
+            Write-Warning ("Cleanup failed for " + $path + ": " + $_.Exception.Message)
+        }
     }
 }
 

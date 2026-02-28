@@ -93,7 +93,7 @@ public sealed class ProcessingEngineMappingTests
     [Fact]
     public void DriverMappingServiceDoesNotEmitMapperAcceptedNoise()
     {
-        var logPath = Path.Combine(Path.GetTempPath(), $"{Guid.NewGuid():N}.log");
+        var logPath = TestTempPaths.CreateFilePath(".log");
         OverrideDriverMappingLogger(new CentralLogger(new CentralLoggerOptions
         {
             SessionLogPath = logPath,
@@ -115,7 +115,7 @@ public sealed class ProcessingEngineMappingTests
     [Fact]
     public void ProcessingEngineRunnerDoesNotEmitGenericMappedToReadableOutputSuccess()
     {
-        var logPath = Path.Combine(Path.GetTempPath(), $"{Guid.NewGuid():N}.log");
+        var logPath = TestTempPaths.CreateFilePath(".log");
         OverrideProcessingEngineRunnerLogger(new CentralLogger(new CentralLoggerOptions
         {
             SessionLogPath = logPath,
@@ -137,32 +137,34 @@ public sealed class ProcessingEngineMappingTests
     }
 
     [Fact]
-    public void DriverMappingServiceEmitsSingleAdditionalInfoMappingSuccessLine()
+    public void ProcessingEngineLogsSingleAdditionalInfoMappingSuccessLine()
     {
-        var logPath = Path.Combine(Path.GetTempPath(), $"{Guid.NewGuid():N}.log");
-        OverrideDriverMappingLogger(new CentralLogger(new CentralLoggerOptions
+        var logPath = TestTempPaths.CreateFilePath(".log");
+        var logger = new CentralLogger(new CentralLoggerOptions
         {
             SessionLogPath = logPath,
             TimestampProvider = () => new DateTime(2026, 2, 28, 12, 13, 0, DateTimeKind.Local)
-        }));
+        });
 
         var bundle = new ProjectDataBundle();
         var driverData = new AdditionalDriverData();
         driverData.IntegerNames[1] = "Room Count";
         bundle.Additional.Drivers["System Variables"] = driverData;
-        var service = new DriverMappingService();
+        var engine = new OracleByFPCLtd.ProcessingEngine.ProcessingEngine(bundle);
+        OverrideProcessingEngineLogger(engine, logger);
         var evt = new DiagnosticEvent(86, "[2026-02-21 11:00:01.000] Driver - Command:'System Variables\\Integers\\Increase(1, 1)' Sustain:NO");
 
-        _ = service.Map(evt, bundle);
+        _ = engine.ProcessEvent(evt);
 
         var log = File.ReadAllText(logPath);
         var successLines = log
             .Split(new[] { Environment.NewLine }, StringSplitOptions.RemoveEmptyEntries)
-            .Where(line => line.Contains("[SUCCESS] DriverMappingService/Processing:", StringComparison.Ordinal))
+            .Where(line => line.Contains("[SUCCESS] ProcessingEngine/Mapping:", StringComparison.Ordinal))
             .ToList();
 
         Assert.Single(successLines);
         Assert.Contains("\"Line 86 - mapped 1 for Room Count\"", successLines[0], StringComparison.Ordinal);
+        Assert.Contains("profile=\"System Variables\"", successLines[0], StringComparison.Ordinal);
         Assert.Contains("source=\"Additional Info\"", successLines[0], StringComparison.Ordinal);
         Assert.DoesNotContain("mapped Additional Info", successLines[0], StringComparison.Ordinal);
 
@@ -170,46 +172,50 @@ public sealed class ProcessingEngineMappingTests
     }
 
     [Fact]
-    public void DriverMappingServiceMarksApexSourceMappingsExplicitly()
+    public void ProcessingEngineLogsApexSourceMappingsExplicitly()
     {
-        var logPath = Path.Combine(Path.GetTempPath(), $"{Guid.NewGuid():N}.log");
-        OverrideDriverMappingLogger(new CentralLogger(new CentralLoggerOptions
+        var logPath = TestTempPaths.CreateFilePath(".log");
+        var logger = new CentralLogger(new CentralLoggerOptions
         {
             SessionLogPath = logPath,
             TimestampProvider = () => new DateTime(2026, 2, 28, 12, 13, 0, DateTimeKind.Local)
-        }));
+        });
 
         var bundle = BuildBundleWithSystemManagerSourceCatalog();
-        var service = new DriverMappingService();
+        var engine = new OracleByFPCLtd.ProcessingEngine.ProcessingEngine(bundle);
+        OverrideProcessingEngineLogger(engine, logger);
         var evt = new DiagnosticEvent(96, "[2026-02-11 14:29:23.662] Driver - Command:'System Manager\\Routing\\Set Source(7)' Sustain:NO");
 
-        _ = service.Map(evt, bundle);
+        _ = engine.ProcessEvent(evt);
 
         var log = File.ReadAllText(logPath);
-        Assert.Contains("[SUCCESS] DriverMappingService/Processing: \"Line 96 - mapped source 7 for Video Source (Global)\"", log, StringComparison.Ordinal);
+        Assert.Contains("[SUCCESS] ProcessingEngine/Mapping: \"Line 96 - mapped source 7 for Video Source (Global)\"", log, StringComparison.Ordinal);
+        Assert.Contains("profile=\"System Manager\"", log, StringComparison.Ordinal);
         Assert.Contains("source=\"Apex\"", log, StringComparison.Ordinal);
 
         File.Delete(logPath);
     }
 
     [Fact]
-    public void SystemMappingServiceLogsPageMappingsWithApexSource()
+    public void ProcessingEngineLogsPageMappingsWithApexSource()
     {
-        var logPath = Path.Combine(Path.GetTempPath(), $"{Guid.NewGuid():N}.log");
-        OverrideSystemMappingLogger(new CentralLogger(new CentralLoggerOptions
+        var logPath = TestTempPaths.CreateFilePath(".log");
+        var logger = new CentralLogger(new CentralLoggerOptions
         {
             SessionLogPath = logPath,
             TimestampProvider = () => new DateTime(2026, 2, 28, 12, 13, 0, DateTimeKind.Local)
-        }));
+        });
 
         var bundle = BuildBundle();
-        var service = new SystemMappingService();
+        var engine = new OracleByFPCLtd.ProcessingEngine.ProcessingEngine(bundle);
+        OverrideProcessingEngineLogger(engine, logger);
         var evt = new DiagnosticEvent(104, "[2026-01-24 10:00:00.000] Change to page 1 on device 'RTiPanel (iPhone X or newer)'");
 
-        _ = service.Map(evt, bundle);
+        _ = engine.ProcessEvent(evt);
 
         var log = File.ReadAllText(logPath);
-        Assert.Contains("[SUCCESS] SystemMappingService/Processing: \"Line 104 - mapped page 1 for Room Select\"", log, StringComparison.Ordinal);
+        Assert.Contains("[SUCCESS] ProcessingEngine/Mapping: \"Line 104 - mapped page 1 for Room Select\"", log, StringComparison.Ordinal);
+        Assert.Contains("driver=\"RTiPanel (iPhone X or newer)\"", log, StringComparison.Ordinal);
         Assert.Contains("source=\"Apex\"", log, StringComparison.Ordinal);
 
         File.Delete(logPath);
@@ -391,25 +397,11 @@ public sealed class ProcessingEngineMappingTests
         method!.Invoke(null, new object[] { logger });
     }
 
-    private static void OverrideSystemMappingLogger(CentralLogger logger)
+    private static void OverrideProcessingEngineLogger(OracleByFPCLtd.ProcessingEngine.ProcessingEngine engine, CentralLogger logger)
     {
-        var method = typeof(SystemMappingService).GetMethod("OverrideCentralLoggerForTesting", BindingFlags.Static | BindingFlags.NonPublic);
+        var method = typeof(OracleByFPCLtd.ProcessingEngine.ProcessingEngine).GetMethod("OverrideCentralLoggerForTesting", BindingFlags.Instance | BindingFlags.NonPublic);
         Assert.NotNull(method);
-        method!.Invoke(null, new object[] { logger });
-    }
-
-    [Fact]
-    public void DriverMappingServiceApexMappingMessagePrefixesSource()
-    {
-        var method = typeof(DriverMappingService).GetMethod(
-            "BuildResolvedMappingMessage",
-            BindingFlags.NonPublic | BindingFlags.Static);
-
-        Assert.NotNull(method);
-
-        var message = method!.Invoke(null, new object[] { "System Manager", "1", "Video Source (Global)", "Apex" }) as string;
-
-        Assert.Equal("mapped source 1 for Video Source (Global)", message);
+        method!.Invoke(engine, new object[] { logger });
     }
 
     [Fact]

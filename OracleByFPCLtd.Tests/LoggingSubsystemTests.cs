@@ -11,7 +11,7 @@ public sealed class LoggingSubsystemTests
     [Fact]
     public void LogEventWritesPlainTextLineWithExpectedFormat()
     {
-        var logPath = Path.Combine(Path.GetTempPath(), $"{Guid.NewGuid():N}.log");
+        var logPath = TestTempPaths.CreateFilePath(".log");
         var fixedTime = new DateTime(2026, 1, 18, 12, 34, 56, 789, DateTimeKind.Local);
         var logger = new CentralLogger(new CentralLoggerOptions
         {
@@ -52,7 +52,7 @@ public sealed class LoggingSubsystemTests
     [Fact]
     public void LogEventCreatesTimestampedSessionLogFileInConfiguredDirectory()
     {
-        var logDirectory = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N"));
+        var logDirectory = TestTempPaths.CreateDirectoryPath();
         Directory.CreateDirectory(logDirectory);
         var fixedTime = new DateTime(2026, 2, 28, 12, 32, 44, DateTimeKind.Local);
         var logger = new CentralLogger(new CentralLoggerOptions
@@ -79,7 +79,7 @@ public sealed class LoggingSubsystemTests
     [Fact]
     public void LogEventFormatsLineSpecificMessagesUsingLinePrefix()
     {
-        var logPath = Path.Combine(Path.GetTempPath(), $"{Guid.NewGuid():N}.log");
+        var logPath = TestTempPaths.CreateFilePath(".log");
         var logger = new CentralLogger(new CentralLoggerOptions
         {
             SessionLogPath = logPath,
@@ -107,7 +107,7 @@ public sealed class LoggingSubsystemTests
     [Fact]
     public void LogEventPrefersProfileOverDriverWhenBothArePresent()
     {
-        var logPath = Path.Combine(Path.GetTempPath(), $"{Guid.NewGuid():N}.log");
+        var logPath = TestTempPaths.CreateFilePath(".log");
         var logger = new CentralLogger(new CentralLoggerOptions
         {
             SessionLogPath = logPath,
@@ -139,7 +139,7 @@ public sealed class LoggingSubsystemTests
     {
         var logger = new CentralLogger(new CentralLoggerOptions
         {
-            LogFilePath = Path.Combine(Path.GetTempPath(), $"{Guid.NewGuid():N}.log")
+            LogFilePath = TestTempPaths.CreateFilePath(".log")
         });
 
         Assert.Throws<ArgumentException>(() =>
@@ -153,7 +153,7 @@ public sealed class LoggingSubsystemTests
         string? capturedMessage = null;
         var logger = new CentralLogger(new CentralLoggerOptions
         {
-            LogFilePath = Path.Combine(Path.GetTempPath(), $"{Guid.NewGuid():N}.log"),
+            LogFilePath = TestTempPaths.CreateFilePath(".log"),
             StatusSink = (level, message) =>
             {
                 capturedLevel = level;
@@ -171,7 +171,7 @@ public sealed class LoggingSubsystemTests
     [Fact]
     public void LogPlainLineWritesExactTextWithoutStructuredPrefix()
     {
-        var logPath = Path.Combine(Path.GetTempPath(), $"{Guid.NewGuid():N}.log");
+        var logPath = TestTempPaths.CreateFilePath(".log");
         var logger = new CentralLogger(new CentralLoggerOptions
         {
             SessionLogPath = logPath,
@@ -198,7 +198,7 @@ public sealed class LoggingSubsystemTests
     [Fact]
     public void LogEventKeepsNewestFiveSessionFiles()
     {
-        var logDirectory = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N"));
+        var logDirectory = TestTempPaths.CreateDirectoryPath();
         Directory.CreateDirectory(logDirectory);
         for (var i = 0; i < 6; i++)
         {
@@ -237,7 +237,7 @@ public sealed class LoggingSubsystemTests
     [Fact]
     public void LogEventDoesNotThrowWhenLogFileIsLocked()
     {
-        var logPath = Path.Combine(Path.GetTempPath(), $"{Guid.NewGuid():N}.log");
+        var logPath = TestTempPaths.CreateFilePath(".log");
         var logger = new CentralLogger(new CentralLoggerOptions
         {
             SessionLogPath = logPath,
