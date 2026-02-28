@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Text.RegularExpressions;
 using OracleByFPCLtd.DriverProfiles.Models;
+using OracleByFPCLtd.ProcessingEngine.Models;
 using OracleByFPCLtd.ProjectData.Models;
 
 namespace OracleByFPCLtd.DriverProfiles;
@@ -18,7 +19,8 @@ public static class DscPowerSeriesProfile
         "happens on\\s*'DSC PowerSeries\\\\",
         RegexOptions.IgnoreCase | RegexOptions.Compiled);
 
-    public static IDriverProfileMapper Mapper { get; } = new DscPowerSeriesMapper();
+    public static IDriverProfileResultMapper ResultMapper { get; } = new DscPowerSeriesResultMapper();
+    public static IDriverProfileMapper Mapper { get; } = new LegacyDscPowerSeriesMapper();
 
     public static DriverProfileDefinition Definition { get; } = new DriverProfileDefinition(
         "DSC PowerSeries",
@@ -29,25 +31,49 @@ public static class DscPowerSeriesProfile
         new List<DriverProfileAnalysisRule>(),
         new List<string>(),
         Array.Empty<AdditionalInfoSheetSchema>(),
-        Mapper);
+        Mapper,
+        ResultMapper);
 
-    private sealed class DscPowerSeriesMapper : IDriverProfileMapper
+    private sealed class LegacyDscPowerSeriesMapper : IDriverProfileMapper
     {
         public bool TryMap(string rawText, ProjectDataBundle bundle, out string mappedText, out bool unresolved)
         {
-            mappedText = rawText ?? "";
-            unresolved = false;
+            var result = ResultMapper.TryMap(rawText, bundle);
+            mappedText = result.Text;
+            unresolved = IsUnresolvedStatus(result.Status);
+            return result.Claimed;
+        }
+    }
+
+    private sealed class DscPowerSeriesResultMapper : IDriverProfileResultMapper
+    {
+        public DriverProfileMapResult TryMap(string rawText, ProjectDataBundle bundle)
+        {
+            var defaultText = rawText ?? "";
             if (string.IsNullOrWhiteSpace(rawText))
             {
-                return false;
+                return new DriverProfileMapResult(false, defaultText, DriverProfileProcessingStatus.NoProfile);
             }
 
             if (DriverCommandPattern.IsMatch(rawText))
             {
-                return true;
+                return new DriverProfileMapResult(true, rawText, DriverProfileProcessingStatus.PassThrough);
             }
 
-            return DriverEventPattern.IsMatch(rawText) && DscAttributionPattern.IsMatch(rawText);
+            if (DriverEventPattern.IsMatch(rawText) && DscAttributionPattern.IsMatch(rawText))
+            {
+                return new DriverProfileMapResult(true, rawText, DriverProfileProcessingStatus.PassThrough);
+            }
+
+            return new DriverProfileMapResult(false, defaultText, DriverProfileProcessingStatus.NoProfile);
         }
+    }
+
+    private static bool IsUnresolvedStatus(DriverProfileProcessingStatus status)
+    {
+        return status is DriverProfileProcessingStatus.NoFormat
+            or DriverProfileProcessingStatus.NoMap
+            or DriverProfileProcessingStatus.Unresolved
+            or DriverProfileProcessingStatus.UnknownState;
     }
 }
