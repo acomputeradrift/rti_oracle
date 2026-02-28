@@ -500,6 +500,7 @@ public sealed class MainWindowProcessedOutputTests
             {
                 IsConnected = true,
                 AutoAckCommands = true,
+                AckDelayMs = 100,
                 ShouldAck = (index, _, _) => index != 1
             };
             InvokeSetTransport(window, transport, false);

@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Text.RegularExpressions;
 using OracleByFPCLtd.DriverProfiles.Models;
+using OracleByFPCLtd.ProcessingEngine.Models;
 using OracleByFPCLtd.ProjectData.Models;
 
 namespace OracleByFPCLtd.DriverProfiles;
@@ -12,7 +13,8 @@ public static class SystemVariablesProfile
         "Driver - Command:\\s*'(?<command>[^']+)'",
         RegexOptions.IgnoreCase | RegexOptions.Compiled);
 
-    public static IDriverProfileMapper Mapper { get; } = new SystemVariablesMapper();
+    public static IDriverProfileResultMapper ResultMapper { get; } = new SystemVariablesResultMapper();
+    public static IDriverProfileMapper Mapper { get; } = new LegacySystemVariablesMapper();
 
     public static DriverProfileDefinition Definition { get; } = new DriverProfileDefinition(
         "System Variables",
@@ -30,75 +32,83 @@ public static class SystemVariablesProfile
                 new("IntegerName", AdditionalInfoColumnRole.IntegerName)
             })
         },
-        Mapper);
+        Mapper,
+        ResultMapper);
 
-    private sealed class SystemVariablesMapper : IDriverProfileMapper
+    private sealed class LegacySystemVariablesMapper : IDriverProfileMapper
     {
         public bool TryMap(string rawText, ProjectDataBundle bundle, out string mappedText, out bool unresolved)
         {
-            mappedText = rawText ?? "";
-            unresolved = false;
+            var result = ResultMapper.TryMap(rawText, bundle);
+            mappedText = result.Text;
+            unresolved = IsUnresolvedStatus(result.Status);
+            return result.Claimed;
+        }
+    }
+
+    private sealed class SystemVariablesResultMapper : IDriverProfileResultMapper
+    {
+        public DriverProfileMapResult TryMap(string rawText, ProjectDataBundle bundle)
+        {
+            var defaultText = rawText ?? "";
             if (string.IsNullOrWhiteSpace(rawText))
             {
-                return false;
+                return new DriverProfileMapResult(false, defaultText, DriverProfileProcessingStatus.NoProfile);
             }
 
             var match = CommandCapturePattern.Match(rawText);
             if (!match.Success)
             {
-                return false;
+                return new DriverProfileMapResult(false, defaultText, DriverProfileProcessingStatus.NoProfile);
             }
 
             var command = match.Groups["command"].Value;
             if (!command.StartsWith("System Variables\\", StringComparison.OrdinalIgnoreCase))
             {
-                return false;
+                return new DriverProfileMapResult(false, defaultText, DriverProfileProcessingStatus.NoProfile);
             }
 
             if (!TryParseCommand(command, out var category, out var actionName, out var args))
             {
-                return true;
+                return new DriverProfileMapResult(true, rawText, DriverProfileProcessingStatus.PassThrough);
             }
 
             if (!category.Equals("Integers", StringComparison.OrdinalIgnoreCase))
             {
-                return true;
+                return new DriverProfileMapResult(true, rawText, DriverProfileProcessingStatus.PassThrough);
             }
 
             if (!actionName.Equals("Decrease", StringComparison.OrdinalIgnoreCase)
                 && !actionName.Equals("Increase", StringComparison.OrdinalIgnoreCase)
                 && !actionName.Equals("Test", StringComparison.OrdinalIgnoreCase))
             {
-                return true;
+                return new DriverProfileMapResult(true, rawText, DriverProfileProcessingStatus.PassThrough);
             }
 
             if (args.Count < 2)
             {
-                unresolved = true;
-                return true;
+                return new DriverProfileMapResult(true, rawText, DriverProfileProcessingStatus.NoMap);
             }
 
             if (!int.TryParse(args[0], out var index))
             {
-                unresolved = true;
-                return true;
+                return new DriverProfileMapResult(true, rawText, DriverProfileProcessingStatus.NoMap);
             }
 
             if (!bundle.Additional.Drivers.TryGetValue(Definition.DeviceName, out var driverData)
                 || !driverData.IntegerNames.TryGetValue(index, out var integerName)
                 || string.IsNullOrWhiteSpace(integerName))
             {
-                unresolved = true;
-                return true;
+                return new DriverProfileMapResult(true, rawText, DriverProfileProcessingStatus.NoMap);
             }
 
             args[0] = integerName;
             var updatedCommand = RebuildCommand(command, actionName, args);
             var replacementStart = match.Groups["command"].Index;
-            mappedText = rawText.Substring(0, replacementStart)
+            var mappedText = rawText.Substring(0, replacementStart)
                 + updatedCommand
                 + rawText.Substring(replacementStart + match.Groups["command"].Length);
-            return true;
+            return new DriverProfileMapResult(true, mappedText, DriverProfileProcessingStatus.Resolved);
         }
 
         private static bool TryParseCommand(string command, out string category, out string actionName, out List<string> args)
@@ -147,5 +157,13 @@ public static class SystemVariablesProfile
             parts[^1] = $"{actionName}({string.Join(", ", args)})";
             return string.Join("\\", parts);
         }
+    }
+
+    private static bool IsUnresolvedStatus(DriverProfileProcessingStatus status)
+    {
+        return status is DriverProfileProcessingStatus.NoFormat
+            or DriverProfileProcessingStatus.NoMap
+            or DriverProfileProcessingStatus.Unresolved
+            or DriverProfileProcessingStatus.UnknownState;
     }
 }
