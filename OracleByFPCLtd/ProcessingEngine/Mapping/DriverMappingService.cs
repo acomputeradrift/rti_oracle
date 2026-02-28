@@ -86,6 +86,29 @@ public sealed class DriverMappingService
                 mappedText += " [Unresolved!]";
             }
 
+            if (!unresolved
+                && string.Equals(mappedText, rawText, StringComparison.Ordinal)
+                && !IsAllowedClaimedPassthrough(profile.DeviceName, rawText)
+                && IsClaimedDriverMessage(rawText))
+            {
+                if (!mappedText.Contains("[No Format!]", StringComparison.Ordinal))
+                {
+                    mappedText += " [No Format!]";
+                }
+
+                unresolved = true;
+                WriteEventLogEntry(
+                    SeverityLevel.Warn,
+                    "Processing:Formatting",
+                    "Driver profile claimed line but no format rule matched.",
+                    new Dictionary<string, string>
+                    {
+                        ["line"] = evt.RawLineNumber.ToString(),
+                        ["profile"] = profile.DeviceName,
+                        ["rawText"] = rawText
+                    });
+            }
+
             var resolvedSubstitution = hasTransition && !unresolved;
 
             MappingResolution? mappingResolution = null;
@@ -218,6 +241,61 @@ public sealed class DriverMappingService
     {
         return text.Contains("Driver - Command:", StringComparison.OrdinalIgnoreCase)
             || text.Contains("Driver Command (", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static bool IsClaimedDriverMessage(string rawText)
+    {
+        return rawText.Contains("Driver - Command:", StringComparison.OrdinalIgnoreCase)
+            || rawText.Contains("Driver event", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static bool IsAllowedClaimedPassthrough(string profileName, string rawText)
+    {
+        if (string.IsNullOrWhiteSpace(profileName))
+        {
+            return false;
+        }
+
+        if (string.Equals(profileName, "RTI Diagnostics", StringComparison.OrdinalIgnoreCase))
+        {
+            return true;
+        }
+
+        if (string.Equals(profileName, "RTI Virtual Multiroom Amp", StringComparison.OrdinalIgnoreCase))
+        {
+            return true;
+        }
+
+        if (string.Equals(profileName, "Activities", StringComparison.OrdinalIgnoreCase))
+        {
+            return true;
+        }
+
+        if (string.Equals(profileName, "Lutron Caseta / RA2 Select", StringComparison.OrdinalIgnoreCase))
+        {
+            return true;
+        }
+
+        if (string.Equals(profileName, "Venstar ColorTouch", StringComparison.OrdinalIgnoreCase)
+            && rawText.StartsWith("Venstar ColorTouch -", StringComparison.OrdinalIgnoreCase))
+        {
+            return true;
+        }
+
+        if (string.Equals(profileName, "RTI Internal", StringComparison.OrdinalIgnoreCase)
+            && rawText.Equals("Macro event", StringComparison.OrdinalIgnoreCase))
+        {
+            return true;
+        }
+
+        if (string.Equals(profileName, "System Manager", StringComparison.OrdinalIgnoreCase)
+            && rawText.Contains("Driver - Command:", StringComparison.OrdinalIgnoreCase)
+            && !rawText.Contains("System Manager\\[Hide]\\", StringComparison.OrdinalIgnoreCase))
+        {
+            return true;
+        }
+
+        return false;
     }
 
     private static bool ShouldAppendNoMap(string text)

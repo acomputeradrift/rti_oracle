@@ -159,6 +159,32 @@ public sealed class ProcessingEngineMappingTests
     }
 
     [Fact]
+    public void DriverMappingServiceAppliesNoFormatWhenClaimedCommandIsUnhandled()
+    {
+        var logPath = TestTempPaths.CreateFilePath(".log");
+        OverrideDriverMappingLogger(new CentralLogger(new CentralLoggerOptions
+        {
+            SessionLogPath = logPath,
+            TimestampProvider = () => new DateTime(2026, 2, 28, 13, 56, 0, DateTimeKind.Local)
+        }));
+
+        var service = new DriverMappingService();
+        var evt = new DiagnosticEvent(58, "[2026-02-28 13:56:58.942] Driver - Command:'System Manager\\[Hide]\\Source Return' Sustain:NO");
+
+        var line = service.Map(evt, new ProjectDataBundle());
+
+        Assert.Equal("58 [2026-02-28 13:56:58.942] Driver - Command:'System Manager\\[Hide]\\Source Return' Sustain:NO [No Format!]", line.Text);
+        Assert.True(line.IsUnresolved);
+
+        var log = File.ReadAllText(logPath);
+        Assert.Contains("[WARN] DriverMappingService/Processing:Formatting: \"Line 58 - Driver profile claimed line but no format rule matched.\"", log, StringComparison.Ordinal);
+        Assert.Contains("profile=\"System Manager\"", log, StringComparison.Ordinal);
+        Assert.Contains("rawText=\"[2026-02-28 13:56:58.942] Driver - Command:'System Manager\\[Hide]\\Source Return' Sustain:NO\"", log, StringComparison.Ordinal);
+
+        File.Delete(logPath);
+    }
+
+    [Fact]
     public void ProcessingEngineLogsSingleAdditionalInfoMappingSuccessLine()
     {
         var logPath = TestTempPaths.CreateFilePath(".log");
