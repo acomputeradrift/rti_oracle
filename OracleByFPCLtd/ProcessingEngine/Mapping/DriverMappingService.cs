@@ -115,7 +115,11 @@ public sealed class DriverMappingService
             SeverityLevel.Warn,
             "Processing:Mapping",
             "Driver profile not found.",
-            new Dictionary<string, string> { ["rawText"] = rawText });
+            new Dictionary<string, string>
+            {
+                ["line"] = evt.RawLineNumber.ToString(),
+                ["rawText"] = rawText
+            });
         if (TryExtractAttributedDriverName(rawText, out var attributedDriverName)
             && HasKnownDriverProfile(attributedDriverName))
         {
@@ -205,7 +209,8 @@ public sealed class DriverMappingService
             rawPage,
             pageName,
             "Apex",
-            Driver: deviceName);
+            Profile: "RTI Internal",
+            Device: deviceName);
         return true;
     }
 

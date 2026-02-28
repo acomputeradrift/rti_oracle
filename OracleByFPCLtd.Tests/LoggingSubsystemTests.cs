@@ -261,4 +261,39 @@ public sealed class LoggingSubsystemTests
             File.Delete(logPath);
         }
     }
+
+    [Fact]
+    public void LogEventUsesEnvironmentOverrideDirectoryForDefaultLogs()
+    {
+        var original = Environment.GetEnvironmentVariable("ORACLE_EVENT_LOG_DIRECTORY_OVERRIDE");
+        var overrideDirectory = TestTempPaths.CreateDirectoryPath();
+
+        try
+        {
+            Environment.SetEnvironmentVariable("ORACLE_EVENT_LOG_DIRECTORY_OVERRIDE", overrideDirectory);
+            var logger = new CentralLogger(new CentralLoggerOptions
+            {
+                TimestampProvider = () => new DateTime(2026, 2, 28, 14, 10, 0, DateTimeKind.Local)
+            });
+
+            logger.LogEvent(new LogEntry(
+                SeverityLevel.Info,
+                "abc123",
+                "MainWindow",
+                "Connection",
+                "Connected to Websocket"));
+
+            var files = Directory.GetFiles(overrideDirectory, "*_oracle_event_logs.log");
+            Assert.Single(files);
+            Assert.Contains("Connected to Websocket", File.ReadAllText(files[0]), StringComparison.Ordinal);
+        }
+        finally
+        {
+            Environment.SetEnvironmentVariable("ORACLE_EVENT_LOG_DIRECTORY_OVERRIDE", original);
+            if (Directory.Exists(overrideDirectory))
+            {
+                Directory.Delete(overrideDirectory, recursive: true);
+            }
+        }
+    }
 }

@@ -6,4 +6,5 @@ public sealed record MappingResolution(
     string MappedTo,
     string Source,
     string? Profile = null,
-    string? Driver = null);
+    string? Driver = null,
+    string? Device = null);

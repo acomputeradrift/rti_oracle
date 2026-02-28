@@ -8,6 +8,7 @@ $ErrorActionPreference = "Stop"
 $repoRoot = Split-Path -Parent $MyInvocation.MyCommand.Path
 $testProject = Join-Path $repoRoot "OracleByFPCLtd.Tests\OracleByFPCLtd.Tests.csproj"
 $testTempRoot = Join-Path ([System.IO.Path]::GetTempPath()) "OracleByFPCLtd.Tests"
+$testDefaultLogOverrideRoot = Join-Path $testTempRoot "default-event-logs"
 $generatedDirectories = @(
     (Join-Path $repoRoot "OracleByFPCLtd\bin"),
     (Join-Path $repoRoot "OracleByFPCLtd\obj"),
@@ -74,9 +75,13 @@ function Get-NormalizedFilters {
 }
 
 Push-Location $repoRoot
+$originalLogDirectoryOverride = $null
 try {
     Write-Host "Cleaning generated build and test output..."
     Invoke-Cleanup
+
+    $originalLogDirectoryOverride = [System.Environment]::GetEnvironmentVariable("ORACLE_EVENT_LOG_DIRECTORY_OVERRIDE", "Process")
+    [System.Environment]::SetEnvironmentVariable("ORACLE_EVENT_LOG_DIRECTORY_OVERRIDE", $testDefaultLogOverrideRoot, "Process")
 
     $exitCode = 0
     $normalizedFilters = @(Get-NormalizedFilters -Entries $Filter)
@@ -106,6 +111,7 @@ try {
 finally {
     Write-Host "Cleaning generated build and test output..."
     try {
+        [System.Environment]::SetEnvironmentVariable("ORACLE_EVENT_LOG_DIRECTORY_OVERRIDE", $originalLogDirectoryOverride, "Process")
         Invoke-Cleanup
     }
     catch {

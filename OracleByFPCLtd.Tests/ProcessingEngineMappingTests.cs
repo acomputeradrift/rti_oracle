@@ -137,6 +137,28 @@ public sealed class ProcessingEngineMappingTests
     }
 
     [Fact]
+    public void DriverMappingServiceLogsLineNumberWhenProfileIsMissing()
+    {
+        var logPath = TestTempPaths.CreateFilePath(".log");
+        OverrideDriverMappingLogger(new CentralLogger(new CentralLoggerOptions
+        {
+            SessionLogPath = logPath,
+            TimestampProvider = () => new DateTime(2026, 2, 28, 13, 35, 0, DateTimeKind.Local)
+        }));
+
+        var service = new DriverMappingService();
+        var evt = new DiagnosticEvent(42, "[2026-02-28 13:35:52.860] Driver - Command:'UNKNOWN' Sustain:NO");
+
+        _ = service.Map(evt, new ProjectDataBundle());
+
+        var log = File.ReadAllText(logPath);
+        Assert.Contains("[WARN] DriverMappingService/Processing:Mapping: \"Line 42 - Driver profile not found.\"", log, StringComparison.Ordinal);
+        Assert.Contains("rawText=\"[2026-02-28 13:35:52.860] Driver - Command:'UNKNOWN' Sustain:NO\"", log, StringComparison.Ordinal);
+
+        File.Delete(logPath);
+    }
+
+    [Fact]
     public void ProcessingEngineLogsSingleAdditionalInfoMappingSuccessLine()
     {
         var logPath = TestTempPaths.CreateFilePath(".log");
@@ -215,7 +237,8 @@ public sealed class ProcessingEngineMappingTests
 
         var log = File.ReadAllText(logPath);
         Assert.Contains("[SUCCESS] ProcessingEngine/Mapping: \"Line 104 - mapped page 1 for Room Select\"", log, StringComparison.Ordinal);
-        Assert.Contains("driver=\"RTiPanel (iPhone X or newer)\"", log, StringComparison.Ordinal);
+        Assert.Contains("profile=\"RTI Internal\"", log, StringComparison.Ordinal);
+        Assert.Contains("device=\"RTiPanel (iPhone X or newer)\"", log, StringComparison.Ordinal);
         Assert.Contains("source=\"Apex\"", log, StringComparison.Ordinal);
 
         File.Delete(logPath);

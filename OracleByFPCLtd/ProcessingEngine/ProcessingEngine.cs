@@ -156,6 +156,11 @@ public sealed class ProcessingEngine
             details["driver"] = mappingResolution.Driver;
         }
 
+        if (!string.IsNullOrWhiteSpace(mappingResolution.Device))
+        {
+            details["device"] = mappingResolution.Device;
+        }
+
         WriteEventLogEntry(
             SeverityLevel.Success,
             "Mapping",

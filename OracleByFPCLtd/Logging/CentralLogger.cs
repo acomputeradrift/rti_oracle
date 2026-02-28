@@ -37,6 +37,7 @@ public sealed class CentralLoggerOptions
 
 public sealed class CentralLogger
 {
+    private const string LogDirectoryOverrideEnvironmentVariable = "ORACLE_EVENT_LOG_DIRECTORY_OVERRIDE";
     private const string SessionFileSuffix = "_oracle_event_logs.log";
     private static readonly HashSet<string> AllowedStatusLevels = new(StringComparer.OrdinalIgnoreCase)
     {
@@ -262,6 +263,12 @@ public sealed class CentralLogger
             {
                 return fromPath;
             }
+        }
+
+        var overrideDirectory = Environment.GetEnvironmentVariable(LogDirectoryOverrideEnvironmentVariable);
+        if (!string.IsNullOrWhiteSpace(overrideDirectory))
+        {
+            return overrideDirectory;
         }
 
         return BuildDefaultLogDirectory();
