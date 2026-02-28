@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.IO;
 using OracleByFPCLtd.Logging;
@@ -10,7 +10,7 @@ public static class RawLogParser
 {
     private static readonly CentralLogger CentralLogger = new(new CentralLoggerOptions
     {
-        LogFilePath = BuildStructuredLogPath()
+        LogFilePath = BuildEventLogFilePathHint()
     });
 
     public static bool TryParseNumberedLine(string line, out DiagnosticEvent diagnosticEvent)
@@ -29,7 +29,7 @@ public static class RawLogParser
 
         if (delimiterIndex <= 0)
         {
-            LogStructuredEvent(
+            WriteEventLogEntry(
                 SeverityLevel.Warn,
                 "TryParseNumberedLine",
                 "Missing line number delimiter.",
@@ -40,7 +40,7 @@ public static class RawLogParser
         var numberText = line.Substring(0, delimiterIndex);
         if (!int.TryParse(numberText, out var rawLineNumber))
         {
-            LogStructuredEvent(
+            WriteEventLogEntry(
                 SeverityLevel.Warn,
                 "TryParseNumberedLine",
                 "Line number parse failed.",
@@ -53,7 +53,7 @@ public static class RawLogParser
         return true;
     }
 
-    private static void LogStructuredEvent(
+    private static void WriteEventLogEntry(
         SeverityLevel severity,
         string phase,
         string message,
@@ -73,7 +73,7 @@ public static class RawLogParser
         return Guid.NewGuid().ToString("N").Substring(0, 6);
     }
 
-    private static string BuildStructuredLogPath()
+    private static string BuildEventLogFilePathHint()
     {
         var folder = Path.Combine(
             Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
@@ -82,3 +82,4 @@ public static class RawLogParser
         return Path.Combine(folder, "oracle-structured.log");
     }
 }
+

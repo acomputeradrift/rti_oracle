@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Security.Cryptography;
@@ -17,7 +17,7 @@ public static class ProjectDataCacheStore
     };
     private static readonly CentralLogger CentralLogger = new(new CentralLoggerOptions
     {
-        LogFilePath = BuildStructuredLogPath()
+        LogFilePath = BuildEventLogFilePathHint()
     });
 
     public static string GetCachePath(string apexPath)
@@ -52,7 +52,7 @@ public static class ProjectDataCacheStore
         }
         catch (Exception ex)
         {
-            LogStructuredEvent(
+            WriteEventLogEntry(
                 SeverityLevel.Warn,
                 "ProjectDataCacheStore",
                 "TryLoad",
@@ -113,7 +113,7 @@ public static class ProjectDataCacheStore
         return Convert.ToHexString(bytes);
     }
 
-    private static void LogStructuredEvent(
+    private static void WriteEventLogEntry(
         SeverityLevel severity,
         string module,
         string phase,
@@ -137,7 +137,7 @@ public static class ProjectDataCacheStore
         return Guid.NewGuid().ToString("N").Substring(0, 6);
     }
 
-    private static string BuildStructuredLogPath()
+    private static string BuildEventLogFilePathHint()
     {
         var folder = Path.Combine(
             Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
@@ -247,3 +247,4 @@ public static class ProjectDataCacheStore
         }
     }
 }
+

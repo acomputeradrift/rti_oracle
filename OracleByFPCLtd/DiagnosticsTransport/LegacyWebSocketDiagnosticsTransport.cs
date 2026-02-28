@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -22,7 +22,7 @@ public sealed class LegacyWebSocketDiagnosticsTransport : IDiagnosticsTransport
     private CancellationTokenSource? _socketCts;
     private readonly CentralLogger _centralLogger = new(new CentralLoggerOptions
     {
-        LogFilePath = BuildStructuredLogPath()
+        LogFilePath = BuildEventLogFilePathHint()
     });
 
     public event EventHandler<string>? RawMessageReceived;
@@ -477,7 +477,7 @@ public sealed class LegacyWebSocketDiagnosticsTransport : IDiagnosticsTransport
         var severity = MapSeverity(message, SeverityLevel.Info);
         if (!IsConnectedSuccessMessage(message))
         {
-            LogStructuredEvent(severity, "TransportInfo", message);
+            WriteEventLogEntry(severity, "TransportInfo", message);
         }
         TransportInfo?.Invoke(this, message);
     }
@@ -485,11 +485,11 @@ public sealed class LegacyWebSocketDiagnosticsTransport : IDiagnosticsTransport
     private void EmitError(string message)
     {
         var severity = MapSeverity(message, SeverityLevel.Error);
-        LogStructuredEvent(severity, "TransportError", message);
+        WriteEventLogEntry(severity, "TransportError", message);
         TransportError?.Invoke(this, message);
     }
 
-    private void LogStructuredEvent(SeverityLevel severity, string phase, string message)
+    private void WriteEventLogEntry(SeverityLevel severity, string phase, string message)
     {
         var correlationId = CreateCorrelationId();
         _centralLogger.LogEvent(new LogEntry(
@@ -528,7 +528,7 @@ public sealed class LegacyWebSocketDiagnosticsTransport : IDiagnosticsTransport
         return Guid.NewGuid().ToString("N").Substring(0, 6);
     }
 
-    private static string BuildStructuredLogPath()
+    private static string BuildEventLogFilePathHint()
     {
         var folder = Path.Combine(
             Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
@@ -537,3 +537,4 @@ public sealed class LegacyWebSocketDiagnosticsTransport : IDiagnosticsTransport
         return Path.Combine(folder, "oracle-structured.log");
     }
 }
+

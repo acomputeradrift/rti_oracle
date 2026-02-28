@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using System.Reflection;
 using System.Text.Json;
@@ -11,6 +12,7 @@ using System.Windows.Documents;
 using System.Windows.Media;
 using System.Windows.Threading;
 using OracleByFPCLtd.DiagnosticsTransport;
+using OracleByFPCLtd.Logging;
 using OracleByFPCLtd.UI.Panels;
 using OracleByFPCLtd.ProjectData;
 using OracleByFPCLtd.Reliability;
@@ -85,6 +87,112 @@ public sealed class MainWindowProcessedOutputTests
             var processed = GetRichText(window, "ProcessedLogTextBox");
             Assert.DoesNotContain("No processed information available", processed);
             Assert.Contains("Change to page \"Room Select\"", processed);
+        });
+    }
+
+    [Fact]
+    public void ChildStatusMessageLogsFullEventBeforeShowingTruncatedStatus()
+    {
+        RunOnSta(() =>
+        {
+            var logPath = Path.Combine(Path.GetTempPath(), $"{Guid.NewGuid():N}.log");
+            var logger = new CentralLogger(new CentralLoggerOptions
+            {
+                SessionLogPath = logPath,
+                TimestampProvider = () => new DateTime(2026, 2, 28, 12, 32, 0, DateTimeKind.Local)
+            });
+            var window = new MainWindow();
+            InvokeOverrideCentralLogger(window, logger);
+
+            const string message = "Project Data Preview: this is a deliberately verbose child status message";
+            InvokeAppendStatusFromChild(window, "INFO", message);
+
+            var statusText = GetStatusText(window);
+            var logText = File.ReadAllText(logPath);
+
+            Assert.Contains("Project Data Preview: this is a deliberately", statusText);
+            Assert.DoesNotContain("verbose child status message", statusText, StringComparison.Ordinal);
+            Assert.Contains(message, logText, StringComparison.Ordinal);
+
+            window.Close();
+            File.Delete(logPath);
+        });
+    }
+
+    [Fact]
+    public void HardDiagnosticsMilestonesLogButDoNotRenderInStatusArea()
+    {
+        RunOnSta(() =>
+        {
+            var logPath = Path.Combine(Path.GetTempPath(), $"{Guid.NewGuid():N}.log");
+            var logger = new CentralLogger(new CentralLoggerOptions
+            {
+                SessionLogPath = logPath,
+                TimestampProvider = () => new DateTime(2026, 2, 28, 12, 13, 0, DateTimeKind.Local)
+            });
+            var window = new MainWindow();
+            InvokeOverrideCentralLogger(window, logger);
+
+            InvokeEmitPhaseStatus(
+                window,
+                "LogLevels:Status",
+                "INFO",
+                "Hard Diagnostics project prime dispatched",
+                "hard_diag_project_prime_dispatched",
+                new Dictionary<string, string>
+                {
+                    ["projectTarget"] = "DRIVER//6",
+                    ["projectLevel"] = "1"
+                },
+                exception: null);
+            InvokeEmitPhaseStatus(
+                window,
+                "LogLevels:Status",
+                "SUCCESS",
+                "Hard Diagnostics project confirm acknowledged",
+                "hard_diag_project_confirm_ack_ok",
+                new Dictionary<string, string>
+                {
+                    ["projectTarget"] = "DRIVER//6",
+                    ["projectLevel"] = "1"
+                },
+                exception: null);
+            InvokeEmitPhaseStatus(
+                window,
+                "LogLevels:Status",
+                "SUCCESS",
+                "Hard Diagnostics system set acknowledged",
+                "hard_diag_system_set_ack_ok",
+                new Dictionary<string, string>
+                {
+                    ["systemTarget"] = "Diagnostics: Primary Processor",
+                    ["systemLevel"] = "0"
+                },
+                exception: null);
+            InvokeEmitPhaseStatus(
+                window,
+                "LogLevels:Status",
+                "SUCCESS",
+                "Hard Diagnostics levels confirmed",
+                "hard_diag_sequence_complete_ok",
+                details: null,
+                exception: null);
+
+            var statusText = GetStatusText(window);
+            var logText = File.ReadAllText(logPath);
+
+            Assert.DoesNotContain("Hard Diagnostics project prime dispatched", statusText, StringComparison.Ordinal);
+            Assert.DoesNotContain("Hard Diagnostics project confirm acknowledged", statusText, StringComparison.Ordinal);
+            Assert.DoesNotContain("Hard Diagnostics system set acknowledged", statusText, StringComparison.Ordinal);
+            Assert.DoesNotContain("Hard Diagnostics levels confirmed", statusText, StringComparison.Ordinal);
+
+            Assert.Contains("Hard Diagnostics project prime dispatched", logText, StringComparison.Ordinal);
+            Assert.Contains("Hard Diagnostics project confirm acknowledged", logText, StringComparison.Ordinal);
+            Assert.Contains("Hard Diagnostics system set acknowledged", logText, StringComparison.Ordinal);
+            Assert.Contains("Hard Diagnostics levels confirmed", logText, StringComparison.Ordinal);
+
+            window.Close();
+            File.Delete(logPath);
         });
     }
 
@@ -704,6 +812,20 @@ public sealed class MainWindowProcessedOutputTests
         var method = typeof(MainWindow).GetMethod("FilterApplyButton_Click", BindingFlags.Instance | BindingFlags.NonPublic);
         Assert.NotNull(method);
         method!.Invoke(window, new object[] { window, new RoutedEventArgs() });
+    }
+
+    private static void InvokeAppendStatusFromChild(MainWindow window, string level, string message)
+    {
+        var method = typeof(MainWindow).GetMethod("AppendStatusFromChild", BindingFlags.Instance | BindingFlags.NonPublic);
+        Assert.NotNull(method);
+        method!.Invoke(window, new object[] { level, message });
+    }
+
+    private static void InvokeOverrideCentralLogger(MainWindow window, CentralLogger logger)
+    {
+        var method = typeof(MainWindow).GetMethod("OverrideCentralLoggerForTesting", BindingFlags.Instance | BindingFlags.NonPublic);
+        Assert.NotNull(method);
+        method!.Invoke(window, new object[] { logger });
     }
 
     private static List<string> GetProcessedLines(MainWindow window)

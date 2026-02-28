@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.IO;
 using OracleByFPCLtd.Logging;
@@ -14,7 +14,7 @@ public sealed class ProcessedLogsExportService
     private readonly IExportFileWriter _writer;
     private readonly CentralLogger _centralLogger = new(new CentralLoggerOptions
     {
-        LogFilePath = BuildStructuredLogPath()
+        LogFilePath = BuildEventLogFilePathHint()
     });
 
     public ProcessedLogsExportService(IPdfRenderer renderer, IExportFileWriter writer)
@@ -27,7 +27,7 @@ public sealed class ProcessedLogsExportService
     {
         if (request is null)
         {
-            LogStructuredEvent(
+            WriteEventLogEntry(
                 SeverityLevel.Error,
                 "Export",
                 "Processed logs export request is null.",
@@ -37,7 +37,7 @@ public sealed class ProcessedLogsExportService
 
         if (string.IsNullOrWhiteSpace(outputPath))
         {
-            LogStructuredEvent(
+            WriteEventLogEntry(
                 SeverityLevel.Error,
                 "Export",
                 "Processed logs export output path missing.",
@@ -47,7 +47,7 @@ public sealed class ProcessedLogsExportService
 
         var bytes = _renderer.Render(request);
         _writer.Write(outputPath, bytes);
-        LogStructuredEvent(
+        WriteEventLogEntry(
             SeverityLevel.Info,
             "Export",
             "Processed logs export completed.",
@@ -58,7 +58,7 @@ public sealed class ProcessedLogsExportService
             });
     }
 
-    private void LogStructuredEvent(
+    private void WriteEventLogEntry(
         SeverityLevel severity,
         string phase,
         string message,
@@ -78,7 +78,7 @@ public sealed class ProcessedLogsExportService
         return Guid.NewGuid().ToString("N").Substring(0, 6);
     }
 
-    private static string BuildStructuredLogPath()
+    private static string BuildEventLogFilePathHint()
     {
         var folder = Path.Combine(
             Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
@@ -87,3 +87,4 @@ public sealed class ProcessedLogsExportService
         return Path.Combine(folder, "oracle-structured.log");
     }
 }
+

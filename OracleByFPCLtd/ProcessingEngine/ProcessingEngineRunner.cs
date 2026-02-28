@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.IO;
 using OracleByFPCLtd.ProcessingEngine.Formatting;
@@ -9,9 +9,9 @@ namespace OracleByFPCLtd.ProcessingEngine;
 
 public static class ProcessingEngineRunner
 {
-    private static readonly CentralLogger CentralLogger = new(new CentralLoggerOptions
+    private static CentralLogger CentralLogger = new(new CentralLoggerOptions
     {
-        LogFilePath = BuildStructuredLogPath()
+        LogFilePath = BuildEventLogFilePathHint()
     });
 
     public static List<string> ProcessNumberedLines(IEnumerable<string> lines, ProcessingEngine engine)
@@ -46,22 +46,23 @@ public static class ProcessingEngineRunner
                 continue;
             }
 
-            LogStructuredEvent(
+            WriteEventLogEntry(
                 SeverityLevel.Info,
-                "Processing:Formatting",
-                "Raw log line formatted (line number, date/time stamp)",
+                "Formatting",
+                "formatted with DateTime, line number",
                 new Dictionary<string, string>
                 {
                     ["line"] = evt.RawLineNumber.ToString()
                 });
 
             var processed = engine.ProcessEvent(evt);
-            results.Add(ProcessedLineFormatter.Format(processed));
+            var formattedLine = ProcessedLineFormatter.Format(processed);
+            results.Add(formattedLine);
 
-            LogStructuredEvent(
+            WriteEventLogEntry(
                 SeverityLevel.Info,
-                "Processing:Formatting",
-                "Processed log line formatted (line number, date/time stamp, readablility)",
+                "Processing",
+                "formatted for readability",
                 new Dictionary<string, string>
                 {
                     ["line"] = evt.RawLineNumber.ToString()
@@ -79,7 +80,7 @@ public static class ProcessingEngineRunner
         return results;
     }
 
-    private static void LogStructuredEvent(
+    private static void WriteEventLogEntry(
         SeverityLevel severity,
         string phase,
         string message,
@@ -99,7 +100,7 @@ public static class ProcessingEngineRunner
         return Guid.NewGuid().ToString("N").Substring(0, 6);
     }
 
-    private static string BuildStructuredLogPath()
+    private static string BuildEventLogFilePathHint()
     {
         var folder = Path.Combine(
             Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
@@ -107,4 +108,10 @@ public static class ProcessingEngineRunner
             "Logs");
         return Path.Combine(folder, "oracle-structured.log");
     }
+
+    private static void OverrideCentralLoggerForTesting(CentralLogger logger)
+    {
+        CentralLogger = logger ?? throw new ArgumentNullException(nameof(logger));
+    }
 }
+

@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.IO;
 using System.IO.Compression;
@@ -14,14 +14,14 @@ public static class AdditionalInfoTemplateBuilder
 {
     private static readonly CentralLogger CentralLogger = new(new CentralLoggerOptions
     {
-        LogFilePath = BuildStructuredLogPath()
+        LogFilePath = BuildEventLogFilePathHint()
     });
 
     public static void Create(string outputPath, IReadOnlyList<AdditionalInfoSheetSchema> schemas)
     {
         if (string.IsNullOrWhiteSpace(outputPath))
         {
-            LogStructuredEvent(
+            WriteEventLogEntry(
                 SeverityLevel.Error,
                 "Create",
                 "Additional info template output path missing.",
@@ -31,7 +31,7 @@ public static class AdditionalInfoTemplateBuilder
 
         if (schemas == null || schemas.Count == 0)
         {
-            LogStructuredEvent(
+            WriteEventLogEntry(
                 SeverityLevel.Error,
                 "Create",
                 "Additional info template schemas missing.",
@@ -61,7 +61,7 @@ public static class AdditionalInfoTemplateBuilder
             WriteEntry(archive, sheetName, BuildWorksheet(rows));
         }
 
-        LogStructuredEvent(
+        WriteEventLogEntry(
             SeverityLevel.Info,
             "Create",
             "Additional info template created.",
@@ -72,7 +72,7 @@ public static class AdditionalInfoTemplateBuilder
             });
     }
 
-    private static void LogStructuredEvent(
+    private static void WriteEventLogEntry(
         SeverityLevel severity,
         string phase,
         string message,
@@ -92,7 +92,7 @@ public static class AdditionalInfoTemplateBuilder
         return Guid.NewGuid().ToString("N").Substring(0, 6);
     }
 
-    private static string BuildStructuredLogPath()
+    private static string BuildEventLogFilePathHint()
     {
         var folder = Path.Combine(
             Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
@@ -217,3 +217,4 @@ public static class AdditionalInfoTemplateBuilder
         return SecurityElement.Escape(value) ?? "";
     }
 }
+

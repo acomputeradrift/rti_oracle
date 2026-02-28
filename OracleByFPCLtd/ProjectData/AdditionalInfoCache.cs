@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.IO;
 using OracleByFPCLtd.Logging;
@@ -18,14 +18,14 @@ public sealed class AdditionalInfoCache
     private AdditionalData? _data;
     private readonly CentralLogger _centralLogger = new(new CentralLoggerOptions
     {
-        LogFilePath = BuildStructuredLogPath()
+        LogFilePath = BuildEventLogFilePathHint()
     });
 
     public AdditionalData GetOrLoad(AdditionalInfoCacheKey key, Func<AdditionalData> loader)
     {
         if (loader is null)
         {
-            LogStructuredEvent(
+            WriteEventLogEntry(
                 SeverityLevel.Error,
                 "GetOrLoad",
                 "Additional info loader is null.",
@@ -35,7 +35,7 @@ public sealed class AdditionalInfoCache
 
         if (_key is not null && _data is not null && _key.Equals(key))
         {
-            LogStructuredEvent(
+            WriteEventLogEntry(
                 SeverityLevel.Info,
                 "GetOrLoad",
                 "Additional info cache hit.",
@@ -46,7 +46,7 @@ public sealed class AdditionalInfoCache
         var data = loader();
         _key = key;
         _data = data;
-        LogStructuredEvent(
+        WriteEventLogEntry(
             SeverityLevel.Info,
             "GetOrLoad",
             "Additional info cache refreshed.",
@@ -58,7 +58,7 @@ public sealed class AdditionalInfoCache
         return data;
     }
 
-    private void LogStructuredEvent(
+    private void WriteEventLogEntry(
         SeverityLevel severity,
         string phase,
         string message,
@@ -78,7 +78,7 @@ public sealed class AdditionalInfoCache
         return Guid.NewGuid().ToString("N").Substring(0, 6);
     }
 
-    private static string BuildStructuredLogPath()
+    private static string BuildEventLogFilePathHint()
     {
         var folder = Path.Combine(
             Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
@@ -87,3 +87,4 @@ public sealed class AdditionalInfoCache
         return Path.Combine(folder, "oracle-structured.log");
     }
 }
+

@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -15,7 +15,7 @@ public static class AdditionalInfoTemplatePlanner
     private const int Rcm12DeviceType = 7;
     private static readonly CentralLogger CentralLogger = new(new CentralLoggerOptions
     {
-        LogFilePath = BuildStructuredLogPath()
+        LogFilePath = BuildEventLogFilePathHint()
     });
 
     public static IReadOnlyList<AdditionalInfoSheetSchema> DetermineSchemas(
@@ -25,7 +25,7 @@ public static class AdditionalInfoTemplatePlanner
     {
         if (drivers is null)
         {
-            LogStructuredEvent(
+            WriteEventLogEntry(
                 SeverityLevel.Warn,
                 "DetermineSchemas",
                 "Additional info schemas skipped; drivers missing.",
@@ -103,7 +103,7 @@ public static class AdditionalInfoTemplatePlanner
             }
         }
 
-        LogStructuredEvent(
+        WriteEventLogEntry(
             SeverityLevel.Info,
             "DetermineSchemas",
             "Additional info schemas determined.",
@@ -144,7 +144,7 @@ public static class AdditionalInfoTemplatePlanner
         return false;
     }
 
-    private static void LogStructuredEvent(
+    private static void WriteEventLogEntry(
         SeverityLevel severity,
         string phase,
         string message,
@@ -164,7 +164,7 @@ public static class AdditionalInfoTemplatePlanner
         return Guid.NewGuid().ToString("N").Substring(0, 6);
     }
 
-    private static string BuildStructuredLogPath()
+    private static string BuildEventLogFilePathHint()
     {
         var folder = Path.Combine(
             Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
@@ -173,3 +173,4 @@ public static class AdditionalInfoTemplatePlanner
         return Path.Combine(folder, "oracle-structured.log");
     }
 }
+

@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.IO;
 using OracleByFPCLtd.Logging;
@@ -9,14 +9,14 @@ public sealed class ExportFileWriter : IExportFileWriter
 {
     private readonly CentralLogger _centralLogger = new(new CentralLoggerOptions
     {
-        LogFilePath = BuildStructuredLogPath()
+        LogFilePath = BuildEventLogFilePathHint()
     });
 
     public void Write(string outputPath, byte[] bytes)
     {
         if (string.IsNullOrWhiteSpace(outputPath))
         {
-            LogStructuredEvent(
+            WriteEventLogEntry(
                 SeverityLevel.Error,
                 "Write",
                 "Export file path missing.",
@@ -26,7 +26,7 @@ public sealed class ExportFileWriter : IExportFileWriter
 
         if (bytes is null)
         {
-            LogStructuredEvent(
+            WriteEventLogEntry(
                 SeverityLevel.Error,
                 "Write",
                 "Export data buffer missing.",
@@ -35,7 +35,7 @@ public sealed class ExportFileWriter : IExportFileWriter
         }
 
         File.WriteAllBytes(outputPath, bytes);
-        LogStructuredEvent(
+        WriteEventLogEntry(
             SeverityLevel.Info,
             "Write",
             "Export file write completed.",
@@ -46,7 +46,7 @@ public sealed class ExportFileWriter : IExportFileWriter
             });
     }
 
-    private void LogStructuredEvent(
+    private void WriteEventLogEntry(
         SeverityLevel severity,
         string phase,
         string message,
@@ -66,7 +66,7 @@ public sealed class ExportFileWriter : IExportFileWriter
         return Guid.NewGuid().ToString("N").Substring(0, 6);
     }
 
-    private static string BuildStructuredLogPath()
+    private static string BuildEventLogFilePathHint()
     {
         var folder = Path.Combine(
             Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
@@ -75,3 +75,4 @@ public sealed class ExportFileWriter : IExportFileWriter
         return Path.Combine(folder, "oracle-structured.log");
     }
 }
+

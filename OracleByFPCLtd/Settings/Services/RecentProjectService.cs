@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -12,7 +12,7 @@ public sealed class RecentProjectService
     private const int MaxRecentItems = 5;
     private readonly CentralLogger _centralLogger = new(new CentralLoggerOptions
     {
-        LogFilePath = BuildStructuredLogPath()
+        LogFilePath = BuildEventLogFilePathHint()
     });
 
     public void RecordProjectSelection(OracleSettings settings, string filePath)
@@ -24,7 +24,7 @@ public sealed class RecentProjectService
 
         UpsertRecentProject(settings, filePath);
         var fileName = Path.GetFileName(filePath);
-        LogStructuredEvent(
+        WriteEventLogEntry(
             SeverityLevel.Info,
             "RecordProjectSelection",
             "Recent project updated.",
@@ -45,7 +45,7 @@ public sealed class RecentProjectService
         UpsertRecentProject(settings, filePath);
         settings.RecentProjects[0].LastSuccessfulIp = ip;
         settings.RecentProjects[0].LastConnectedAt = DateTime.Now;
-        LogStructuredEvent(
+        WriteEventLogEntry(
             SeverityLevel.Info,
             "RecordSuccessfulConnection",
             "Recent project connection updated.",
@@ -84,7 +84,7 @@ public sealed class RecentProjectService
         }
     }
 
-    private void LogStructuredEvent(
+    private void WriteEventLogEntry(
         SeverityLevel severity,
         string phase,
         string message,
@@ -104,7 +104,7 @@ public sealed class RecentProjectService
         return Guid.NewGuid().ToString("N").Substring(0, 6);
     }
 
-    private static string BuildStructuredLogPath()
+    private static string BuildEventLogFilePathHint()
     {
         var folder = Path.Combine(
             Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
@@ -113,3 +113,4 @@ public sealed class RecentProjectService
         return Path.Combine(folder, "oracle-structured.log");
     }
 }
+

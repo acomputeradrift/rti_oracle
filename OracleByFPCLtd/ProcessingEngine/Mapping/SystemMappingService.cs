@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Text.RegularExpressions;
@@ -13,9 +13,9 @@ public sealed class SystemMappingService
     private static readonly Regex PagePattern = new Regex(
         @"(?<prefix>.*?\bChange to page\s+)(?<page>\d+)(?<suffix>\s+on device\s+'(?<device>[^']+)'.*)",
         RegexOptions.IgnoreCase | RegexOptions.Compiled);
-    private static readonly CentralLogger CentralLogger = new(new CentralLoggerOptions
+    private static CentralLogger CentralLogger = new(new CentralLoggerOptions
     {
-        LogFilePath = BuildStructuredLogPath()
+        LogFilePath = BuildEventLogFilePathHint()
     });
 
     public ProcessedLine Map(DiagnosticEvent evt, ProjectDataBundle bundle)
@@ -45,7 +45,7 @@ public sealed class SystemMappingService
         var deviceName = match.Groups["device"].Value;
         if (!int.TryParse(pageText, out var pageNumber) || pageNumber <= 0)
         {
-            LogStructuredEvent(
+            WriteEventLogEntry(
                 SeverityLevel.Warn,
                 "Processing:Mapping",
                 "Page number parse failed.",
@@ -60,7 +60,7 @@ public sealed class SystemMappingService
         if (!TryBuildDeviceNameMap(bundle.System.DiagnosticsMapping, out var deviceNameToId)
             || !deviceNameToId.TryGetValue(deviceName, out var deviceId))
         {
-            LogStructuredEvent(
+            WriteEventLogEntry(
                 SeverityLevel.Warn,
                 "Processing:Mapping",
                 "Device mapping not found.",
@@ -72,7 +72,7 @@ public sealed class SystemMappingService
         var key = $"{deviceId}|{pageIndex}";
         if (!bundle.System.PageIndexMap.TryGetValue(key, out var pageName) || string.IsNullOrWhiteSpace(pageName))
         {
-            LogStructuredEvent(
+            WriteEventLogEntry(
                 SeverityLevel.Warn,
                 "Processing:Mapping",
                 "Page index mapping not found.",
@@ -85,21 +85,22 @@ public sealed class SystemMappingService
         }
 
         var resolved = $"{match.Groups["prefix"].Value}\"{pageName}\"{match.Groups["suffix"].Value}";
-        LogStructuredEvent(
+        WriteEventLogEntry(
             SeverityLevel.Success,
-            "Processing:Mapping",
-            $"Processed log line mapped to Apex file (Page {pageNumber} -> {pageName})",
+            "Processing",
+            $"mapped page {pageNumber} for {pageName}",
             new Dictionary<string, string>
             {
                 ["line"] = evt.RawLineNumber.ToString(),
                 ["device"] = deviceName,
                 ["mappedFrom"] = $"Page {pageNumber}",
-                ["mappedTo"] = pageName
+                ["mappedTo"] = pageName,
+                ["source"] = "Apex"
             });
         return new ProcessedLine($"{evt.RawLineNumber} {resolved}", false);
     }
 
-    private static void LogStructuredEvent(
+    private static void WriteEventLogEntry(
         SeverityLevel severity,
         string phase,
         string message,
@@ -119,13 +120,18 @@ public sealed class SystemMappingService
         return Guid.NewGuid().ToString("N").Substring(0, 6);
     }
 
-    private static string BuildStructuredLogPath()
+    private static string BuildEventLogFilePathHint()
     {
         var folder = Path.Combine(
             Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
             "Oracle by FP&C",
             "Logs");
         return Path.Combine(folder, "oracle-structured.log");
+    }
+
+    private static void OverrideCentralLoggerForTesting(CentralLogger logger)
+    {
+        CentralLogger = logger ?? throw new ArgumentNullException(nameof(logger));
     }
 
     private static bool TryBuildDeviceNameMap(
@@ -150,3 +156,4 @@ public sealed class SystemMappingService
         return deviceNameToId.Count > 0;
     }
 }
+

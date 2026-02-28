@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Text.Json;
@@ -11,7 +11,7 @@ public static class LogLevelAckParser
 {
     private static readonly CentralLogger CentralLogger = new(new CentralLoggerOptions
     {
-        LogFilePath = BuildStructuredLogPath()
+        LogFilePath = BuildEventLogFilePathHint()
     });
     private static readonly Regex DriverParenPattern = new(
         @"Setting LogLevel on DRIVER\s*\((\d+)\)\s*to\s*(\d+)",
@@ -32,7 +32,7 @@ public static class LogLevelAckParser
 
         if (string.IsNullOrWhiteSpace(text))
         {
-            LogStructuredEvent(
+            WriteEventLogEntry(
                 SeverityLevel.Warn,
                 "TryParse",
                 "Log level ack text missing.",
@@ -137,7 +137,7 @@ public static class LogLevelAckParser
         }
         catch (JsonException)
         {
-            LogStructuredEvent(
+            WriteEventLogEntry(
                 SeverityLevel.Warn,
                 "TryParseEmbeddedLogLevelJson",
                 "Log level JSON parse failed.",
@@ -146,7 +146,7 @@ public static class LogLevelAckParser
         }
         catch (FormatException)
         {
-            LogStructuredEvent(
+            WriteEventLogEntry(
                 SeverityLevel.Warn,
                 "TryParseEmbeddedLogLevelJson",
                 "Log level JSON format failed.",
@@ -197,7 +197,7 @@ public static class LogLevelAckParser
         return false;
     }
 
-    private static void LogStructuredEvent(
+    private static void WriteEventLogEntry(
         SeverityLevel severity,
         string phase,
         string message,
@@ -217,7 +217,7 @@ public static class LogLevelAckParser
         return Guid.NewGuid().ToString("N").Substring(0, 6);
     }
 
-    private static string BuildStructuredLogPath()
+    private static string BuildEventLogFilePathHint()
     {
         var folder = Path.Combine(
             Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
@@ -226,3 +226,4 @@ public static class LogLevelAckParser
         return Path.Combine(folder, "oracle-structured.log");
     }
 }
+

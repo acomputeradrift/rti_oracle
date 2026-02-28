@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Threading;
@@ -19,7 +19,7 @@ public sealed class DiagnosticsTransportFacade : IDiagnosticsTransport
     private readonly ISysvarSubscriptionController _sysvarController;
     private readonly CentralLogger _centralLogger = new(new CentralLoggerOptions
     {
-        LogFilePath = BuildStructuredLogPath()
+        LogFilePath = BuildEventLogFilePathHint()
     });
 
     public DiagnosticsTransportFacade(
@@ -37,13 +37,13 @@ public sealed class DiagnosticsTransportFacade : IDiagnosticsTransport
         {
             if (!IsConnectedSuccessMessage(message))
             {
-                LogStructuredEvent(SeverityLevel.Info, "TransportInfo", message);
+                WriteEventLogEntry(SeverityLevel.Info, "TransportInfo", message);
             }
             TransportInfo?.Invoke(this, message);
         };
         _connection.TransportError += (_, message) =>
         {
-            LogStructuredEvent(SeverityLevel.Error, "TransportError", message);
+            WriteEventLogEntry(SeverityLevel.Error, "TransportError", message);
             TransportError?.Invoke(this, message);
         };
         _receiver.RawMessageReceived += (_, message) => RawMessageReceived?.Invoke(this, message);
@@ -70,7 +70,7 @@ public sealed class DiagnosticsTransportFacade : IDiagnosticsTransport
 
     public Task<List<DriverInfo>> LoadDriversAsync(string ip) => _connection.LoadDriversAsync(ip);
 
-    private void LogStructuredEvent(SeverityLevel severity, string phase, string message)
+    private void WriteEventLogEntry(SeverityLevel severity, string phase, string message)
     {
         var correlationId = CreateCorrelationId();
         _centralLogger.LogEvent(new LogEntry(
@@ -94,7 +94,7 @@ public sealed class DiagnosticsTransportFacade : IDiagnosticsTransport
         return Guid.NewGuid().ToString("N").Substring(0, 6);
     }
 
-    private static string BuildStructuredLogPath()
+    private static string BuildEventLogFilePathHint()
     {
         var folder = Path.Combine(
             Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
@@ -103,3 +103,4 @@ public sealed class DiagnosticsTransportFacade : IDiagnosticsTransport
         return Path.Combine(folder, "oracle-structured.log");
     }
 }
+

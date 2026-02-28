@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Text.RegularExpressions;
 using System.Windows.Media;
 using System.Collections.Generic;
@@ -25,14 +25,14 @@ public static class ProcessedLineClassifier
     private static readonly Regex NumberPrefix = new Regex("^\\s*\\d+\\s+", RegexOptions.Compiled);
     private static readonly CentralLogger CentralLogger = new(new CentralLoggerOptions
     {
-        LogFilePath = BuildStructuredLogPath()
+        LogFilePath = BuildEventLogFilePathHint()
     });
 
     public static ProcessedLineCategory DetermineCategory(string line)
     {
         if (string.IsNullOrWhiteSpace(line))
         {
-            LogStructuredEvent(
+            WriteEventLogEntry(
                 SeverityLevel.Warn,
                 "DetermineCategory",
                 "Processed line is empty.",
@@ -97,7 +97,7 @@ public static class ProcessedLineClassifier
         return ProcessedLineCategory.Default;
     }
 
-    private static void LogStructuredEvent(
+    private static void WriteEventLogEntry(
         SeverityLevel severity,
         string phase,
         string message,
@@ -117,7 +117,7 @@ public static class ProcessedLineClassifier
         return Guid.NewGuid().ToString("N").Substring(0, 6);
     }
 
-    private static string BuildStructuredLogPath()
+    private static string BuildEventLogFilePathHint()
     {
         var folder = Path.Combine(
             Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
@@ -149,3 +149,4 @@ public static class ProcessedLineClassifier
         return brush;
     }
 }
+

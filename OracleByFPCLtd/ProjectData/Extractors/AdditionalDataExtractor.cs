@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
@@ -19,7 +19,7 @@ public static class AdditionalDataExtractor
     private static readonly XNamespace DocumentRelationshipNamespace = "http://schemas.openxmlformats.org/officeDocument/2006/relationships";
     private static readonly CentralLogger CentralLogger = new(new CentralLoggerOptions
     {
-        LogFilePath = BuildStructuredLogPath()
+        LogFilePath = BuildEventLogFilePathHint()
     });
 
     public static AdditionalData Extract(ProjectDataExtractionResult result)
@@ -50,7 +50,7 @@ public static class AdditionalDataExtractor
         var workbookSheets = ReadWorkbookSheets(archive, data.Errors);
         if (workbookSheets.Count == 0)
         {
-            LogStructuredEvent(
+            WriteEventLogEntry(
                 SeverityLevel.Warn,
                 "AdditionalDataExtractor",
                 "ReadWorkbookSheets",
@@ -180,7 +180,7 @@ public static class AdditionalDataExtractor
         }
         catch (Exception ex)
         {
-            LogStructuredEvent(
+            WriteEventLogEntry(
                 SeverityLevel.Warn,
                 "AdditionalDataExtractor",
                 "ReadWorkbookSheets",
@@ -214,7 +214,7 @@ public static class AdditionalDataExtractor
         }
         catch (Exception ex)
         {
-            LogStructuredEvent(
+            WriteEventLogEntry(
                 SeverityLevel.Warn,
                 "AdditionalDataExtractor",
                 "ReadSharedStrings",
@@ -290,7 +290,7 @@ public static class AdditionalDataExtractor
         }
         catch (Exception ex)
         {
-            LogStructuredEvent(
+            WriteEventLogEntry(
                 SeverityLevel.Warn,
                 "AdditionalDataExtractor",
                 "ReadSheetRows",
@@ -302,7 +302,7 @@ public static class AdditionalDataExtractor
         }
     }
 
-    private static void LogStructuredEvent(
+    private static void WriteEventLogEntry(
         SeverityLevel severity,
         string module,
         string phase,
@@ -326,7 +326,7 @@ public static class AdditionalDataExtractor
         return Guid.NewGuid().ToString("N").Substring(0, 6);
     }
 
-    private static string BuildStructuredLogPath()
+    private static string BuildEventLogFilePathHint()
     {
         var folder = Path.Combine(
             Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
@@ -767,3 +767,4 @@ public static class AdditionalDataExtractor
 
     private sealed record WorkbookSheet(string Name, string Path);
 }
+

@@ -1,7 +1,12 @@
+using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Reflection;
+using System.Linq;
 using OracleByFPCLtd.DriverProfiles;
+using OracleByFPCLtd.Logging;
 using OracleByFPCLtd.ProjectData;
+using OracleByFPCLtd.ProcessingEngine;
 using OracleByFPCLtd.ProcessingEngine.Mapping;
 using OracleByFPCLtd.ProcessingEngine.Models;
 using OracleByFPCLtd.ProcessingEngine.Parsing;
@@ -83,6 +88,163 @@ public sealed class ProcessingEngineMappingTests
 
         Assert.Equal("5 Driver - Command:'Vaux Lattis Matrix\\Output Settings\\Source Select(Route All, Gym, Shaw 1)' Sustain:NO", line.Text);
         Assert.False(line.IsUnresolved);
+    }
+
+    [Fact]
+    public void DriverMappingServiceDoesNotEmitMapperAcceptedNoise()
+    {
+        var logPath = Path.Combine(Path.GetTempPath(), $"{Guid.NewGuid():N}.log");
+        OverrideDriverMappingLogger(new CentralLogger(new CentralLoggerOptions
+        {
+            SessionLogPath = logPath,
+            TimestampProvider = () => new DateTime(2026, 2, 28, 11, 49, 0, DateTimeKind.Local)
+        }));
+
+        var bundle = BuildBundleWithVaux();
+        var service = new DriverMappingService();
+        var evt = new DiagnosticEvent(5, "Driver - Command:'Vaux Lattis Matrix\\Output Settings\\Source Select(Route All, 13, 1)' Sustain:NO");
+
+        _ = service.Map(evt, bundle);
+
+        var log = File.ReadAllText(logPath);
+        Assert.DoesNotContain("Driver profile mapper accepted line", log, StringComparison.Ordinal);
+
+        File.Delete(logPath);
+    }
+
+    [Fact]
+    public void ProcessingEngineRunnerDoesNotEmitGenericMappedToReadableOutputSuccess()
+    {
+        var logPath = Path.Combine(Path.GetTempPath(), $"{Guid.NewGuid():N}.log");
+        OverrideProcessingEngineRunnerLogger(new CentralLogger(new CentralLoggerOptions
+        {
+            SessionLogPath = logPath,
+            TimestampProvider = () => new DateTime(2026, 2, 28, 11, 50, 0, DateTimeKind.Local)
+        }));
+
+        var engine = new OracleByFPCLtd.ProcessingEngine.ProcessingEngine(new ProcessingContext(
+            new Dictionary<string, int> { ["RTiPanel (iPhone X or newer)"] = 81 },
+            new Dictionary<string, string> { ["81|0"] = "Room Select" }));
+
+        _ = ProcessingEngineRunner.ProcessNumberedLines(
+            new[] { "16 [2026-01-24 10:00:00.000] Change to page 1 on device 'RTiPanel (iPhone X or newer)'" },
+            engine);
+
+        var log = File.ReadAllText(logPath);
+        Assert.DoesNotContain("mapped to readable output", log, StringComparison.Ordinal);
+
+        File.Delete(logPath);
+    }
+
+    [Fact]
+    public void DriverMappingServiceEmitsSingleAdditionalInfoMappingSuccessLine()
+    {
+        var logPath = Path.Combine(Path.GetTempPath(), $"{Guid.NewGuid():N}.log");
+        OverrideDriverMappingLogger(new CentralLogger(new CentralLoggerOptions
+        {
+            SessionLogPath = logPath,
+            TimestampProvider = () => new DateTime(2026, 2, 28, 12, 13, 0, DateTimeKind.Local)
+        }));
+
+        var bundle = new ProjectDataBundle();
+        var driverData = new AdditionalDriverData();
+        driverData.IntegerNames[1] = "Room Count";
+        bundle.Additional.Drivers["System Variables"] = driverData;
+        var service = new DriverMappingService();
+        var evt = new DiagnosticEvent(86, "[2026-02-21 11:00:01.000] Driver - Command:'System Variables\\Integers\\Increase(1, 1)' Sustain:NO");
+
+        _ = service.Map(evt, bundle);
+
+        var log = File.ReadAllText(logPath);
+        var successLines = log
+            .Split(new[] { Environment.NewLine }, StringSplitOptions.RemoveEmptyEntries)
+            .Where(line => line.Contains("[SUCCESS] DriverMappingService/Processing:", StringComparison.Ordinal))
+            .ToList();
+
+        Assert.Single(successLines);
+        Assert.Contains("\"Line 86 - mapped 1 for Room Count\"", successLines[0], StringComparison.Ordinal);
+        Assert.Contains("source=\"Additional Info\"", successLines[0], StringComparison.Ordinal);
+        Assert.DoesNotContain("mapped Additional Info", successLines[0], StringComparison.Ordinal);
+
+        File.Delete(logPath);
+    }
+
+    [Fact]
+    public void DriverMappingServiceMarksApexSourceMappingsExplicitly()
+    {
+        var logPath = Path.Combine(Path.GetTempPath(), $"{Guid.NewGuid():N}.log");
+        OverrideDriverMappingLogger(new CentralLogger(new CentralLoggerOptions
+        {
+            SessionLogPath = logPath,
+            TimestampProvider = () => new DateTime(2026, 2, 28, 12, 13, 0, DateTimeKind.Local)
+        }));
+
+        var bundle = BuildBundleWithSystemManagerSourceCatalog();
+        var service = new DriverMappingService();
+        var evt = new DiagnosticEvent(96, "[2026-02-11 14:29:23.662] Driver - Command:'System Manager\\Routing\\Set Source(7)' Sustain:NO");
+
+        _ = service.Map(evt, bundle);
+
+        var log = File.ReadAllText(logPath);
+        Assert.Contains("[SUCCESS] DriverMappingService/Processing: \"Line 96 - mapped source 7 for Video Source (Global)\"", log, StringComparison.Ordinal);
+        Assert.Contains("source=\"Apex\"", log, StringComparison.Ordinal);
+
+        File.Delete(logPath);
+    }
+
+    [Fact]
+    public void SystemMappingServiceLogsPageMappingsWithApexSource()
+    {
+        var logPath = Path.Combine(Path.GetTempPath(), $"{Guid.NewGuid():N}.log");
+        OverrideSystemMappingLogger(new CentralLogger(new CentralLoggerOptions
+        {
+            SessionLogPath = logPath,
+            TimestampProvider = () => new DateTime(2026, 2, 28, 12, 13, 0, DateTimeKind.Local)
+        }));
+
+        var bundle = BuildBundle();
+        var service = new SystemMappingService();
+        var evt = new DiagnosticEvent(104, "[2026-01-24 10:00:00.000] Change to page 1 on device 'RTiPanel (iPhone X or newer)'");
+
+        _ = service.Map(evt, bundle);
+
+        var log = File.ReadAllText(logPath);
+        Assert.Contains("[SUCCESS] SystemMappingService/Processing: \"Line 104 - mapped page 1 for Room Select\"", log, StringComparison.Ordinal);
+        Assert.Contains("source=\"Apex\"", log, StringComparison.Ordinal);
+
+        File.Delete(logPath);
+    }
+
+    [Fact]
+    public void ProcessingEngineRunnerLogsMappedPagesWithResolvedPageName()
+    {
+        var logPath = Path.Combine(Path.GetTempPath(), $"{Guid.NewGuid():N}.log");
+        OverrideSystemMappingLogger(new CentralLogger(new CentralLoggerOptions
+        {
+            SessionLogPath = logPath,
+            TimestampProvider = () => new DateTime(2026, 2, 28, 12, 13, 0, DateTimeKind.Local)
+        }));
+        OverrideProcessingEngineRunnerLogger(new CentralLogger(new CentralLoggerOptions
+        {
+            SessionLogPath = logPath,
+            TimestampProvider = () => new DateTime(2026, 2, 28, 12, 13, 0, DateTimeKind.Local)
+        }));
+
+        var engine = new OracleByFPCLtd.ProcessingEngine.ProcessingEngine(new ProcessingContext(
+            new Dictionary<string, int> { ["RTiPanel (iPhone X or newer)"] = 81 },
+            new Dictionary<string, string> { ["81|9"] = "Cameras,(Overview)" }));
+
+        var results = ProcessingEngineRunner.ProcessNumberedLines(
+            new[] { "104 [2026-02-28 12:13:22.636] Change to page 10 on device 'RTiPanel (iPhone X or newer)'" },
+            engine);
+
+        var log = File.ReadAllText(logPath);
+
+        Assert.Contains("Change to page \"Cameras,(Overview)\" on device 'RTiPanel (iPhone X or newer)'", results[0], StringComparison.Ordinal);
+        Assert.Contains("[SUCCESS] SystemMappingService/Processing: \"Line 104 - mapped page 10 for Cameras,(Overview)\"", log, StringComparison.Ordinal);
+        Assert.Contains("source=\"Apex\"", log, StringComparison.Ordinal);
+
+        File.Delete(logPath);
     }
 
     [Fact]
@@ -233,18 +395,39 @@ public sealed class ProcessingEngineMappingTests
         Assert.Equal("Room One -> Room 1", args[2]);
     }
 
+    private static void OverrideDriverMappingLogger(CentralLogger logger)
+    {
+        var method = typeof(DriverMappingService).GetMethod("OverrideCentralLoggerForTesting", BindingFlags.Static | BindingFlags.NonPublic);
+        Assert.NotNull(method);
+        method!.Invoke(null, new object[] { logger });
+    }
+
+    private static void OverrideProcessingEngineRunnerLogger(CentralLogger logger)
+    {
+        var method = typeof(ProcessingEngineRunner).GetMethod("OverrideCentralLoggerForTesting", BindingFlags.Static | BindingFlags.NonPublic);
+        Assert.NotNull(method);
+        method!.Invoke(null, new object[] { logger });
+    }
+
+    private static void OverrideSystemMappingLogger(CentralLogger logger)
+    {
+        var method = typeof(SystemMappingService).GetMethod("OverrideCentralLoggerForTesting", BindingFlags.Static | BindingFlags.NonPublic);
+        Assert.NotNull(method);
+        method!.Invoke(null, new object[] { logger });
+    }
+
     [Fact]
     public void DriverMappingServiceApexMappingMessagePrefixesSource()
     {
         var method = typeof(DriverMappingService).GetMethod(
-            "BuildApexMappingMessage",
+            "BuildResolvedMappingMessage",
             BindingFlags.NonPublic | BindingFlags.Static);
 
         Assert.NotNull(method);
 
-        var message = method!.Invoke(null, new object[] { "1 -> Video Source (Global)" }) as string;
+        var message = method!.Invoke(null, new object[] { "System Manager", "1", "Video Source (Global)", "Apex" }) as string;
 
-        Assert.Equal("Processed log line mapped to Apex file (Source 1 -> Video Source (Global))", message);
+        Assert.Equal("mapped source 1 for Video Source (Global)", message);
     }
 
     [Fact]

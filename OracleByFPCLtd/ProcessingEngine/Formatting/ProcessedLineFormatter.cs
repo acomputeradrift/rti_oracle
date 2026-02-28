@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.IO;
 using OracleByFPCLtd.Logging;
@@ -10,14 +10,14 @@ public static class ProcessedLineFormatter
 {
     private static readonly CentralLogger CentralLogger = new(new CentralLoggerOptions
     {
-        LogFilePath = BuildStructuredLogPath()
+        LogFilePath = BuildEventLogFilePathHint()
     });
 
     public static string Format(ProcessedLine line)
     {
         if (line is null)
         {
-            LogStructuredEvent(
+            WriteEventLogEntry(
                 SeverityLevel.Error,
                 "Processing:Formatting",
                 "Processed line formatter received null.",
@@ -28,7 +28,7 @@ public static class ProcessedLineFormatter
         return line.Text;
     }
 
-    private static void LogStructuredEvent(
+    private static void WriteEventLogEntry(
         SeverityLevel severity,
         string phase,
         string message,
@@ -48,7 +48,7 @@ public static class ProcessedLineFormatter
         return Guid.NewGuid().ToString("N").Substring(0, 6);
     }
 
-    private static string BuildStructuredLogPath()
+    private static string BuildEventLogFilePathHint()
     {
         var folder = Path.Combine(
             Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
@@ -57,3 +57,4 @@ public static class ProcessedLineFormatter
         return Path.Combine(folder, "oracle-structured.log");
     }
 }
+

@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Threading.Tasks;
@@ -10,12 +10,12 @@ public sealed class NoOpSysvarSubscriptionController : ISysvarSubscriptionContro
 {
     private readonly CentralLogger _centralLogger = new(new CentralLoggerOptions
     {
-        LogFilePath = BuildStructuredLogPath()
+        LogFilePath = BuildEventLogFilePathHint()
     });
 
     public Task SendSubscribeAsync(string resource, string value)
     {
-        LogStructuredEvent(
+        WriteEventLogEntry(
             SeverityLevel.Info,
             "SendSubscribeAsync",
             "Sysvar subscribe ignored (noop).",
@@ -27,7 +27,7 @@ public sealed class NoOpSysvarSubscriptionController : ISysvarSubscriptionContro
         return Task.CompletedTask;
     }
 
-    private void LogStructuredEvent(
+    private void WriteEventLogEntry(
         SeverityLevel severity,
         string phase,
         string message,
@@ -47,7 +47,7 @@ public sealed class NoOpSysvarSubscriptionController : ISysvarSubscriptionContro
         return Guid.NewGuid().ToString("N").Substring(0, 6);
     }
 
-    private static string BuildStructuredLogPath()
+    private static string BuildEventLogFilePathHint()
     {
         var folder = Path.Combine(
             Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
@@ -56,3 +56,4 @@ public sealed class NoOpSysvarSubscriptionController : ISysvarSubscriptionContro
         return Path.Combine(folder, "oracle-structured.log");
     }
 }
+

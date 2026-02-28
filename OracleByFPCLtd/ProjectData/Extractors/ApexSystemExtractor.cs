@@ -1,4 +1,4 @@
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using System.IO;
 using OracleByFPCLtd.Logging;
 using OracleByFPCLtd.ProjectData.Models;
@@ -9,14 +9,14 @@ public static class ApexSystemExtractor
 {
     private static readonly CentralLogger CentralLogger = new(new CentralLoggerOptions
     {
-        LogFilePath = BuildStructuredLogPath()
+        LogFilePath = BuildEventLogFilePathHint()
     });
 
     public static SystemData Extract(ProjectDataExtractionResult result)
     {
         if (result is null)
         {
-            LogStructuredEvent(
+            WriteEventLogEntry(
                 SeverityLevel.Error,
                 "Extract",
                 "System data extraction received null result.",
@@ -27,7 +27,7 @@ public static class ApexSystemExtractor
         return SystemData.FromExtractionResult(result);
     }
 
-    private static void LogStructuredEvent(
+    private static void WriteEventLogEntry(
         SeverityLevel severity,
         string phase,
         string message,
@@ -47,7 +47,7 @@ public static class ApexSystemExtractor
         return System.Guid.NewGuid().ToString("N").Substring(0, 6);
     }
 
-    private static string BuildStructuredLogPath()
+    private static string BuildEventLogFilePathHint()
     {
         var folder = Path.Combine(
             System.Environment.GetFolderPath(System.Environment.SpecialFolder.LocalApplicationData),
@@ -56,3 +56,4 @@ public static class ApexSystemExtractor
         return Path.Combine(folder, "oracle-structured.log");
     }
 }
+

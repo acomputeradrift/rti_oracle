@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -67,14 +67,14 @@ public sealed class ProjectDataExtractor : IProjectDataExtractor
 {
     private static readonly CentralLogger CentralLogger = new(new CentralLoggerOptions
     {
-        LogFilePath = BuildStructuredLogPath()
+        LogFilePath = BuildEventLogFilePathHint()
     });
 
     public ProjectDataExtractionResult Extract(string apexPath, IProgress<ProjectDataExtractionProgress>? progress = null)
     {
         if (!File.Exists(apexPath))
         {
-            LogStructuredEvent(
+            WriteEventLogEntry(
                 SeverityLevel.Error,
                 "Extract",
                 "APEX file not found.",
@@ -90,7 +90,7 @@ public sealed class ProjectDataExtractor : IProjectDataExtractor
             && cached.ApexDiscoveryPreload.SourceCatalog.Count > 0
             && cached.ApexDiscoveryPreload.SystemManagerSourceCatalog.Count > 0)
         {
-            LogStructuredEvent(
+            WriteEventLogEntry(
                 SeverityLevel.Info,
                 "Extract",
                 "Project data loaded from cache.",
@@ -322,7 +322,7 @@ public sealed class ProjectDataExtractor : IProjectDataExtractor
             Report(progress, "Complete", 100);
             result.ApexDiscoveryPreload = ApexDiscoveryPreloadExtractor.Extract(tempPath);
             ProjectDataCacheStore.Save(apexPath, result);
-            LogStructuredEvent(
+            WriteEventLogEntry(
                 SeverityLevel.Info,
                 "Extract",
                 "Project data extraction completed.",
@@ -355,7 +355,7 @@ public sealed class ProjectDataExtractor : IProjectDataExtractor
         progress?.Report(new ProjectDataExtractionProgress(stage, percent));
     }
 
-    private static void LogStructuredEvent(
+    private static void WriteEventLogEntry(
         SeverityLevel severity,
         string phase,
         string message,
@@ -375,7 +375,7 @@ public sealed class ProjectDataExtractor : IProjectDataExtractor
         return Guid.NewGuid().ToString("N").Substring(0, 6);
     }
 
-    private static string BuildStructuredLogPath()
+    private static string BuildEventLogFilePathHint()
     {
         var folder = Path.Combine(
             Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
@@ -594,3 +594,4 @@ public sealed class ProjectDataExtractor : IProjectDataExtractor
     private sealed record LayerRow(int PageId, int SharedLayerId, int? SourceId);
     private sealed record ButtonRow(int ButtonId, int SharedLayerId, int ButtonTagId, string Text);
 }
+

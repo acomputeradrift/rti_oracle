@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.IO;
 using System.Windows;
 using OracleByFPCLtd.Logging;
@@ -11,7 +11,7 @@ public sealed class MainWindowFailureNotifier : IUserFailureNotifier
     private readonly Func<DateTime?>? _timestampProvider;
     private readonly CentralLogger _centralLogger = new(new CentralLoggerOptions
     {
-        LogFilePath = BuildStructuredLogPath()
+        LogFilePath = BuildEventLogFilePathHint()
     });
 
     public MainWindowFailureNotifier(Window owner, Func<DateTime?>? timestampProvider = null)
@@ -41,7 +41,7 @@ public sealed class MainWindowFailureNotifier : IUserFailureNotifier
         {
             var normalizedStatus = NormalizeStatus(status);
             var effectiveTimestamp = _timestampProvider?.Invoke() ?? timestampUtc;
-            LogStructuredEvent(normalizedStatus, code, message, context, effectiveTimestamp);
+            WriteEventLogEntry(normalizedStatus, code, message, context, effectiveTimestamp);
         }
         catch (Exception)
         {
@@ -49,7 +49,7 @@ public sealed class MainWindowFailureNotifier : IUserFailureNotifier
         }
     }
 
-    private static string BuildStructuredLogPath()
+    private static string BuildEventLogFilePathHint()
     {
         var folder = Path.Combine(
             Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
@@ -66,7 +66,7 @@ public sealed class MainWindowFailureNotifier : IUserFailureNotifier
             : status.Trim().ToUpperInvariant();
     }
 
-    private void LogStructuredEvent(string status, string code, string message, string context, DateTime timestampUtc)
+    private void WriteEventLogEntry(string status, string code, string message, string context, DateTime timestampUtc)
     {
         var severity = status switch
         {
@@ -97,3 +97,4 @@ public sealed class MainWindowFailureNotifier : IUserFailureNotifier
         return Guid.NewGuid().ToString("N").Substring(0, 6);
     }
 }
+

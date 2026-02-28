@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.IO;
 using System.Text.Json;
 using OracleByFPCLtd.Logging;
@@ -12,7 +12,7 @@ public sealed class OracleSettingsStore
     private readonly string _settingsPath;
     private static readonly CentralLogger CentralLogger = new(new CentralLoggerOptions
     {
-        LogFilePath = BuildStructuredLogPath()
+        LogFilePath = BuildEventLogFilePathHint()
     });
 
     public OracleSettingsStore(string? settingsPath = null)
@@ -34,7 +34,7 @@ public sealed class OracleSettingsStore
         }
         catch (Exception ex)
         {
-            LogStructuredEvent(
+            WriteEventLogEntry(
                 SeverityLevel.Warn,
                 "OracleSettingsStore",
                 "Load",
@@ -68,7 +68,7 @@ public sealed class OracleSettingsStore
         return Path.Combine(folder, "Oracle by FP&C", "settings.json");
     }
 
-    private static void LogStructuredEvent(
+    private static void WriteEventLogEntry(
         SeverityLevel severity,
         string module,
         string phase,
@@ -92,7 +92,7 @@ public sealed class OracleSettingsStore
         return Guid.NewGuid().ToString("N").Substring(0, 6);
     }
 
-    private static string BuildStructuredLogPath()
+    private static string BuildEventLogFilePathHint()
     {
         var folder = Path.Combine(
             Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
@@ -101,3 +101,4 @@ public sealed class OracleSettingsStore
         return Path.Combine(folder, "oracle-structured.log");
     }
 }
+

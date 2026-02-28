@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Threading;
@@ -14,7 +14,7 @@ public sealed class TcpCaptureLogLevelController : ILogLevelController
     private readonly TcpCaptureDiagnosticsTransport _inner;
     private readonly CentralLogger _centralLogger = new(new CentralLoggerOptions
     {
-        LogFilePath = BuildStructuredLogPath()
+        LogFilePath = BuildEventLogFilePathHint()
     });
 
     public TcpCaptureLogLevelController(TcpCaptureDiagnosticsTransport inner)
@@ -30,7 +30,7 @@ public sealed class TcpCaptureLogLevelController : ILogLevelController
 
     public Task<CommandDispatchResult> SendLogLevelCommandAsync(string type, string level, CancellationToken token = default)
     {
-        LogStructuredEvent(
+        WriteEventLogEntry(
             SeverityLevel.Info,
             "SendLogLevelCommandAsync",
             "TCP capture log level command sent.",
@@ -44,7 +44,7 @@ public sealed class TcpCaptureLogLevelController : ILogLevelController
 
     public Task SendLogLevelAsync(string type, string level)
     {
-        LogStructuredEvent(
+        WriteEventLogEntry(
             SeverityLevel.Info,
             "SendLogLevelAsync",
             "TCP capture log level command sent.",
@@ -56,7 +56,7 @@ public sealed class TcpCaptureLogLevelController : ILogLevelController
         return _inner.SendLogLevelAsync(type, level);
     }
 
-    private void LogStructuredEvent(
+    private void WriteEventLogEntry(
         SeverityLevel severity,
         string phase,
         string message,
@@ -76,7 +76,7 @@ public sealed class TcpCaptureLogLevelController : ILogLevelController
         return Guid.NewGuid().ToString("N").Substring(0, 6);
     }
 
-    private static string BuildStructuredLogPath()
+    private static string BuildEventLogFilePathHint()
     {
         var folder = Path.Combine(
             Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
@@ -85,3 +85,4 @@ public sealed class TcpCaptureLogLevelController : ILogLevelController
         return Path.Combine(folder, "oracle-structured.log");
     }
 }
+

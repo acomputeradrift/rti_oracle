@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.IO;
 using System.Collections.Generic;
 using OracleByFPCLtd.Logging;
@@ -11,7 +11,7 @@ public sealed class AdditionalInfoService
     private const int MaxRecentItems = 5;
     private readonly CentralLogger _centralLogger = new(new CentralLoggerOptions
     {
-        LogFilePath = BuildStructuredLogPath()
+        LogFilePath = BuildEventLogFilePathHint()
     });
 
     public void RecordAdditionalInfo(OracleSettings settings, string filePath)
@@ -30,7 +30,7 @@ public sealed class AdditionalInfoService
             settings.RecentAdditionalInfo.RemoveRange(MaxRecentItems, settings.RecentAdditionalInfo.Count - MaxRecentItems);
         }
 
-        LogStructuredEvent(
+        WriteEventLogEntry(
             SeverityLevel.Info,
             "RecordAdditionalInfo",
             "Additional info file recorded.",
@@ -41,7 +41,7 @@ public sealed class AdditionalInfoService
             });
     }
 
-    private void LogStructuredEvent(
+    private void WriteEventLogEntry(
         SeverityLevel severity,
         string phase,
         string message,
@@ -61,7 +61,7 @@ public sealed class AdditionalInfoService
         return Guid.NewGuid().ToString("N").Substring(0, 6);
     }
 
-    private static string BuildStructuredLogPath()
+    private static string BuildEventLogFilePathHint()
     {
         var folder = Path.Combine(
             Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
@@ -70,3 +70,4 @@ public sealed class AdditionalInfoService
         return Path.Combine(folder, "oracle-structured.log");
     }
 }
+

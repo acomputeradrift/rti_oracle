@@ -1,4 +1,4 @@
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using System.IO;
 using OracleByFPCLtd.Logging;
 using OracleByFPCLtd.Settings.Models;
@@ -10,7 +10,7 @@ public sealed class RecentIpService
     private const int MaxRecentItems = 5;
     private readonly CentralLogger _centralLogger = new(new CentralLoggerOptions
     {
-        LogFilePath = BuildStructuredLogPath()
+        LogFilePath = BuildEventLogFilePathHint()
     });
 
     public void RecordRecentIp(OracleSettings settings, string ip)
@@ -26,14 +26,14 @@ public sealed class RecentIpService
             settings.RecentIps.RemoveRange(MaxRecentItems, settings.RecentIps.Count - MaxRecentItems);
         }
 
-        LogStructuredEvent(
+        WriteEventLogEntry(
             SeverityLevel.Info,
             "RecordRecentIp",
             "Recent IP recorded.",
             new Dictionary<string, string> { ["ip"] = ip });
     }
 
-    private void LogStructuredEvent(
+    private void WriteEventLogEntry(
         SeverityLevel severity,
         string phase,
         string message,
@@ -53,7 +53,7 @@ public sealed class RecentIpService
         return System.Guid.NewGuid().ToString("N").Substring(0, 6);
     }
 
-    private static string BuildStructuredLogPath()
+    private static string BuildEventLogFilePathHint()
     {
         var folder = Path.Combine(
             System.Environment.GetFolderPath(System.Environment.SpecialFolder.LocalApplicationData),
@@ -62,3 +62,4 @@ public sealed class RecentIpService
         return Path.Combine(folder, "oracle-structured.log");
     }
 }
+

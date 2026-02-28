@@ -144,7 +144,7 @@ public partial class MainWindow : Window
     private readonly HashSet<string> _hiddenLogLevelTargets = new(StringComparer.OrdinalIgnoreCase);
     private readonly FeatureHealthRegistry _featureHealthRegistry = new();
     private readonly IUserFailureNotifier _failureNotifier;
-    private readonly CentralLogger _centralLogger;
+    private CentralLogger _centralLogger;
     private bool _isReconnecting;
     private int _reconnectAttempt;
     private bool _suppressReconnect;
@@ -234,7 +234,7 @@ public partial class MainWindow : Window
         _failureNotifier = new MainWindowFailureNotifier(this, () => _lastProcessorTimestamp);
         _centralLogger = new CentralLogger(new CentralLoggerOptions
         {
-            LogFilePath = BuildStructuredLogPath()
+            LogFilePath = BuildEventLogFilePathHint()
         });
         Title = $"Oracle by FP&C {AppVersion.CurrentLabel()}";
         WirePanelHandlers();
@@ -1604,7 +1604,7 @@ public partial class MainWindow : Window
             return;
         }
 
-        LogStructuredEvent(
+        WriteEventLogEntry(
             SeverityLevel.Error,
             "DiagnosticsTransport",
             "TransportError",
@@ -1712,7 +1712,7 @@ public partial class MainWindow : Window
                 }
             }
             SetConnectionStatus(sorted.Count == 0 ? "No Devices Found" : $"Found {sorted.Count}");
-            LogStructuredEvent(
+            WriteEventLogEntry(
                 SeverityLevel.Info,
                 "MainWindow",
                 "Connection",
@@ -1725,7 +1725,7 @@ public partial class MainWindow : Window
         catch (Exception ex)
         {
             SetConnectionStatus("Discovery Failed");
-            LogStructuredEvent(
+            WriteEventLogEntry(
                 SeverityLevel.Error,
                 "MainWindow",
                 "Discover",
@@ -1839,7 +1839,7 @@ public partial class MainWindow : Window
         catch (Exception ex)
         {
             SetConnectionStatus("Connect Failed");
-            LogStructuredEvent(
+            WriteEventLogEntry(
                 SeverityLevel.Error,
                 "MainWindow",
                 "Connect",
@@ -1903,7 +1903,7 @@ public partial class MainWindow : Window
         EmitPhaseStatus(
             "Connection",
             "INFO",
-            "Reconnecting…",
+            "Reconnecting...",
             "reconnect_start",
             new Dictionary<string, string> { ["ip"] = ip });
         DisconnectButton.IsEnabled = false;
@@ -1983,7 +1983,7 @@ public partial class MainWindow : Window
                 }
                 catch (Exception ex)
                 {
-                    LogStructuredEvent(
+                    WriteEventLogEntry(
                         SeverityLevel.Warn,
                         "MainWindow",
                         "Reconnect",
@@ -2017,7 +2017,7 @@ public partial class MainWindow : Window
         }
     }
 
-    private static string BuildStructuredLogPath()
+    private static string BuildEventLogFilePathHint()
     {
         var folder = Path.Combine(
             Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
@@ -2028,10 +2028,18 @@ public partial class MainWindow : Window
 
     private void LogMappingStartSeparator(string mappingStartStamp)
     {
-        _centralLogger.LogPlainLine($"----- MAPPING START {mappingStartStamp} -----");
+        WriteEventLogEntry(
+            SeverityLevel.Info,
+            "MainWindow",
+            "Processing:Mapping",
+            "Mapping session started",
+            new Dictionary<string, string>
+            {
+                ["timestamp"] = mappingStartStamp
+            });
     }
 
-    private void LogStructuredEvent(
+    private void WriteEventLogEntry(
         SeverityLevel severity,
         string module,
         string phase,
@@ -3076,11 +3084,11 @@ public partial class MainWindow : Window
             var trimmed = line.Trim();
             if (TryParseStatusLine(trimmed, out var level, out var message))
             {
-                AppendAppStatus(level, message, logToFile: false);
+                AppendAppStatus(level, message, logToFile: true);
                 return;
             }
 
-            AppendAppStatus("INFO", trimmed, logToFile: false);
+            AppendAppStatus("INFO", trimmed, logToFile: true);
         });
     }
 
@@ -3100,13 +3108,6 @@ public partial class MainWindow : Window
             return;
         }
 
-        var paragraph = AppStatusTextBox.Document.Blocks.OfType<Paragraph>().FirstOrDefault();
-        if (paragraph == null)
-        {
-            paragraph = new Paragraph { Margin = new Thickness(0) };
-            AppStatusTextBox.Document.Blocks.Add(paragraph);
-        }
-
         var normalizedLevel = NormalizeStatusLevel(level);
         var statusText = BuildStatusText(message);
         if (logToFile)
@@ -3114,7 +3115,7 @@ public partial class MainWindow : Window
             var logDetails = new Dictionary<string, string>(StringComparer.Ordinal)
             {
                 ["statusLevel"] = normalizedLevel,
-                ["statusMessage"] = statusText,
+                ["statusMessage"] = message.Trim(),
                 ["op"] = op
             };
             if (details != null)
@@ -3125,14 +3126,27 @@ public partial class MainWindow : Window
                 }
             }
 
-            LogStructuredEvent(
+            WriteEventLogEntry(
                 MapStatusSeverity(normalizedLevel),
                 "MainWindow",
                 phase,
-                statusText,
+                message.Trim(),
                 logDetails,
                 exception: exception);
         }
+
+        if (ShouldSuppressStatusInUi(op))
+        {
+            return;
+        }
+
+        var paragraph = AppStatusTextBox.Document.Blocks.OfType<Paragraph>().FirstOrDefault();
+        if (paragraph == null)
+        {
+            paragraph = new Paragraph { Margin = new Thickness(0) };
+            AppStatusTextBox.Document.Blocks.Add(paragraph);
+        }
+
         var badge = $"[{normalizedLevel}]";
         paragraph.Inlines.Add(new Run(badge)
         {
@@ -3146,7 +3160,21 @@ public partial class MainWindow : Window
 
     internal void AppendStatusFromChild(string level, string message)
     {
-        AppendAppStatus(level, message, logToFile: false);
+        AppendAppStatus(
+            level,
+            message,
+            new Dictionary<string, string>
+            {
+                ["origin"] = "child_window"
+            },
+            logToFile: true,
+            phase: "Status:Child",
+            op: "child_status");
+    }
+
+    private void OverrideCentralLoggerForTesting(CentralLogger logger)
+    {
+        _centralLogger = logger ?? throw new ArgumentNullException(nameof(logger));
     }
 
     private void EmitPhaseStatus(
@@ -3168,6 +3196,18 @@ public partial class MainWindow : Window
             "WARN" => SeverityLevel.Warn,
             "FAIL" => SeverityLevel.Error,
             _ => SeverityLevel.Info
+        };
+    }
+
+    private static bool ShouldSuppressStatusInUi(string op)
+    {
+        return op switch
+        {
+            "hard_diag_project_prime_dispatched" => true,
+            "hard_diag_project_confirm_ack_ok" => true,
+            "hard_diag_system_set_ack_ok" => true,
+            "hard_diag_sequence_complete_ok" => true,
+            _ => false
         };
     }
 
@@ -3304,7 +3344,7 @@ public partial class MainWindow : Window
         EmitPhaseStatus(
             "LogLevels:LoadDriverNames",
             "INFO",
-            "Loading drivers…",
+            "Loading drivers...",
             "load_start",
             new Dictionary<string, string> { ["ip"] = ip });
         try
@@ -3337,7 +3377,7 @@ public partial class MainWindow : Window
             });
 
             ReportDriverLoadBreakdown(ip, list);
-            LogStructuredEvent(
+            WriteEventLogEntry(
                 SeverityLevel.Info,
                 "MainWindow",
                 "LogLevels:DiagnosticsSelection",
@@ -3426,7 +3466,7 @@ public partial class MainWindow : Window
                 "FAIL",
                 "Log level status failed",
                 "protected_driver_missing");
-            LogStructuredEvent(
+            WriteEventLogEntry(
                 SeverityLevel.Error,
                 "MainWindow",
                 "LogLevels:DiagnosticsSelection",
@@ -3594,7 +3634,7 @@ public partial class MainWindow : Window
                     "SUCCESS",
                     "Hard Diagnostics levels confirmed",
                     "hard_diag_sequence_complete_ok");
-                LogStructuredEvent(
+                WriteEventLogEntry(
                     SeverityLevel.Success,
                     "MainWindow",
                     "LogLevels:DiagnosticsSelection",
@@ -3619,7 +3659,7 @@ public partial class MainWindow : Window
                         ["acknowledged"] = acknowledged.ToString(CultureInfo.InvariantCulture),
                         ["expected"] = "2"
                     });
-                LogStructuredEvent(
+                WriteEventLogEntry(
                     SeverityLevel.Error,
                     "MainWindow",
                     "LogLevels:DiagnosticsSelection",
@@ -3649,7 +3689,7 @@ public partial class MainWindow : Window
                 "protected_set_error",
                 new Dictionary<string, string> { ["error"] = ex.Message },
                 ex);
-            LogStructuredEvent(
+            WriteEventLogEntry(
                 SeverityLevel.Error,
                 "MainWindow",
                 "LogLevels:DiagnosticsSelection",
@@ -3742,7 +3782,7 @@ public partial class MainWindow : Window
         }
 
         _baselineStatusReported = true;
-        LogStructuredEvent(
+        WriteEventLogEntry(
             SeverityLevel.Info,
             "MainWindow",
             "LogLevels:Status",
@@ -3951,7 +3991,7 @@ public partial class MainWindow : Window
 
         if (_rawLogLines.Count == 0 || processed.Count == 0)
         {
-            LogStructuredEvent(
+            WriteEventLogEntry(
                 SeverityLevel.Info,
                 "MainWindow",
                 "Processing:Formatting",
@@ -3972,24 +4012,6 @@ public partial class MainWindow : Window
                 new Dictionary<string, string>
                 {
                     ["rawCount"] = _rawLogLines.Count.ToString(CultureInfo.InvariantCulture),
-                    ["processedCount"] = processed.Count.ToString(CultureInfo.InvariantCulture)
-                });
-            LogStructuredEvent(
-                SeverityLevel.Info,
-                "MainWindow",
-                "Processing:Formatting",
-                "Raw log line formatted (line number, date/time stamp)",
-                new Dictionary<string, string>
-                {
-                    ["rawCount"] = _rawLogLines.Count.ToString(CultureInfo.InvariantCulture)
-                });
-            LogStructuredEvent(
-                SeverityLevel.Info,
-                "MainWindow",
-                "Processing:Formatting",
-                "Processed log line formatted (line number, date/time stamp, readablility)",
-                new Dictionary<string, string>
-                {
                     ["processedCount"] = processed.Count.ToString(CultureInfo.InvariantCulture)
                 });
         }
@@ -4096,7 +4118,7 @@ public partial class MainWindow : Window
 
         if (_rawLogLines.Count == 0 || processed.Count == 0)
         {
-            LogStructuredEvent(
+            WriteEventLogEntry(
                 SeverityLevel.Info,
                 "MainWindow",
                 "Processing:Formatting",
@@ -4117,24 +4139,6 @@ public partial class MainWindow : Window
                 new Dictionary<string, string>
                 {
                     ["rawCount"] = _rawLogLines.Count.ToString(CultureInfo.InvariantCulture),
-                    ["processedCount"] = processed.Count.ToString(CultureInfo.InvariantCulture)
-                });
-            LogStructuredEvent(
-                SeverityLevel.Info,
-                "MainWindow",
-                "Processing:Formatting",
-                "Raw log line formatted (line number, date/time stamp)",
-                new Dictionary<string, string>
-                {
-                    ["rawCount"] = _rawLogLines.Count.ToString(CultureInfo.InvariantCulture)
-                });
-            LogStructuredEvent(
-                SeverityLevel.Info,
-                "MainWindow",
-                "Processing:Formatting",
-                "Processed log line formatted (line number, date/time stamp, readablility)",
-                new Dictionary<string, string>
-                {
                     ["processedCount"] = processed.Count.ToString(CultureInfo.InvariantCulture)
                 });
         }
@@ -4939,7 +4943,7 @@ public partial class MainWindow : Window
 
     private async void DriverAllLogLevels_Click(object sender, RoutedEventArgs e)
     {
-        LogStructuredEvent(
+        WriteEventLogEntry(
             SeverityLevel.Info,
             "MainWindow",
             "LogLevelPreset",
@@ -4971,7 +4975,7 @@ public partial class MainWindow : Window
 
     private async void DriverSystemOnlyLogLevels_Click(object sender, RoutedEventArgs e)
     {
-        LogStructuredEvent(
+        WriteEventLogEntry(
             SeverityLevel.Info,
             "MainWindow",
             "LogLevelPreset",
@@ -5023,7 +5027,7 @@ public partial class MainWindow : Window
 
     private async void DriverNoneLogLevels_Click(object sender, RoutedEventArgs e)
     {
-        LogStructuredEvent(
+        WriteEventLogEntry(
             SeverityLevel.Info,
             "MainWindow",
             "LogLevelPreset",
@@ -5184,7 +5188,7 @@ public partial class MainWindow : Window
 
         if (_missingDriverNameWarnings.Add(dName))
         {
-            LogStructuredEvent(
+            WriteEventLogEntry(
                 SeverityLevel.Warn,
                 "MainWindow",
                 "DriverName",
@@ -5335,3 +5339,4 @@ public partial class MainWindow : Window
         }
     }
 }
+

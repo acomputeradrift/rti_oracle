@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -27,7 +27,7 @@ public sealed class TcpCaptureDiagnosticsTransport : IDiagnosticsTransport
     private DecodeWsStreamDecoder _decoder = new();
     private readonly CentralLogger _centralLogger = new(new CentralLoggerOptions
     {
-        LogFilePath = BuildStructuredLogPath()
+        LogFilePath = BuildEventLogFilePathHint()
     });
 
     public TcpCaptureDiagnosticsTransport(int port = 2113, bool sendProbeOnConnect = false)
@@ -174,18 +174,18 @@ public sealed class TcpCaptureDiagnosticsTransport : IDiagnosticsTransport
 
     private void EmitInfo(string message)
     {
-        LogStructuredEvent(SeverityLevel.Info, "TransportInfo", message);
+        WriteEventLogEntry(SeverityLevel.Info, "TransportInfo", message);
         TransportInfo?.Invoke(this, message);
     }
 
     private void EmitError(string message)
     {
         var severity = MapSeverity(message, SeverityLevel.Error);
-        LogStructuredEvent(severity, "TransportError", message);
+        WriteEventLogEntry(severity, "TransportError", message);
         TransportError?.Invoke(this, message);
     }
 
-    private void LogStructuredEvent(SeverityLevel severity, string phase, string message)
+    private void WriteEventLogEntry(SeverityLevel severity, string phase, string message)
     {
         var correlationId = CreateCorrelationId();
         _centralLogger.LogEvent(new LogEntry(
@@ -216,7 +216,7 @@ public sealed class TcpCaptureDiagnosticsTransport : IDiagnosticsTransport
         return Guid.NewGuid().ToString("N").Substring(0, 6);
     }
 
-    private static string BuildStructuredLogPath()
+    private static string BuildEventLogFilePathHint()
     {
         var folder = Path.Combine(
             Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
@@ -711,3 +711,4 @@ public sealed class TcpCaptureDiagnosticsTransport : IDiagnosticsTransport
         }
     }
 }
+

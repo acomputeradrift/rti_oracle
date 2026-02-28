@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.ObjectModel;
 using System.IO;
 using System.Threading.Tasks;
@@ -19,7 +19,7 @@ public partial class ProjectDataPreviewWindow : Window
     private ApexDiscoveryPreloadResult? _preload;
     private readonly CentralLogger _centralLogger = new(new CentralLoggerOptions
     {
-        LogFilePath = BuildStructuredLogPath()
+        LogFilePath = BuildEventLogFilePathHint()
     });
 
     public ObservableCollection<DiagnosticsMappingEntry> DiagnosticsMapping { get; } = new();
@@ -158,7 +158,7 @@ public partial class ProjectDataPreviewWindow : Window
         }
         catch (Exception ex)
         {
-            LogStructuredEvent(
+            WriteEventLogEntry(
                 SeverityLevel.Error,
                 "ProjectDataPreviewWindow",
                 "LoadAsync",
@@ -214,7 +214,7 @@ public partial class ProjectDataPreviewWindow : Window
         }
         catch (Exception ex)
         {
-            LogStructuredEvent(
+            WriteEventLogEntry(
                 SeverityLevel.Error,
                 "ProjectDataPreviewWindow",
                 "ExportDiagnosticsMapping",
@@ -272,7 +272,7 @@ public partial class ProjectDataPreviewWindow : Window
         }
     }
 
-    private void LogStructuredEvent(
+    private void WriteEventLogEntry(
         SeverityLevel severity,
         string module,
         string phase,
@@ -296,7 +296,7 @@ public partial class ProjectDataPreviewWindow : Window
         return Guid.NewGuid().ToString("N").Substring(0, 6);
     }
 
-    private static string BuildStructuredLogPath()
+    private static string BuildEventLogFilePathHint()
     {
         var folder = Path.Combine(
             Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
@@ -314,3 +314,4 @@ public partial class ProjectDataPreviewWindow : Window
         string ResolvedVariableName);
     public sealed record SysVarRefMapEntry(string SysVarRef, int? DriverDeviceId, string DriverName, int? DeviceId, string VariableName);
 }
+

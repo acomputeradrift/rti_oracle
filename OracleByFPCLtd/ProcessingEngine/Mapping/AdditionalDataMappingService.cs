@@ -1,4 +1,4 @@
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using System.IO;
 using OracleByFPCLtd.Logging;
 using OracleByFPCLtd.ProcessingEngine.Models;
@@ -10,7 +10,7 @@ public sealed class AdditionalDataMappingService
 {
     private static readonly CentralLogger CentralLogger = new(new CentralLoggerOptions
     {
-        LogFilePath = BuildStructuredLogPath()
+        LogFilePath = BuildEventLogFilePathHint()
     });
 
     public ProcessedLine Map(DiagnosticEvent evt, ProjectDataBundle bundle)
@@ -18,7 +18,7 @@ public sealed class AdditionalDataMappingService
         _ = bundle;
         if (evt is null)
         {
-            LogStructuredEvent(
+            WriteEventLogEntry(
                 SeverityLevel.Error,
                 "Processing:Mapping",
                 "Additional data mapping received null event.",
@@ -29,7 +29,7 @@ public sealed class AdditionalDataMappingService
         return new ProcessedLine($"{evt.RawLineNumber} {evt.RawText}", false);
     }
 
-    private static void LogStructuredEvent(
+    private static void WriteEventLogEntry(
         SeverityLevel severity,
         string phase,
         string message,
@@ -49,7 +49,7 @@ public sealed class AdditionalDataMappingService
         return System.Guid.NewGuid().ToString("N").Substring(0, 6);
     }
 
-    private static string BuildStructuredLogPath()
+    private static string BuildEventLogFilePathHint()
     {
         var folder = Path.Combine(
             System.Environment.GetFolderPath(System.Environment.SpecialFolder.LocalApplicationData),
@@ -58,3 +58,4 @@ public sealed class AdditionalDataMappingService
         return Path.Combine(folder, "oracle-structured.log");
     }
 }
+

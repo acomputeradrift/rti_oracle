@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Threading;
 using System.Threading.Tasks;
 using System;
@@ -15,7 +15,7 @@ public sealed class LogLevelController : ILogLevelController
     private readonly LegacyWebSocketDiagnosticsTransport _inner;
     private readonly CentralLogger _centralLogger = new(new CentralLoggerOptions
     {
-        LogFilePath = BuildStructuredLogPath()
+        LogFilePath = BuildEventLogFilePathHint()
     });
 
     public LogLevelController(LegacyWebSocketDiagnosticsTransport inner)
@@ -36,7 +36,7 @@ public sealed class LogLevelController : ILogLevelController
         var message = isResend
             ? (isBaseline ? "Baseline Log level command resent." : "Log level command resent.")
             : (isBaseline ? "Baseline Log level command sent." : "Log level command sent.");
-        LogStructuredEvent(
+        WriteEventLogEntry(
             SeverityLevel.Info,
             "SendLogLevelCommandAsync",
             message,
@@ -50,7 +50,7 @@ public sealed class LogLevelController : ILogLevelController
 
     public Task SendLogLevelAsync(string type, string level)
     {
-        LogStructuredEvent(
+        WriteEventLogEntry(
             SeverityLevel.Info,
             "SendLogLevelAsync",
             "Log level command sent.",
@@ -62,7 +62,7 @@ public sealed class LogLevelController : ILogLevelController
         return _inner.SendLogLevelAsync(type, level);
     }
 
-    private void LogStructuredEvent(
+    private void WriteEventLogEntry(
         SeverityLevel severity,
         string phase,
         string message,
@@ -82,7 +82,7 @@ public sealed class LogLevelController : ILogLevelController
         return Guid.NewGuid().ToString("N").Substring(0, 6);
     }
 
-    private static string BuildStructuredLogPath()
+    private static string BuildEventLogFilePathHint()
     {
         var folder = Path.Combine(
             Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
@@ -91,3 +91,4 @@ public sealed class LogLevelController : ILogLevelController
         return Path.Combine(folder, "oracle-structured.log");
     }
 }
+

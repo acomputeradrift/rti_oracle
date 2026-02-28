@@ -1,4 +1,4 @@
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using OracleByFPCLtd.Logging;
@@ -10,14 +10,14 @@ public static class AdditionalInfoDisplayBuilder
 {
     private static readonly CentralLogger CentralLogger = new(new CentralLoggerOptions
     {
-        LogFilePath = BuildStructuredLogPath()
+        LogFilePath = BuildEventLogFilePathHint()
     });
 
     public static IEnumerable<AdditionalInfoDisplayEntry> Build(AdditionalData data)
     {
         if (data is null)
         {
-            LogStructuredEvent(
+            WriteEventLogEntry(
                 SeverityLevel.Warn,
                 "Build",
                 "Additional info display data missing.",
@@ -113,7 +113,7 @@ public static class AdditionalInfoDisplayBuilder
         return $"{entry.GroupName} {entry.ZoneName}";
     }
 
-    private static void LogStructuredEvent(
+    private static void WriteEventLogEntry(
         SeverityLevel severity,
         string phase,
         string message,
@@ -133,7 +133,7 @@ public static class AdditionalInfoDisplayBuilder
         return System.Guid.NewGuid().ToString("N").Substring(0, 6);
     }
 
-    private static string BuildStructuredLogPath()
+    private static string BuildEventLogFilePathHint()
     {
         var folder = Path.Combine(
             System.Environment.GetFolderPath(System.Environment.SpecialFolder.LocalApplicationData),
@@ -144,3 +144,4 @@ public static class AdditionalInfoDisplayBuilder
 }
 
 public sealed record AdditionalInfoDisplayEntry(string DriverName, string MapType, int Index, string Name);
+

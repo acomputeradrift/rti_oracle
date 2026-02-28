@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.IO;
 using OracleByFPCLtd.Logging;
@@ -23,7 +23,7 @@ public sealed class ProcessingEngine
     private readonly AdditionalDataMappingService _additionalDataMappingService = new();
     private readonly CentralLogger _centralLogger = new(new CentralLoggerOptions
     {
-        LogFilePath = BuildStructuredLogPath()
+        LogFilePath = BuildEventLogFilePathHint()
     });
 
     public ProcessingEngine(ProcessingContext context)
@@ -70,7 +70,7 @@ public sealed class ProcessingEngine
         _ = _additionalDataMappingService.Map(evt, _bundle);
         if (driverLine.IsUnresolved && systemLine.IsUnresolved)
         {
-            LogStructuredEvent(
+            WriteEventLogEntry(
                 SeverityLevel.Warn,
                 "ProcessEvent",
                 "Unresolved diagnostic line.",
@@ -113,7 +113,7 @@ public sealed class ProcessingEngine
         return ProjectDataBundle.FromExtractionResult(result);
     }
 
-    private void LogStructuredEvent(
+    private void WriteEventLogEntry(
         SeverityLevel severity,
         string phase,
         string message,
@@ -133,7 +133,7 @@ public sealed class ProcessingEngine
         return Guid.NewGuid().ToString("N").Substring(0, 6);
     }
 
-    private static string BuildStructuredLogPath()
+    private static string BuildEventLogFilePathHint()
     {
         var folder = Path.Combine(
             Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
@@ -142,3 +142,4 @@ public sealed class ProcessingEngine
         return Path.Combine(folder, "oracle-structured.log");
     }
 }
+

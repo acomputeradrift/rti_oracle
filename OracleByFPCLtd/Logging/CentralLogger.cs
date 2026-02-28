@@ -28,13 +28,16 @@ public sealed record LogEntry(
 public sealed class CentralLoggerOptions
 {
     public string LogFilePath { get; set; } = "";
+    public string? LogDirectoryPath { get; set; }
+    public string? SessionLogPath { get; set; }
+    public int RetainedSessionFileCount { get; set; } = 5;
     public Func<DateTime>? TimestampProvider { get; set; }
     public Action<string, string>? StatusSink { get; set; }
-    public string? HtmlLogPath { get; set; }
 }
 
 public sealed class CentralLogger
 {
+    private const string SessionFileSuffix = "_oracle_event_logs.log";
     private static readonly HashSet<string> AllowedStatusLevels = new(StringComparer.OrdinalIgnoreCase)
     {
         "SUCCESS",
@@ -44,10 +47,10 @@ public sealed class CentralLogger
     };
 
     private static readonly object SessionLock = new();
-    private static readonly HashSet<string> SessionHeadersWritten = new(StringComparer.OrdinalIgnoreCase);
+    private static readonly Dictionary<string, string> SessionLogPathsByDirectory = new(StringComparer.OrdinalIgnoreCase);
+    private static readonly Dictionary<string, object> PathLocks = new(StringComparer.OrdinalIgnoreCase);
 
-    private readonly string _logFilePath;
-    private readonly string? _htmlLogPath;
+    private readonly string _eventLogPath;
     private readonly Func<DateTime> _timestampProvider;
     private readonly Action<string, string> _statusSink;
 
@@ -58,18 +61,11 @@ public sealed class CentralLogger
             throw new ArgumentNullException(nameof(options));
         }
 
-        _logFilePath = options.LogFilePath ?? "";
         _timestampProvider = options.TimestampProvider ?? (() => LogTimestampSource.GetTimestamp(DateTime.Now));
         _statusSink = options.StatusSink ?? ((_, _) => { });
-        _htmlLogPath = string.IsNullOrWhiteSpace(options.HtmlLogPath)
-            ? BuildDefaultHtmlPath()
-            : options.HtmlLogPath;
-
-        if (!string.IsNullOrWhiteSpace(_htmlLogPath))
-        {
-            EnsureHtmlLogFileExists(_htmlLogPath);
-            AppendHtmlSessionSeparatorOnce(_htmlLogPath, _timestampProvider());
-        }
+        _eventLogPath = ResolveLogPath(options, _timestampProvider());
+        EnsureLogFileExists(_eventLogPath);
+        ApplyRetention(_eventLogPath, options.RetainedSessionFileCount);
     }
 
     public void LogEvent(LogEntry entry)
@@ -80,29 +76,9 @@ public sealed class CentralLogger
         }
 
         var timestamp = _timestampProvider();
-        var payload = new Dictionary<string, object?>
-        {
-            ["timestampUtc"] = timestamp.ToString("O", CultureInfo.InvariantCulture),
-            ["severity"] = entry.Severity.ToString().ToUpperInvariant(),
-            ["correlationId"] = entry.CorrelationId,
-            ["module"] = entry.Module,
-            ["phase"] = entry.Phase,
-            ["message"] = entry.Message
-        };
-
-        if (entry.Details is not null && entry.Details.Count > 0)
-        {
-            payload["details"] = entry.Details;
-        }
-
-        if (entry.Exception is not null)
-        {
-            payload["exception"] = entry.Exception.ToString();
-        }
-
         try
         {
-            WriteHtmlLine(payload);
+            AppendLine(BuildStructuredLine(entry, timestamp));
         }
         catch (Exception ex) when (IsNonFatalFileException(ex))
         {
@@ -127,109 +103,117 @@ public sealed class CentralLogger
         _statusSink(normalizedLevel, trimmed);
     }
 
-    public void LogPlainLine(string line)
+    private void AppendLine(string line)
     {
-        if (string.IsNullOrWhiteSpace(_htmlLogPath) || string.IsNullOrWhiteSpace(line))
+        if (string.IsNullOrWhiteSpace(line))
         {
             return;
-        }
-
-        try
-        {
-            EnsureHtmlLogFileExists(_htmlLogPath);
-            ExecuteFileIoWithRetry(() =>
-            {
-                var html = File.ReadAllText(_htmlLogPath);
-                var marker = "</pre>";
-                var index = html.IndexOf(marker, StringComparison.OrdinalIgnoreCase);
-                if (index < 0)
-                {
-                    return;
-                }
-
-                html = html.Insert(index, EscapeHtml(line) + Environment.NewLine);
-                File.WriteAllText(_htmlLogPath, html);
-            });
-        }
-        catch (Exception ex) when (IsNonFatalFileException(ex))
-        {
-            // Best-effort logging only; never fail caller workflows due to log file locks.
-        }
-    }
-
-    private void WriteHtmlLine(Dictionary<string, object?> payload)
-    {
-        if (string.IsNullOrWhiteSpace(_htmlLogPath))
-        {
-            return;
-        }
-
-        EnsureHtmlLogFileExists(_htmlLogPath);
-        var severity = payload.TryGetValue("severity", out var severityValue)
-            ? severityValue?.ToString() ?? "INFO"
-            : "INFO";
-        var timestamp = payload.TryGetValue("timestampUtc", out var timestampValue)
-            ? timestampValue?.ToString() ?? ""
-            : "";
-        var module = payload.TryGetValue("module", out var moduleValue)
-            ? moduleValue?.ToString() ?? ""
-            : "";
-        var phase = payload.TryGetValue("phase", out var phaseValue)
-            ? phaseValue?.ToString() ?? ""
-            : "";
-        var message = payload.TryGetValue("message", out var messageValue)
-            ? messageValue?.ToString() ?? ""
-            : "";
-        var details = payload.TryGetValue("details", out var detailValue) ? detailValue : null;
-        var exception = payload.TryGetValue("exception", out var exceptionValue)
-            ? exceptionValue?.ToString() ?? ""
-            : "";
-
-        var detailText = details is IReadOnlyDictionary<string, string> dict
-            ? string.Join(";", dict.Select(pair => $"{pair.Key}={pair.Value}"))
-            : "";
-
-        var severityColor = severity switch
-        {
-            "SUCCESS" => "#2f7d32",
-            "ERROR" => "#b00020",
-            "WARN" => "#b26a00",
-            "INFO" => "#000000",
-            "DEBUG" => "#555555",
-            _ => "#222222"
-        };
-
-        var safeTimestamp = EscapeHtml(timestamp);
-        var safeSeverity = EscapeHtml(severity);
-        var safeMessage = $"<strong>{EscapeHtml(message)}</strong>";
-        var safeModulePhase = $"{EscapeHtml(module)}/{EscapeHtml(phase)}";
-        var severityTag = $"<span style=\"color:{severityColor}\">[{safeSeverity}]</span>";
-        var line = $"{safeTimestamp} {severityTag} {safeMessage} {safeModulePhase}";
-        if (!string.IsNullOrWhiteSpace(detailText))
-        {
-            line += $" | details={EscapeHtml(detailText)}";
-        }
-        if (!string.IsNullOrWhiteSpace(exception))
-        {
-            line += $" | exception={EscapeHtml(exception)}";
         }
 
         ExecuteFileIoWithRetry(() =>
         {
-            var html = File.ReadAllText(_htmlLogPath);
-            var marker = "</pre>";
-            var index = html.IndexOf(marker, StringComparison.OrdinalIgnoreCase);
-            if (index < 0)
+            lock (GetPathLock(_eventLogPath))
             {
-                return;
+                File.AppendAllText(_eventLogPath, line + Environment.NewLine);
             }
-
-            html = html.Insert(index, line + Environment.NewLine);
-            File.WriteAllText(_htmlLogPath, html);
         });
     }
 
-    private static void EnsureHtmlLogFileExists(string path)
+    private static string BuildStructuredLine(LogEntry entry, DateTime timestamp)
+    {
+        var source = BuildSource(entry.Module, entry.Phase);
+        var detailPairs = NormalizeDetailPairs(entry.Details);
+        var quotedMessage = BuildQuotedMessage(entry.Message, detailPairs);
+        var line = string.Create(
+            CultureInfo.InvariantCulture,
+            $"{timestamp:yyyy-MM-dd HH:mm} [{entry.Severity.ToString().ToUpperInvariant()}] {source}: \"{quotedMessage}\"");
+
+        foreach (var pair in detailPairs)
+        {
+            if (string.Equals(pair.Key, "line", StringComparison.OrdinalIgnoreCase))
+            {
+                continue;
+            }
+
+            if (string.Equals(pair.Key, "driver", StringComparison.OrdinalIgnoreCase)
+                && detailPairs.Any(item => string.Equals(item.Key, "profile", StringComparison.OrdinalIgnoreCase)))
+            {
+                continue;
+            }
+
+            line += string.Create(
+                CultureInfo.InvariantCulture,
+                $" {pair.Key}=\"{SanitizeInline(pair.Value)}\"");
+        }
+
+        if (entry.Exception is not null)
+        {
+            line += string.Create(
+                CultureInfo.InvariantCulture,
+                $" exception=\"{SanitizeInline(entry.Exception.ToString())}\"");
+        }
+
+        return line;
+    }
+
+    private static List<KeyValuePair<string, string>> NormalizeDetailPairs(IReadOnlyDictionary<string, string>? details)
+    {
+        var pairs = new List<KeyValuePair<string, string>>();
+        if (details is null)
+        {
+            return pairs;
+        }
+
+        foreach (var pair in details)
+        {
+            if (string.IsNullOrWhiteSpace(pair.Key) || string.IsNullOrWhiteSpace(pair.Value))
+            {
+                continue;
+            }
+
+            if (pairs.Any(existing => string.Equals(existing.Key, pair.Key, StringComparison.OrdinalIgnoreCase)
+                && string.Equals(existing.Value, pair.Value, StringComparison.Ordinal)))
+            {
+                continue;
+            }
+
+            pairs.Add(new KeyValuePair<string, string>(pair.Key, pair.Value));
+        }
+
+        return pairs;
+    }
+
+    private static string BuildQuotedMessage(string message, IReadOnlyList<KeyValuePair<string, string>> detailPairs)
+    {
+        var safeMessage = SanitizeInline(message);
+        var lineNumber = detailPairs
+            .FirstOrDefault(pair => string.Equals(pair.Key, "line", StringComparison.OrdinalIgnoreCase))
+            .Value;
+
+        return string.IsNullOrWhiteSpace(lineNumber)
+            ? safeMessage
+            : $"Line {SanitizeInline(lineNumber)} - {safeMessage}";
+    }
+
+    private static string BuildSource(string module, string phase)
+    {
+        var safeModule = string.IsNullOrWhiteSpace(module) ? "Unknown" : module.Trim();
+        var safePhase = string.IsNullOrWhiteSpace(phase) ? "" : phase.Trim();
+        return string.IsNullOrWhiteSpace(safePhase)
+            ? safeModule
+            : $"{safeModule}/{safePhase}";
+    }
+
+    private static string SanitizeInline(string value)
+    {
+        return (value ?? "")
+            .Replace("\r", " ", StringComparison.Ordinal)
+            .Replace("\n", " ", StringComparison.Ordinal)
+            .Replace("\"", "'", StringComparison.Ordinal)
+            .Trim();
+    }
+
+    private static void EnsureLogFileExists(string path)
     {
         var directory = Path.GetDirectoryName(path);
         if (!string.IsNullOrWhiteSpace(directory))
@@ -239,51 +223,105 @@ public sealed class CentralLogger
 
         if (!File.Exists(path))
         {
-            var html = "<!doctype html><html><head><meta charset=\"utf-8\"><title>Oracle Structured Log</title></head><body><pre>" +
-                       "</pre></body></html>";
-            File.WriteAllText(path, html);
+            File.WriteAllText(path, string.Empty);
         }
     }
 
-    private static void AppendHtmlSessionSeparatorOnce(string path, DateTime timestamp)
+    private static string ResolveLogPath(CentralLoggerOptions options, DateTime timestamp)
     {
+        if (!string.IsNullOrWhiteSpace(options.SessionLogPath))
+        {
+            return options.SessionLogPath!;
+        }
+
+        var directory = ResolveLogDirectory(options);
         lock (SessionLock)
         {
-            if (!SessionHeadersWritten.Add(path))
+            if (!SessionLogPathsByDirectory.TryGetValue(directory, out var path))
             {
-                return;
+                var fileName = timestamp.ToString("yyyy-MM-dd_HH-mm", CultureInfo.InvariantCulture) + SessionFileSuffix;
+                path = Path.Combine(directory, fileName);
+                SessionLogPathsByDirectory[directory] = path;
+            }
+
+            return path;
+        }
+    }
+
+    private static string ResolveLogDirectory(CentralLoggerOptions options)
+    {
+        if (!string.IsNullOrWhiteSpace(options.LogDirectoryPath))
+        {
+            return options.LogDirectoryPath!;
+        }
+
+        if (!string.IsNullOrWhiteSpace(options.LogFilePath))
+        {
+            var fromPath = Path.GetDirectoryName(options.LogFilePath);
+            if (!string.IsNullOrWhiteSpace(fromPath))
+            {
+                return fromPath;
             }
         }
 
-        var html = File.ReadAllText(path);
-        var marker = "</pre>";
-        var index = html.IndexOf(marker, StringComparison.OrdinalIgnoreCase);
-        if (index < 0)
+        return BuildDefaultLogDirectory();
+    }
+
+    private static void ApplyRetention(string path, int retainedSessionFileCount)
+    {
+        if (retainedSessionFileCount < 1)
+        {
+            retainedSessionFileCount = 1;
+        }
+
+        var directory = Path.GetDirectoryName(path);
+        if (string.IsNullOrWhiteSpace(directory) || !Directory.Exists(directory))
         {
             return;
         }
 
-        var stamp = EscapeHtml(timestamp.ToString("O", CultureInfo.InvariantCulture));
-        var line = $"----- SESSION START {stamp} -----{Environment.NewLine}";
-        html = html.Insert(index, line);
-        File.WriteAllText(path, html);
+        try
+        {
+            var files = Directory.GetFiles(directory, $"*{SessionFileSuffix}")
+                .OrderByDescending(file => Path.GetFileName(file), StringComparer.Ordinal)
+                .ToList();
+
+            foreach (var file in files.Skip(retainedSessionFileCount))
+            {
+                if (string.Equals(file, path, StringComparison.OrdinalIgnoreCase))
+                {
+                    continue;
+                }
+
+                File.Delete(file);
+            }
+        }
+        catch (Exception ex) when (IsNonFatalFileException(ex))
+        {
+            // Best-effort retention only; never fail caller workflows due to cleanup issues.
+        }
     }
 
-    private static string EscapeHtml(string value)
+    private static object GetPathLock(string path)
     {
-        return value
-            .Replace("&", "&amp;", StringComparison.Ordinal)
-            .Replace("<", "&lt;", StringComparison.Ordinal)
-            .Replace(">", "&gt;", StringComparison.Ordinal);
+        lock (SessionLock)
+        {
+            if (!PathLocks.TryGetValue(path, out var syncRoot))
+            {
+                syncRoot = new object();
+                PathLocks[path] = syncRoot;
+            }
+
+            return syncRoot;
+        }
     }
 
-    private static string BuildDefaultHtmlPath()
+    private static string BuildDefaultLogDirectory()
     {
-        var folder = Path.Combine(
+        return Path.Combine(
             Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
             "Oracle by FP&C",
             "Logs");
-        return Path.Combine(folder, "oracle-log.html");
     }
 
     private static bool IsNonFatalFileException(Exception ex)

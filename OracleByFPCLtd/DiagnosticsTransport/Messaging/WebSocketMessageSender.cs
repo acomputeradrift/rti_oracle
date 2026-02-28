@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Threading.Tasks;
@@ -12,7 +12,7 @@ public sealed class WebSocketMessageSender : IMessageSender
     private readonly LegacyWebSocketDiagnosticsTransport _inner;
     private readonly CentralLogger _centralLogger = new(new CentralLoggerOptions
     {
-        LogFilePath = BuildStructuredLogPath()
+        LogFilePath = BuildEventLogFilePathHint()
     });
 
     public WebSocketMessageSender(LegacyWebSocketDiagnosticsTransport inner)
@@ -22,7 +22,7 @@ public sealed class WebSocketMessageSender : IMessageSender
 
     public Task SendJsonAsync<T>(T payload)
     {
-        LogStructuredEvent(
+        WriteEventLogEntry(
             SeverityLevel.Info,
             "SendJsonAsync",
             "WebSocket message send requested.",
@@ -30,7 +30,7 @@ public sealed class WebSocketMessageSender : IMessageSender
         return _inner.SendJsonAsync(payload);
     }
 
-    private void LogStructuredEvent(
+    private void WriteEventLogEntry(
         SeverityLevel severity,
         string phase,
         string message,
@@ -50,7 +50,7 @@ public sealed class WebSocketMessageSender : IMessageSender
         return Guid.NewGuid().ToString("N").Substring(0, 6);
     }
 
-    private static string BuildStructuredLogPath()
+    private static string BuildEventLogFilePathHint()
     {
         var folder = Path.Combine(
             Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
@@ -59,3 +59,4 @@ public sealed class WebSocketMessageSender : IMessageSender
         return Path.Combine(folder, "oracle-structured.log");
     }
 }
+

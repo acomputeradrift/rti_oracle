@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
@@ -114,14 +114,14 @@ public static class ApexDiscoveryPreloadExtractor
     private static readonly Regex OutputNamePattern = new Regex("^Output(\\d+)name$", RegexOptions.IgnoreCase | RegexOptions.Compiled);
     private static readonly CentralLogger CentralLogger = new(new CentralLoggerOptions
     {
-        LogFilePath = BuildStructuredLogPath()
+        LogFilePath = BuildEventLogFilePathHint()
     });
 
     public static ApexDiscoveryPreloadResult Extract(string apexPath)
     {
         if (!File.Exists(apexPath))
         {
-            LogStructuredEvent(
+            WriteEventLogEntry(
                 SeverityLevel.Error,
                 "Extract",
                 "APEX file not found.",
@@ -152,7 +152,7 @@ public static class ApexDiscoveryPreloadExtractor
         LoadSystemManagerSourceCatalog(connection, result.DriverConfigMap, result.SourceCatalog, result.SystemManagerSourceCatalog);
         LoadDriverTemplateVariables(connection, result.DriverTemplateVariables);
 
-        LogStructuredEvent(
+        WriteEventLogEntry(
             SeverityLevel.Info,
             "Extract",
             "APEX discovery preload completed.",
@@ -176,7 +176,7 @@ public static class ApexDiscoveryPreloadExtractor
         return result;
     }
 
-    private static void LogStructuredEvent(
+    private static void WriteEventLogEntry(
         SeverityLevel severity,
         string phase,
         string message,
@@ -196,7 +196,7 @@ public static class ApexDiscoveryPreloadExtractor
         return Guid.NewGuid().ToString("N").Substring(0, 6);
     }
 
-    private static string BuildStructuredLogPath()
+    private static string BuildEventLogFilePathHint()
     {
         var folder = Path.Combine(
             Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
@@ -1560,3 +1560,4 @@ ORDER BY d.DeviceId, sv.SysVarID;
         return int.TryParse(numberText, NumberStyles.Integer, CultureInfo.InvariantCulture, out index);
     }
 }
+

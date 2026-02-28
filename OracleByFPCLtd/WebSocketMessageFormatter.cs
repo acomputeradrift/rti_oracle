@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Text.Json;
@@ -32,7 +32,7 @@ public sealed class WebSocketMessageFormatter
     private TimeSpan? _lastMessageLogTime;
     private readonly CentralLogger _centralLogger = new(new CentralLoggerOptions
     {
-        LogFilePath = BuildStructuredLogPath()
+        LogFilePath = BuildEventLogFilePathHint()
     });
 
     public WebSocketMessageFormatter(DateOnly? startDate = null)
@@ -75,7 +75,7 @@ public sealed class WebSocketMessageFormatter
                         }
                         catch (JsonException)
                         {
-                            LogStructuredEvent(
+                            WriteEventLogEntry(
                                 SeverityLevel.Warn,
                                 "Format",
                                 "WebSocket echo payload parse failed.",
@@ -83,7 +83,7 @@ public sealed class WebSocketMessageFormatter
                         }
                         catch (FormatException)
                         {
-                            LogStructuredEvent(
+                            WriteEventLogEntry(
                                 SeverityLevel.Warn,
                                 "Format",
                                 "WebSocket echo payload format failed.",
@@ -121,7 +121,7 @@ public sealed class WebSocketMessageFormatter
         }
         catch (JsonException)
         {
-            LogStructuredEvent(
+            WriteEventLogEntry(
                 SeverityLevel.Warn,
                 "Format",
                 "WebSocket JSON parse failed.",
@@ -129,7 +129,7 @@ public sealed class WebSocketMessageFormatter
         }
         catch (FormatException)
         {
-            LogStructuredEvent(
+            WriteEventLogEntry(
                 SeverityLevel.Warn,
                 "Format",
                 "WebSocket payload format failed.",
@@ -172,7 +172,7 @@ public sealed class WebSocketMessageFormatter
             out timeOfDay);
     }
 
-    private void LogStructuredEvent(
+    private void WriteEventLogEntry(
         SeverityLevel severity,
         string phase,
         string message,
@@ -192,7 +192,7 @@ public sealed class WebSocketMessageFormatter
         return Guid.NewGuid().ToString("N").Substring(0, 6);
     }
 
-    private static string BuildStructuredLogPath()
+    private static string BuildEventLogFilePathHint()
     {
         var folder = Path.Combine(
             Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
@@ -201,3 +201,4 @@ public sealed class WebSocketMessageFormatter
         return Path.Combine(folder, "oracle-structured.log");
     }
 }
+

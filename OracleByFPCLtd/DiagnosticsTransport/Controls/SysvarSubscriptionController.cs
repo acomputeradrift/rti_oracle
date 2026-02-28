@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Threading.Tasks;
@@ -12,7 +12,7 @@ public sealed class SysvarSubscriptionController : ISysvarSubscriptionController
     private readonly LegacyWebSocketDiagnosticsTransport _inner;
     private readonly CentralLogger _centralLogger = new(new CentralLoggerOptions
     {
-        LogFilePath = BuildStructuredLogPath()
+        LogFilePath = BuildEventLogFilePathHint()
     });
 
     public SysvarSubscriptionController(LegacyWebSocketDiagnosticsTransport inner)
@@ -22,7 +22,7 @@ public sealed class SysvarSubscriptionController : ISysvarSubscriptionController
 
     public Task SendSubscribeAsync(string resource, string value)
     {
-        LogStructuredEvent(
+        WriteEventLogEntry(
             SeverityLevel.Info,
             "SendSubscribeAsync",
             "Sysvar subscribe requested.",
@@ -34,7 +34,7 @@ public sealed class SysvarSubscriptionController : ISysvarSubscriptionController
         return _inner.SendSubscribeAsync(resource, value);
     }
 
-    private void LogStructuredEvent(
+    private void WriteEventLogEntry(
         SeverityLevel severity,
         string phase,
         string message,
@@ -54,7 +54,7 @@ public sealed class SysvarSubscriptionController : ISysvarSubscriptionController
         return Guid.NewGuid().ToString("N").Substring(0, 6);
     }
 
-    private static string BuildStructuredLogPath()
+    private static string BuildEventLogFilePathHint()
     {
         var folder = Path.Combine(
             Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
@@ -63,3 +63,4 @@ public sealed class SysvarSubscriptionController : ISysvarSubscriptionController
         return Path.Combine(folder, "oracle-structured.log");
     }
 }
+

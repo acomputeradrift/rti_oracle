@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Text.RegularExpressions;
@@ -21,9 +21,9 @@ public sealed class DriverMappingService
     private static readonly Regex DriverEventAttributionPattern = new(
         "happens on\\s*'(?<driver>[^'\\\\]+)\\\\",
         RegexOptions.IgnoreCase | RegexOptions.Compiled);
-    private static readonly CentralLogger CentralLogger = new(new CentralLoggerOptions
+    private static CentralLogger CentralLogger = new(new CentralLoggerOptions
     {
-        LogFilePath = BuildStructuredLogPath()
+        LogFilePath = BuildEventLogFilePathHint()
     });
 
     public ProcessedLine Map(DiagnosticEvent evt, ProjectDataBundle bundle)
@@ -81,56 +81,31 @@ public sealed class DriverMappingService
             }
 
             var resolvedSubstitution = hasTransition && !unresolved;
-            LogStructuredEvent(
-                unresolved ? SeverityLevel.Warn : SeverityLevel.Info,
-                "Processing:Mapping",
-                "Driver profile mapper accepted line",
-                new Dictionary<string, string>
-                {
-                    ["driver"] = profile.DeviceName,
-                    ["line"] = evt.RawLineNumber.ToString(),
-                    ["mapperAccepted"] = "true",
-                    ["resolvedSubstitution"] = resolvedSubstitution ? "true" : "false",
-                    ["unresolved"] = unresolved ? "true" : "false"
-                });
 
             if (resolvedSubstitution)
             {
                 var transitionParts = transition.Split(" -> ", 2, StringSplitOptions.None);
                 var mappedFrom = transitionParts.Length > 0 ? transitionParts[0] : "";
                 var mappedTo = transitionParts.Length > 1 ? transitionParts[1] : "";
-                LogStructuredEvent(
+                var mappingSource = HasAdditionalInfoData(bundle, profile.DeviceName) ? "Additional Info" : "Apex";
+                WriteEventLogEntry(
                     SeverityLevel.Success,
-                    "Processing:Mapping",
-                    BuildApexMappingMessage(transition),
+                    "Processing",
+                    BuildResolvedMappingMessage(profile.DeviceName, mappedFrom, mappedTo, mappingSource),
                     new Dictionary<string, string>
                     {
-                        ["driver"] = profile.DeviceName,
+                        ["profile"] = profile.DeviceName,
                         ["line"] = evt.RawLineNumber.ToString(),
                         ["mappedFrom"] = mappedFrom,
-                        ["mappedTo"] = mappedTo
+                        ["mappedTo"] = mappedTo,
+                        ["source"] = mappingSource
                     });
-
-                if (HasAdditionalInfoData(bundle, profile.DeviceName))
-                {
-                    LogStructuredEvent(
-                        SeverityLevel.Success,
-                        "Processing:Mapping",
-                        "Processed log line mapped to Additional Info file (<Driver>:<id> -> <name>)",
-                        new Dictionary<string, string>
-                        {
-                            ["driver"] = profile.DeviceName,
-                            ["line"] = evt.RawLineNumber.ToString(),
-                            ["mappedFrom"] = mappedFrom,
-                            ["mappedTo"] = mappedTo
-                        });
-                }
             }
 
             return new ProcessedLine($"{evt.RawLineNumber} {mappedText}", unresolved);
         }
 
-        LogStructuredEvent(
+        WriteEventLogEntry(
             SeverityLevel.Warn,
             "Processing:Mapping",
             "Driver profile not found.",
@@ -144,7 +119,7 @@ public sealed class DriverMappingService
         return new ProcessedLine($"{evt.RawLineNumber} {rawText} [No Profile!]", true);
     }
 
-    private static void LogStructuredEvent(
+    private static void WriteEventLogEntry(
         SeverityLevel severity,
         string phase,
         string message,
@@ -164,7 +139,7 @@ public sealed class DriverMappingService
         return Guid.NewGuid().ToString("N").Substring(0, 6);
     }
 
-    private static string BuildStructuredLogPath()
+    private static string BuildEventLogFilePathHint()
     {
         var folder = Path.Combine(
             Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
@@ -173,9 +148,20 @@ public sealed class DriverMappingService
         return Path.Combine(folder, "oracle-structured.log");
     }
 
-    private static string BuildApexMappingMessage(string transition)
+    private static void OverrideCentralLoggerForTesting(CentralLogger logger)
     {
-        return $"Processed log line mapped to Apex file (Source {transition})";
+        CentralLogger = logger ?? throw new ArgumentNullException(nameof(logger));
+    }
+
+    private static string BuildResolvedMappingMessage(string profileName, string mappedFrom, string mappedTo, string mappingSource)
+    {
+        if (string.Equals(mappingSource, "Apex", StringComparison.OrdinalIgnoreCase)
+            && string.Equals(profileName, "System Manager", StringComparison.OrdinalIgnoreCase))
+        {
+            return $"mapped source {mappedFrom} for {mappedTo}";
+        }
+
+        return $"mapped {mappedFrom} for {mappedTo}";
     }
 
     private static bool IsDriverCommandLine(string text)
@@ -487,3 +473,4 @@ public sealed class DriverMappingService
         return args.Count > 0;
     }
 }
+
