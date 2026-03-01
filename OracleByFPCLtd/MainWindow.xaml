@@ -40,7 +40,7 @@
       <ColumnDefinition Width="*" />
     </Grid.ColumnDefinitions>
 
-    <Menu Grid.Row="0" Grid.Column="0" Margin="0,0,0,8" Background="White" BorderBrush="#D0D0D0" BorderThickness="0,0,0,1">
+    <Menu Grid.Row="0" Grid.Column="0" Margin="0,0,0,6" Background="White" BorderBrush="#D0D0D0" BorderThickness="0,0,0,1">
       <MenuItem Header="_File">
         <MenuItem x:Name="DownloadProcessedLogsMenuItemControl" Header="Download Processed Logs" />
         <MenuItem x:Name="DownloadAdditionalInfoTemplateMenuItemControl" Header="Download Additional Info Template" />
@@ -54,71 +54,65 @@
       </MenuItem>
     </Menu>
 
-    <Grid x:Name="TopHeaderGrid" Grid.Row="1" Grid.Column="0" Margin="0,0,0,8" Grid.IsSharedSizeScope="True">
+    <Grid x:Name="TopHeaderGrid" Grid.Row="1" Grid.Column="0" Margin="0,0,0,6" Grid.IsSharedSizeScope="True">
       <Grid.RowDefinitions>
-        <RowDefinition Height="Auto" />
         <RowDefinition Height="Auto" />
       </Grid.RowDefinitions>
       <Grid.ColumnDefinitions>
         <ColumnDefinition Width="Auto" />
-        <ColumnDefinition Width="8" />
+        <ColumnDefinition Width="6" />
         <ColumnDefinition Width="*" />
-        <ColumnDefinition Width="8" />
-        <ColumnDefinition Width="*" />
-        <ColumnDefinition Width="8" />
-        <ColumnDefinition Width="*" />
+        <ColumnDefinition Width="6" />
+        <ColumnDefinition Width="Auto" />
+        <ColumnDefinition Width="6" />
+        <ColumnDefinition Width="Auto" />
       </Grid.ColumnDefinitions>
 
       <Border x:Name="ConnectBoxBorder"
               Grid.Row="0"
-              Grid.RowSpan="2"
               Grid.Column="4"
               BorderBrush="#CCCCCC"
               BorderThickness="1"
               CornerRadius="4"
               Background="White"
-              Padding="8"
-              HorizontalAlignment="Stretch"
-              VerticalAlignment="Top"
-              Height="{Binding ActualHeight, ElementName=ProjectDataBorder}">
+              Padding="6"
+              HorizontalAlignment="Left"
+              VerticalAlignment="Top">
         <panels:ConnectionPanel x:Name="ConnectionPanel" />
       </Border>
 
       <Image x:Name="AppLogoImage"
              Grid.Row="0"
-             Grid.RowSpan="2"
              Grid.Column="0"
              Source="pack://application:,,,/feeny-logo-100-circle-black-back.png"
              Width="{Binding ActualHeight, ElementName=ProjectDataBorder}"
              Height="{Binding ActualHeight, ElementName=ProjectDataBorder}"
-             Margin="12,0"
+             Margin="0"
              VerticalAlignment="Center"
              HorizontalAlignment="Center"
              Stretch="Uniform" />
 
       <Border x:Name="ProjectDataBorder"
               Grid.Row="0"
-              Grid.RowSpan="2"
               Grid.Column="6"
               BorderBrush="#CCCCCC"
               BorderThickness="1"
               CornerRadius="4"
               Background="White"
-              Padding="8"
-              HorizontalAlignment="Stretch"
+              Padding="6"
+              HorizontalAlignment="Left"
               VerticalAlignment="Top">
         <panels:ProjectDataPanel x:Name="ProjectDataPanel" />
       </Border>
 
       <Border x:Name="StatusBorder"
               Grid.Row="0"
-              Grid.RowSpan="2"
               Grid.Column="2"
               BorderBrush="#CCCCCC"
               BorderThickness="1"
               CornerRadius="4"
               Background="White"
-              Padding="8"
+              Padding="6"
               HorizontalAlignment="Stretch"
               VerticalAlignment="Top"
               Height="{Binding ActualHeight, ElementName=ProjectDataBorder}">

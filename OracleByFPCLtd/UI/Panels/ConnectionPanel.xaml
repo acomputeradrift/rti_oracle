@@ -10,7 +10,7 @@
     <TextBlock x:Name="ConnectHeaderTextControl" Text="Connect" FontWeight="SemiBold" Margin="0,0,0,8" />
     <StackPanel Orientation="Horizontal" Grid.Row="1" Margin="0,0,0,6">
       <TextBlock Text="SHP IP:" VerticalAlignment="Center" Margin="0,0,8,0" />
-      <TextBox x:Name="IpTextBoxControl" Width="220" Height="26" Margin="0,0,8,0" />
+      <TextBox x:Name="IpTextBoxControl" Width="180" Height="26" Margin="0,0,8,0" />
       <Button x:Name="ConnectButtonControl" Content="Connect" Width="90" Height="26" Margin="0,0,8,0"
               IsEnabled="False"
               ToolTip="Upload a project (.apex) to enable connecting." />
@@ -20,7 +20,7 @@
     <StackPanel Orientation="Horizontal" Grid.Row="2">
       <Button x:Name="DiscoverButtonControl" Content="Discover" Width="90" Height="26" Margin="0,0,8,0" />
       <TextBlock Text="Discovered:" VerticalAlignment="Center" Margin="0,0,8,0" />
-      <ComboBox x:Name="DiscoveredComboControl" Width="220" Height="26" />
+      <ComboBox x:Name="DiscoveredComboControl" Width="180" Height="26" />
     </StackPanel>
   </Grid>
 </UserControl>

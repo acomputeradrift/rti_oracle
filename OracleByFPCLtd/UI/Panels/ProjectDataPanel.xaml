@@ -27,10 +27,9 @@
       <ComboBox x:Name="RecentProjectComboBoxControl"
                 Grid.Row="0"
                 Grid.Column="1"
+                Width="180"
                 Height="24"
                 Margin="10,0,0,0"
-                MinWidth="120"
-                MaxWidth="220"
                 HorizontalAlignment="Stretch"
                 TextSearch.TextPath="FileName">
         <ComboBox.ItemTemplate>
