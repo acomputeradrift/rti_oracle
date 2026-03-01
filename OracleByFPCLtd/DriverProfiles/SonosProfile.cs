@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Text.RegularExpressions;
 using OracleByFPCLtd.DriverProfiles.Models;
+using OracleByFPCLtd.ProcessingEngine.Models;
 using OracleByFPCLtd.ProjectData.Models;
 
 namespace OracleByFPCLtd.DriverProfiles;
@@ -15,7 +16,8 @@ public static class SonosProfile
         "happens on\\s*'Sonos\\\\",
         RegexOptions.IgnoreCase | RegexOptions.Compiled);
 
-    public static IDriverProfileMapper Mapper { get; } = new SonosMapper();
+    public static IDriverProfileResultMapper ResultMapper { get; } = new SonosResultMapper();
+    public static IDriverProfileMapper Mapper { get; } = new LegacySonosMapper();
 
     public static DriverProfileDefinition Definition { get; } = new DriverProfileDefinition(
         "Sonos",
@@ -26,25 +28,38 @@ public static class SonosProfile
         new List<DriverProfileAnalysisRule>(),
         new List<string>(),
         Array.Empty<AdditionalInfoSheetSchema>(),
-        Mapper);
+        Mapper,
+        ResultMapper);
 
-    private sealed class SonosMapper : IDriverProfileMapper
+    private sealed class LegacySonosMapper : IDriverProfileMapper
     {
         public bool TryMap(string rawText, ProjectDataBundle bundle, out string mappedText, out bool unresolved)
         {
-            mappedText = rawText ?? "";
-            unresolved = false;
+            var result = ResultMapper.TryMap(rawText, bundle);
+            mappedText = result.Text;
+            unresolved = IsUnresolvedStatus(result.Status);
+            return result.Claimed;
+        }
+    }
+
+    private sealed class SonosResultMapper : IDriverProfileResultMapper
+    {
+        public DriverProfileMapResult TryMap(string rawText, ProjectDataBundle bundle)
+        {
+            var defaultText = rawText ?? "";
             if (string.IsNullOrWhiteSpace(rawText))
             {
-                return false;
+                return new DriverProfileMapResult(false, defaultText, DriverProfileProcessingStatus.NoProfile);
             }
 
             if (DriverCommandPattern.IsMatch(rawText) || DriverEventPattern.IsMatch(rawText))
             {
-                return true;
+                return new DriverProfileMapResult(true, rawText, DriverProfileProcessingStatus.PassThrough);
             }
 
-            return false;
+            return new DriverProfileMapResult(false, defaultText, DriverProfileProcessingStatus.NoProfile);
         }
     }
+
+    private static bool IsUnresolvedStatus(DriverProfileProcessingStatus status) => status is DriverProfileProcessingStatus.NoFormat or DriverProfileProcessingStatus.NoMap or DriverProfileProcessingStatus.Unresolved or DriverProfileProcessingStatus.UnknownState;
 }

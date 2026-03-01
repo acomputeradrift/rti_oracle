@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Text.RegularExpressions;
 using OracleByFPCLtd.DriverProfiles.Models;
+using OracleByFPCLtd.ProcessingEngine.Models;
 using OracleByFPCLtd.ProjectData.Models;
 
 namespace OracleByFPCLtd.DriverProfiles;
@@ -12,7 +13,8 @@ public static class RtiSystemVariableEventsProfile
         "^\\s*(?:\\[[^\\]]+\\]\\s*)?Driver - Command:\\s*'System Variable Events(?:\\s*#\\d+)?\\\\",
         RegexOptions.IgnoreCase | RegexOptions.Compiled);
 
-    public static IDriverProfileMapper Mapper { get; } = new SystemVariableEventsMapper();
+    public static IDriverProfileResultMapper ResultMapper { get; } = new SystemVariableEventsResultMapper();
+    public static IDriverProfileMapper Mapper { get; } = new LegacySystemVariableEventsMapper();
 
     public static DriverProfileDefinition Definition { get; } = new DriverProfileDefinition(
         "System Variable Events",
@@ -23,20 +25,38 @@ public static class RtiSystemVariableEventsProfile
         new List<DriverProfileAnalysisRule>(),
         new List<string>(),
         Array.Empty<AdditionalInfoSheetSchema>(),
-        Mapper);
+        Mapper,
+        ResultMapper);
 
-    private sealed class SystemVariableEventsMapper : IDriverProfileMapper
+    private sealed class LegacySystemVariableEventsMapper : IDriverProfileMapper
     {
         public bool TryMap(string rawText, ProjectDataBundle bundle, out string mappedText, out bool unresolved)
         {
-            mappedText = rawText ?? "";
-            unresolved = false;
-            if (string.IsNullOrWhiteSpace(rawText))
-            {
-                return false;
-            }
-
-            return DriverCommandPattern.IsMatch(rawText);
+            var result = ResultMapper.TryMap(rawText, bundle);
+            mappedText = result.Text;
+            unresolved = IsUnresolvedStatus(result.Status);
+            return result.Claimed;
         }
     }
+
+    private sealed class SystemVariableEventsResultMapper : IDriverProfileResultMapper
+    {
+        public DriverProfileMapResult TryMap(string rawText, ProjectDataBundle bundle)
+        {
+            var defaultText = rawText ?? "";
+            if (string.IsNullOrWhiteSpace(rawText))
+            {
+                return new DriverProfileMapResult(false, defaultText, DriverProfileProcessingStatus.NoProfile);
+            }
+
+            if (DriverCommandPattern.IsMatch(rawText))
+            {
+                return new DriverProfileMapResult(true, rawText, DriverProfileProcessingStatus.PassThrough);
+            }
+
+            return new DriverProfileMapResult(false, defaultText, DriverProfileProcessingStatus.NoProfile);
+        }
+    }
+
+    private static bool IsUnresolvedStatus(DriverProfileProcessingStatus status) => status is DriverProfileProcessingStatus.NoFormat or DriverProfileProcessingStatus.NoMap or DriverProfileProcessingStatus.Unresolved or DriverProfileProcessingStatus.UnknownState;
 }

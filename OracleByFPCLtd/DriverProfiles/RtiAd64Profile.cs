@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Text.RegularExpressions;
 using OracleByFPCLtd.DriverProfiles.Models;
+using OracleByFPCLtd.ProcessingEngine.Models;
 using OracleByFPCLtd.ProjectData.Models;
 
 namespace OracleByFPCLtd.DriverProfiles;
@@ -19,7 +20,8 @@ public static class RtiAd64Profile
         @"^(?:(?<timestamp>\[[^\]]+\])\s*)?Audio Matrix \(16 Zone\)\s*-\s*(?<update>.+)$",
         RegexOptions.IgnoreCase | RegexOptions.Compiled);
 
-    public static IDriverProfileMapper Mapper { get; } = new RtiAd64Mapper();
+    public static IDriverProfileResultMapper ResultMapper { get; } = new RtiAd64ResultMapper();
+    public static IDriverProfileMapper Mapper { get; } = new LegacyRtiAd64Mapper();
 
     public static DriverProfileDefinition Definition { get; } = new DriverProfileDefinition(
         "RTI AD-64",
@@ -30,22 +32,33 @@ public static class RtiAd64Profile
         new List<DriverProfileAnalysisRule>(),
         new List<string>(),
         Array.Empty<AdditionalInfoSheetSchema>(),
-        Mapper);
+        Mapper,
+        ResultMapper);
 
-    private sealed class RtiAd64Mapper : IDriverProfileMapper
+    private sealed class LegacyRtiAd64Mapper : IDriverProfileMapper
     {
         public bool TryMap(string rawText, ProjectDataBundle bundle, out string mappedText, out bool unresolved)
         {
-            mappedText = rawText ?? "";
-            unresolved = false;
+            var result = ResultMapper.TryMap(rawText, bundle);
+            mappedText = result.Text;
+            unresolved = IsUnresolvedStatus(result.Status);
+            return result.Claimed;
+        }
+    }
+
+    private sealed class RtiAd64ResultMapper : IDriverProfileResultMapper
+    {
+        public DriverProfileMapResult TryMap(string rawText, ProjectDataBundle bundle)
+        {
+            var defaultText = rawText ?? "";
             if (string.IsNullOrWhiteSpace(rawText))
             {
-                return false;
+                return new DriverProfileMapResult(false, defaultText, DriverProfileProcessingStatus.NoProfile);
             }
 
             if (DriverCommandPattern.IsMatch(rawText) || DriverEventPattern.IsMatch(rawText))
             {
-                return true;
+                return new DriverProfileMapResult(true, rawText, DriverProfileProcessingStatus.PassThrough);
             }
 
             var updateMatch = UpdatePattern.Match(rawText);
@@ -53,13 +66,13 @@ public static class RtiAd64Profile
             {
                 var timestamp = updateMatch.Groups["timestamp"].Value;
                 var updateText = NormalizeUpdateText(updateMatch.Groups["update"].Value);
-                mappedText = string.IsNullOrWhiteSpace(timestamp)
+                var mappedText = string.IsNullOrWhiteSpace(timestamp)
                     ? $"Driver Update ({Definition.DeviceName}): '{updateText}'"
                     : $"{timestamp} Driver Update ({Definition.DeviceName}): '{updateText}'";
-                return true;
+                return new DriverProfileMapResult(true, mappedText, DriverProfileProcessingStatus.Resolved);
             }
 
-            return false;
+            return new DriverProfileMapResult(false, defaultText, DriverProfileProcessingStatus.NoProfile);
         }
 
         private static string NormalizeUpdateText(string value)
@@ -73,4 +86,6 @@ public static class RtiAd64Profile
             return text.EndsWith(".", StringComparison.Ordinal) ? text : $"{text}.";
         }
     }
+
+    private static bool IsUnresolvedStatus(DriverProfileProcessingStatus status) => status is DriverProfileProcessingStatus.NoFormat or DriverProfileProcessingStatus.NoMap or DriverProfileProcessingStatus.Unresolved or DriverProfileProcessingStatus.UnknownState;
 }

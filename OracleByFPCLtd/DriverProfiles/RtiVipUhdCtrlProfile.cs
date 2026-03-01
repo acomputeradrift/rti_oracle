@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Text.RegularExpressions;
 using OracleByFPCLtd.DriverProfiles.Models;
+using OracleByFPCLtd.ProcessingEngine.Models;
 using OracleByFPCLtd.ProjectData.Models;
 
 namespace OracleByFPCLtd.DriverProfiles;
@@ -21,7 +22,8 @@ public static class RtiVipUhdCtrlProfile
         @"^RTI VIP-UHD-CTRL\s*-\s*(?<message>On(?:Connect|Disconnect)JSON)\s*$",
         RegexOptions.IgnoreCase | RegexOptions.Compiled);
 
-    public static IDriverProfileMapper Mapper { get; } = new RtiVipUhdCtrlMapper();
+    public static IDriverProfileResultMapper ResultMapper { get; } = new RtiVipUhdCtrlResultMapper();
+    public static IDriverProfileMapper Mapper { get; } = new LegacyRtiVipUhdCtrlMapper();
 
     public static DriverProfileDefinition Definition { get; } = new DriverProfileDefinition(
         "RTI VIP-UHD-CTRL",
@@ -32,32 +34,42 @@ public static class RtiVipUhdCtrlProfile
         new List<DriverProfileAnalysisRule>(),
         new List<string>(),
         Array.Empty<AdditionalInfoSheetSchema>(),
-        Mapper);
+        Mapper,
+        ResultMapper);
 
-    private sealed class RtiVipUhdCtrlMapper : IDriverProfileMapper
+    private sealed class LegacyRtiVipUhdCtrlMapper : IDriverProfileMapper
     {
         public bool TryMap(string rawText, ProjectDataBundle bundle, out string mappedText, out bool unresolved)
         {
-            mappedText = rawText ?? "";
-            unresolved = false;
+            var result = ResultMapper.TryMap(rawText, bundle);
+            mappedText = result.Text;
+            unresolved = IsUnresolvedStatus(result.Status);
+            return result.Claimed;
+        }
+    }
+
+    private sealed class RtiVipUhdCtrlResultMapper : IDriverProfileResultMapper
+    {
+        public DriverProfileMapResult TryMap(string rawText, ProjectDataBundle bundle)
+        {
+            var defaultText = rawText ?? "";
             if (string.IsNullOrWhiteSpace(rawText))
             {
-                return false;
+                return new DriverProfileMapResult(false, defaultText, DriverProfileProcessingStatus.NoProfile);
             }
 
             if (DriverCommandPattern.IsMatch(rawText)
                 || DriverEventPattern.IsMatch(rawText))
             {
-                return true;
+                return new DriverProfileMapResult(true, rawText, DriverProfileProcessingStatus.PassThrough);
             }
 
             if (TryBuildDriverUpdate(rawText, out var driverUpdate))
             {
-                mappedText = driverUpdate;
-                return true;
+                return new DriverProfileMapResult(true, driverUpdate, DriverProfileProcessingStatus.Resolved);
             }
 
-            return false;
+            return new DriverProfileMapResult(false, defaultText, DriverProfileProcessingStatus.NoProfile);
         }
 
         private static bool TryBuildDriverUpdate(string rawText, out string mappedText)
@@ -86,4 +98,6 @@ public static class RtiVipUhdCtrlProfile
             return true;
         }
     }
+
+    private static bool IsUnresolvedStatus(DriverProfileProcessingStatus status) => status is DriverProfileProcessingStatus.NoFormat or DriverProfileProcessingStatus.NoMap or DriverProfileProcessingStatus.Unresolved or DriverProfileProcessingStatus.UnknownState;
 }

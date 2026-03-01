@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Text.RegularExpressions;
 using OracleByFPCLtd.DriverProfiles.Models;
+using OracleByFPCLtd.ProcessingEngine.Models;
 using OracleByFPCLtd.ProjectData.Models;
 
 namespace OracleByFPCLtd.DriverProfiles;
@@ -18,7 +19,8 @@ public static class VenstarColorTouchProfile
         "^Venstar ColorTouch\\s+-\\s+.+\\s+is\\s+connected\\s*$",
         RegexOptions.IgnoreCase | RegexOptions.Compiled);
 
-    public static IDriverProfileMapper Mapper { get; } = new VenstarColorTouchMapper();
+    public static IDriverProfileResultMapper ResultMapper { get; } = new VenstarColorTouchResultMapper();
+    public static IDriverProfileMapper Mapper { get; } = new LegacyVenstarColorTouchMapper();
 
     public static DriverProfileDefinition Definition { get; } = new DriverProfileDefinition(
         "Venstar ColorTouch",
@@ -29,25 +31,39 @@ public static class VenstarColorTouchProfile
         new List<DriverProfileAnalysisRule>(),
         new List<string>(),
         Array.Empty<AdditionalInfoSheetSchema>(),
-        Mapper);
+        Mapper,
+        ResultMapper);
 
-    private sealed class VenstarColorTouchMapper : IDriverProfileMapper
+    private sealed class LegacyVenstarColorTouchMapper : IDriverProfileMapper
     {
         public bool TryMap(string rawText, ProjectDataBundle bundle, out string mappedText, out bool unresolved)
         {
-            mappedText = rawText ?? "";
-            unresolved = false;
-            if (string.IsNullOrWhiteSpace(rawText))
-            {
-                return false;
-            }
-
-            if (DriverEventPattern.IsMatch(rawText) && VenstarAttributionPattern.IsMatch(rawText))
-            {
-                return true;
-            }
-
-            return DriverUpdatePattern.IsMatch(rawText);
+            var result = ResultMapper.TryMap(rawText, bundle);
+            mappedText = result.Text;
+            unresolved = IsUnresolvedStatus(result.Status);
+            return result.Claimed;
         }
     }
+
+    private sealed class VenstarColorTouchResultMapper : IDriverProfileResultMapper
+    {
+        public DriverProfileMapResult TryMap(string rawText, ProjectDataBundle bundle)
+        {
+            var defaultText = rawText ?? "";
+            if (string.IsNullOrWhiteSpace(rawText))
+            {
+                return new DriverProfileMapResult(false, defaultText, DriverProfileProcessingStatus.NoProfile);
+            }
+
+            if ((DriverEventPattern.IsMatch(rawText) && VenstarAttributionPattern.IsMatch(rawText))
+                || DriverUpdatePattern.IsMatch(rawText))
+            {
+                return new DriverProfileMapResult(true, rawText, DriverProfileProcessingStatus.PassThrough);
+            }
+
+            return new DriverProfileMapResult(false, defaultText, DriverProfileProcessingStatus.NoProfile);
+        }
+    }
+
+    private static bool IsUnresolvedStatus(DriverProfileProcessingStatus status) => status is DriverProfileProcessingStatus.NoFormat or DriverProfileProcessingStatus.NoMap or DriverProfileProcessingStatus.Unresolved or DriverProfileProcessingStatus.UnknownState;
 }

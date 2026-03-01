@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Text.RegularExpressions;
 using OracleByFPCLtd.DriverProfiles.Models;
+using OracleByFPCLtd.ProcessingEngine.Models;
 using OracleByFPCLtd.ProjectData.Models;
 
 namespace OracleByFPCLtd.DriverProfiles;
@@ -18,7 +19,8 @@ public static class LutronCasetaRa2SelectProfile
         "^Lutron\\s+(Upper|Lower)\\s+-\\s+ID\\s+\\d+\\s*,",
         RegexOptions.IgnoreCase | RegexOptions.Compiled);
 
-    public static IDriverProfileMapper Mapper { get; } = new LutronCasetaRa2SelectMapper();
+    public static IDriverProfileResultMapper ResultMapper { get; } = new LutronCasetaRa2SelectResultMapper();
+    public static IDriverProfileMapper Mapper { get; } = new LegacyLutronCasetaRa2SelectMapper();
 
     public static DriverProfileDefinition Definition { get; } = new DriverProfileDefinition(
         "Lutron Caseta / RA2 Select",
@@ -29,27 +31,40 @@ public static class LutronCasetaRa2SelectProfile
         new List<DriverProfileAnalysisRule>(),
         new List<string>(),
         Array.Empty<AdditionalInfoSheetSchema>(),
-        Mapper);
+        Mapper,
+        ResultMapper);
 
-    private sealed class LutronCasetaRa2SelectMapper : IDriverProfileMapper
+    private sealed class LegacyLutronCasetaRa2SelectMapper : IDriverProfileMapper
     {
         public bool TryMap(string rawText, ProjectDataBundle bundle, out string mappedText, out bool unresolved)
         {
-            mappedText = rawText ?? "";
-            unresolved = false;
+            var result = ResultMapper.TryMap(rawText, bundle);
+            mappedText = result.Text;
+            unresolved = IsUnresolvedStatus(result.Status);
+            return result.Claimed;
+        }
+    }
+
+    private sealed class LutronCasetaRa2SelectResultMapper : IDriverProfileResultMapper
+    {
+        public DriverProfileMapResult TryMap(string rawText, ProjectDataBundle bundle)
+        {
+            var defaultText = rawText ?? "";
             if (string.IsNullOrWhiteSpace(rawText))
             {
-                return false;
+                return new DriverProfileMapResult(false, defaultText, DriverProfileProcessingStatus.NoProfile);
             }
 
             if (DriverCommandPattern.IsMatch(rawText)
                 || DriverEventPattern.IsMatch(rawText)
                 || DriverUpdatePattern.IsMatch(rawText))
             {
-                return true;
+                return new DriverProfileMapResult(true, rawText, DriverProfileProcessingStatus.PassThrough);
             }
 
-            return false;
+            return new DriverProfileMapResult(false, defaultText, DriverProfileProcessingStatus.NoProfile);
         }
     }
+
+    private static bool IsUnresolvedStatus(DriverProfileProcessingStatus status) => status is DriverProfileProcessingStatus.NoFormat or DriverProfileProcessingStatus.NoMap or DriverProfileProcessingStatus.Unresolved or DriverProfileProcessingStatus.UnknownState;
 }
