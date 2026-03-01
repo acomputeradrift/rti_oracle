@@ -288,14 +288,13 @@ public sealed class ProcessingEngineMappingTests
     public void VauxProfileMapsSourceSelect()
     {
         var bundle = BuildBundleWithVaux();
-        var mapper = VauxLattisMatrixProfile.Mapper;
         var rawText = "Driver - Command:'Vaux Lattis Matrix\\Output Settings\\Source Select(Route All, 13, 1)' Sustain:NO";
 
-        var mapped = mapper.TryMap(rawText, bundle, out var mappedText, out var unresolved);
+        var result = VauxLattisMatrixProfile.ResultMapper!.TryMap(rawText, bundle);
 
-        Assert.True(mapped);
-        Assert.Equal("Driver - Command:'Vaux Lattis Matrix\\Output Settings\\Source Select(Route All, Gym, Shaw 1)' Sustain:NO", mappedText);
-        Assert.False(unresolved);
+        Assert.True(result.Claimed);
+        Assert.Equal("Driver - Command:'Vaux Lattis Matrix\\Output Settings\\Source Select(Route All, Gym, Shaw 1)' Sustain:NO", result.Text);
+        Assert.Equal(OracleByFPCLtd.DriverProfiles.Models.DriverProfileProcessingStatus.Resolved, result.Status);
     }
 
     [Theory]

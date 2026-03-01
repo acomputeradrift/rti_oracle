@@ -17,7 +17,6 @@ public static class AvproEdgeMxNet1GProfile
         RegexOptions.IgnoreCase | RegexOptions.Compiled);
 
     public static IDriverProfileResultMapper ResultMapper { get; } = new AvproEdgeMxNet1GResultMapper();
-    public static IDriverProfileMapper Mapper { get; } = new LegacyAvproEdgeMxNet1GMapper();
 
     public static DriverProfileDefinition Definition { get; } = new DriverProfileDefinition(
         "AVProEdge MXNet_1G",
@@ -28,19 +27,8 @@ public static class AvproEdgeMxNet1GProfile
         new List<DriverProfileAnalysisRule>(),
         new List<string>(),
         Array.Empty<AdditionalInfoSheetSchema>(),
-        Mapper,
         ResultMapper);
 
-    private sealed class LegacyAvproEdgeMxNet1GMapper : IDriverProfileMapper
-    {
-        public bool TryMap(string rawText, ProjectDataBundle bundle, out string mappedText, out bool unresolved)
-        {
-            var result = ResultMapper.TryMap(rawText, bundle);
-            mappedText = result.Text;
-            unresolved = IsUnresolvedStatus(result.Status);
-            return result.Claimed;
-        }
-    }
 
     private sealed class AvproEdgeMxNet1GResultMapper : IDriverProfileResultMapper
     {

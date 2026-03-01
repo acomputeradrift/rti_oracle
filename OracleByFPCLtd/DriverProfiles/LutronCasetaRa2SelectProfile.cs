@@ -20,7 +20,6 @@ public static class LutronCasetaRa2SelectProfile
         RegexOptions.IgnoreCase | RegexOptions.Compiled);
 
     public static IDriverProfileResultMapper ResultMapper { get; } = new LutronCasetaRa2SelectResultMapper();
-    public static IDriverProfileMapper Mapper { get; } = new LegacyLutronCasetaRa2SelectMapper();
 
     public static DriverProfileDefinition Definition { get; } = new DriverProfileDefinition(
         "Lutron Caseta / RA2 Select",
@@ -31,19 +30,8 @@ public static class LutronCasetaRa2SelectProfile
         new List<DriverProfileAnalysisRule>(),
         new List<string>(),
         Array.Empty<AdditionalInfoSheetSchema>(),
-        Mapper,
         ResultMapper);
 
-    private sealed class LegacyLutronCasetaRa2SelectMapper : IDriverProfileMapper
-    {
-        public bool TryMap(string rawText, ProjectDataBundle bundle, out string mappedText, out bool unresolved)
-        {
-            var result = ResultMapper.TryMap(rawText, bundle);
-            mappedText = result.Text;
-            unresolved = IsUnresolvedStatus(result.Status);
-            return result.Claimed;
-        }
-    }
 
     private sealed class LutronCasetaRa2SelectResultMapper : IDriverProfileResultMapper
     {

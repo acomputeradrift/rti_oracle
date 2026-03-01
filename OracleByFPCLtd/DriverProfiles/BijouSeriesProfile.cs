@@ -17,7 +17,6 @@ public static class BijouSeriesProfile
         RegexOptions.IgnoreCase | RegexOptions.Compiled);
 
     public static IDriverProfileResultMapper ResultMapper { get; } = new BijouSeriesResultMapper();
-    public static IDriverProfileMapper Mapper { get; } = new LegacyBijouSeriesMapper();
 
     public static DriverProfileDefinition Definition { get; } = new DriverProfileDefinition(
         "BijouSeries",
@@ -28,19 +27,8 @@ public static class BijouSeriesProfile
         new List<DriverProfileAnalysisRule>(),
         new List<string>(),
         Array.Empty<AdditionalInfoSheetSchema>(),
-        Mapper,
         ResultMapper);
 
-    private sealed class LegacyBijouSeriesMapper : IDriverProfileMapper
-    {
-        public bool TryMap(string rawText, ProjectDataBundle bundle, out string mappedText, out bool unresolved)
-        {
-            var result = ResultMapper.TryMap(rawText, bundle);
-            mappedText = result.Text;
-            unresolved = IsUnresolvedStatus(result.Status);
-            return result.Claimed;
-        }
-    }
 
     private sealed class BijouSeriesResultMapper : IDriverProfileResultMapper
     {

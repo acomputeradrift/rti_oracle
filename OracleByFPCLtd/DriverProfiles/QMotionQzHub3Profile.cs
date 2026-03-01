@@ -17,7 +17,6 @@ public static class QMotionQzHub3Profile
         RegexOptions.IgnoreCase | RegexOptions.Compiled);
 
     public static IDriverProfileResultMapper ResultMapper { get; } = new QMotionQzHub3ResultMapper();
-    public static IDriverProfileMapper Mapper { get; } = new LegacyQMotionQzHub3Mapper();
 
     public static DriverProfileDefinition Definition { get; } = new DriverProfileDefinition(
         "QMotion QzHub3",
@@ -28,19 +27,8 @@ public static class QMotionQzHub3Profile
         new List<DriverProfileAnalysisRule>(),
         new List<string>(),
         Array.Empty<AdditionalInfoSheetSchema>(),
-        Mapper,
         ResultMapper);
 
-    private sealed class LegacyQMotionQzHub3Mapper : IDriverProfileMapper
-    {
-        public bool TryMap(string rawText, ProjectDataBundle bundle, out string mappedText, out bool unresolved)
-        {
-            var result = ResultMapper.TryMap(rawText, bundle);
-            mappedText = result.Text;
-            unresolved = IsUnresolvedStatus(result.Status);
-            return result.Claimed;
-        }
-    }
 
     private sealed class QMotionQzHub3ResultMapper : IDriverProfileResultMapper
     {

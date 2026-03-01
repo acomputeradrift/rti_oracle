@@ -53,153 +53,79 @@ public sealed class DriverMappingService
 
         foreach (var profile in DriverProfileCatalog.All())
         {
-            if (profile.ResultMapper is not null)
-            {
-                var result = profile.ResultMapper.TryMap(rawText, bundle);
-                if (!result.Claimed)
-                {
-                    continue;
-                }
-
-                var resultText = result.Text ?? rawText;
-                var resultFormatterDriverName = ResolveFormatterDriverName(profile.DeviceName, resultText);
-                if (DriverMessageTemplateFormatter.TryFormatDriverCommand(resultText, resultFormatterDriverName, out var resultFormattedCommand))
-                {
-                    resultText = resultFormattedCommand;
-                }
-                else if (DriverMessageTemplateFormatter.TryFormatDriverEvent(resultText, resultFormatterDriverName, out var resultFormattedEvent))
-                {
-                    resultText = resultFormattedEvent;
-                }
-
-                var effectiveStatus = result.Status;
-                var warningMessage = result.WarningMessage;
-                var warningDetails = result.WarningDetails;
-
-                if (effectiveStatus == DriverProfileProcessingStatus.PassThrough
-                    && string.Equals(resultText, rawText, StringComparison.Ordinal)
-                    && !IsAllowedClaimedPassthrough(profile.DeviceName, rawText)
-                    && IsClaimedDriverMessage(rawText))
-                {
-                    effectiveStatus = DriverProfileProcessingStatus.NoFormat;
-                    warningMessage ??= "Driver profile claimed line but no format rule matched.";
-                }
-
-                var resultUnresolved = IsUnresolvedStatus(effectiveStatus);
-                resultText = ApplyStatusTag(resultText, effectiveStatus);
-
-                if (!string.IsNullOrWhiteSpace(warningMessage))
-                {
-                    WriteEventLogEntry(
-                        SeverityLevel.Warn,
-                        "Processing:Formatting",
-                        warningMessage!,
-                        BuildWarningDetails(evt.RawLineNumber, profile.DeviceName, rawText, warningDetails));
-                }
-
-                MappingResolution? resolvedMapping = result.MappingResolution;
-                if (resolvedMapping is null
-                    && effectiveStatus == DriverProfileProcessingStatus.Resolved
-                    && TryExtractMappingTransition(rawText, result.Text ?? rawText, out var resultTransition))
-                {
-                    var transitionParts = resultTransition.Split(" -> ", 2, StringSplitOptions.None);
-                    var mappedFrom = transitionParts.Length > 0 ? transitionParts[0] : "";
-                    var mappedTo = transitionParts.Length > 1 ? transitionParts[1] : "";
-                    var mappingSource = HasAdditionalInfoData(bundle, profile.DeviceName) ? "Additional Info" : "Apex";
-                    resolvedMapping = new MappingResolution(
-                        DetermineMappingKind(profile.DeviceName, mappingSource),
-                        mappedFrom,
-                        mappedTo,
-                        mappingSource,
-                        Profile: profile.DeviceName);
-                }
-
-                return new ProcessedLine(
-                    $"{evt.RawLineNumber} {resultText}",
-                    resultUnresolved,
-                    resolvedMapping);
-            }
-
-            var mapper = profile.Mapper;
-            if (mapper is null)
+            if (profile.ResultMapper is null)
             {
                 continue;
             }
 
-            if (!mapper.TryMap(rawText, bundle, out var mappedText, out var unresolved))
+            var result = profile.ResultMapper.TryMap(rawText, bundle);
+            if (!result.Claimed)
             {
                 continue;
             }
 
-            // Capture mapping transition from the profile-mapped command before
-            // readability formatting changes the command shape.
-            var hasTransition = TryExtractMappingTransition(rawText, mappedText, out var transition);
-
-            var formatterDriverName = ResolveFormatterDriverName(profile.DeviceName, mappedText);
-            if (DriverMessageTemplateFormatter.TryFormatDriverCommand(mappedText, formatterDriverName, out var formattedCommand))
+            var resultText = result.Text ?? rawText;
+            var resultFormatterDriverName = ResolveFormatterDriverName(profile.DeviceName, resultText);
+            if (DriverMessageTemplateFormatter.TryFormatDriverCommand(resultText, resultFormatterDriverName, out var resultFormattedCommand))
             {
-                mappedText = formattedCommand;
+                resultText = resultFormattedCommand;
             }
-            else if (DriverMessageTemplateFormatter.TryFormatDriverEvent(mappedText, formatterDriverName, out var formattedEvent))
+            else if (DriverMessageTemplateFormatter.TryFormatDriverEvent(resultText, resultFormatterDriverName, out var resultFormattedEvent))
             {
-                mappedText = formattedEvent;
+                resultText = resultFormattedEvent;
             }
 
-            if (unresolved && IsDriverCommandLine(mappedText) && ShouldAppendNoMap(mappedText))
-            {
-                mappedText += " [No Map!]";
-            }
-            else if (unresolved && ShouldAppendUnresolved(mappedText))
-            {
-                mappedText += " [Unresolved!]";
-            }
+            var effectiveStatus = result.Status;
+            var warningMessage = result.WarningMessage;
+            var warningDetails = result.WarningDetails;
 
-            if (!unresolved
-                && string.Equals(mappedText, rawText, StringComparison.Ordinal)
+            if (effectiveStatus == DriverProfileProcessingStatus.PassThrough
+                && string.Equals(resultText, rawText, StringComparison.Ordinal)
                 && !IsAllowedClaimedPassthrough(profile.DeviceName, rawText)
                 && IsClaimedDriverMessage(rawText))
             {
-                if (!mappedText.Contains("[No Format!]", StringComparison.Ordinal))
-                {
-                    mappedText += " [No Format!]";
-                }
+                effectiveStatus = DriverProfileProcessingStatus.NoFormat;
+                warningMessage ??= "Driver profile claimed line but no format rule matched.";
+            }
 
-                unresolved = true;
+            var resultUnresolved = IsUnresolvedStatus(effectiveStatus);
+            resultText = ApplyStatusTag(resultText, effectiveStatus);
+
+            if (!string.IsNullOrWhiteSpace(warningMessage))
+            {
                 WriteEventLogEntry(
                     SeverityLevel.Warn,
                     "Processing:Formatting",
-                    "Driver profile claimed line but no format rule matched.",
-                    new Dictionary<string, string>
-                    {
-                        ["line"] = evt.RawLineNumber.ToString(),
-                        ["profile"] = profile.DeviceName,
-                        ["rawText"] = rawText
-                    });
+                    warningMessage!,
+                    BuildWarningDetails(evt.RawLineNumber, profile.DeviceName, rawText, warningDetails));
             }
 
-            var resolvedSubstitution = hasTransition && !unresolved;
-
-            MappingResolution? mappingResolution = null;
-            if (resolvedSubstitution)
+            MappingResolution? resolvedMapping = result.MappingResolution;
+            if (resolvedMapping is null
+                && effectiveStatus == DriverProfileProcessingStatus.Resolved
+                && TryExtractMappingTransition(rawText, result.Text ?? rawText, out var resultTransition))
             {
-                var transitionParts = transition.Split(" -> ", 2, StringSplitOptions.None);
+                var transitionParts = resultTransition.Split(" -> ", 2, StringSplitOptions.None);
                 var mappedFrom = transitionParts.Length > 0 ? transitionParts[0] : "";
                 var mappedTo = transitionParts.Length > 1 ? transitionParts[1] : "";
                 var mappingSource = HasAdditionalInfoData(bundle, profile.DeviceName) ? "Additional Info" : "Apex";
-                mappingResolution = new MappingResolution(
+                resolvedMapping = new MappingResolution(
                     DetermineMappingKind(profile.DeviceName, mappingSource),
                     mappedFrom,
                     mappedTo,
                     mappingSource,
                     Profile: profile.DeviceName);
             }
-            else if (!unresolved
-                && TryBuildInlineMappingResolution(profile.DeviceName, rawText, mappedText, out var inlineMappingResolution))
+            else if (!resultUnresolved
+                && TryBuildInlineMappingResolution(profile.DeviceName, rawText, resultText, out var inlineMappingResolution))
             {
-                mappingResolution = inlineMappingResolution;
+                resolvedMapping = inlineMappingResolution;
             }
 
-            return new ProcessedLine($"{evt.RawLineNumber} {mappedText}", unresolved, mappingResolution);
+            return new ProcessedLine(
+                $"{evt.RawLineNumber} {resultText}",
+                resultUnresolved,
+                resolvedMapping);
         }
 
         WriteEventLogEntry(

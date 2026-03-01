@@ -17,7 +17,6 @@ public static class YamahaAventageProfile
         RegexOptions.IgnoreCase | RegexOptions.Compiled);
 
     public static IDriverProfileResultMapper ResultMapper { get; } = new YamahaAventageResultMapper();
-    public static IDriverProfileMapper Mapper { get; } = new LegacyYamahaAventageMapper();
 
     public static DriverProfileDefinition Definition { get; } = new DriverProfileDefinition(
         "Yamaha AVENTAGE",
@@ -28,19 +27,8 @@ public static class YamahaAventageProfile
         new List<DriverProfileAnalysisRule>(),
         new List<string>(),
         Array.Empty<AdditionalInfoSheetSchema>(),
-        Mapper,
         ResultMapper);
 
-    private sealed class LegacyYamahaAventageMapper : IDriverProfileMapper
-    {
-        public bool TryMap(string rawText, ProjectDataBundle bundle, out string mappedText, out bool unresolved)
-        {
-            var result = ResultMapper.TryMap(rawText, bundle);
-            mappedText = result.Text;
-            unresolved = IsUnresolvedStatus(result.Status);
-            return result.Claimed;
-        }
-    }
 
     private sealed class YamahaAventageResultMapper : IDriverProfileResultMapper
     {

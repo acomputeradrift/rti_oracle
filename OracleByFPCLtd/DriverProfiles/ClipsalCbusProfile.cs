@@ -20,7 +20,6 @@ public static class ClipsalCbusProfile
     private static readonly Regex ZoneIdPattern = new Regex("\\((?<zone>\\d+)\\)", RegexOptions.Compiled);
 
     public static IDriverProfileResultMapper ResultMapper { get; } = new ClipsalCbusResultMapper();
-    public static IDriverProfileMapper Mapper { get; } = new LegacyClipsalCbusMapper();
 
     public static DriverProfileDefinition Definition { get; } = new DriverProfileDefinition(
         "Clipsal C-Bus",
@@ -53,19 +52,8 @@ public static class ClipsalCbusProfile
                 new("ZoneName", AdditionalInfoColumnRole.ZoneName)
             })
         },
-        Mapper,
         ResultMapper);
 
-    private sealed class LegacyClipsalCbusMapper : IDriverProfileMapper
-    {
-        public bool TryMap(string rawText, ProjectDataBundle bundle, out string mappedText, out bool unresolved)
-        {
-            var result = ResultMapper.TryMap(rawText, bundle);
-            mappedText = result.Text;
-            unresolved = IsUnresolvedStatus(result.Status);
-            return result.Claimed;
-        }
-    }
 
     private sealed class ClipsalCbusResultMapper : IDriverProfileResultMapper
     {

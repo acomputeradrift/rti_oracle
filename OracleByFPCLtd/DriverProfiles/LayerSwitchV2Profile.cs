@@ -17,7 +17,6 @@ public static class LayerSwitchV2Profile
         RegexOptions.IgnoreCase | RegexOptions.Compiled);
 
     public static IDriverProfileResultMapper ResultMapper { get; } = new LayerSwitchV2ResultMapper();
-    public static IDriverProfileMapper Mapper { get; } = new LegacyLayerSwitchV2Mapper();
 
     public static DriverProfileDefinition Definition { get; } = new DriverProfileDefinition(
         "Layer Switch v2.x",
@@ -28,19 +27,8 @@ public static class LayerSwitchV2Profile
         new List<DriverProfileAnalysisRule>(),
         new List<string>(),
         Array.Empty<AdditionalInfoSheetSchema>(),
-        Mapper,
         ResultMapper);
 
-    private sealed class LegacyLayerSwitchV2Mapper : IDriverProfileMapper
-    {
-        public bool TryMap(string rawText, ProjectDataBundle bundle, out string mappedText, out bool unresolved)
-        {
-            var result = ResultMapper.TryMap(rawText, bundle);
-            mappedText = result.Text;
-            unresolved = IsUnresolvedStatus(result.Status);
-            return result.Claimed;
-        }
-    }
 
     private sealed class LayerSwitchV2ResultMapper : IDriverProfileResultMapper
     {

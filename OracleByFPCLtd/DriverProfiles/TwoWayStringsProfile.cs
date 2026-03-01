@@ -17,7 +17,6 @@ public static class TwoWayStringsProfile
         RegexOptions.IgnoreCase | RegexOptions.Compiled);
 
     public static IDriverProfileResultMapper ResultMapper { get; } = new TwoWayStringsResultMapper();
-    public static IDriverProfileMapper Mapper { get; } = new LegacyTwoWayStringsMapper();
 
     public static DriverProfileDefinition Definition { get; } = new DriverProfileDefinition(
         "Two Way Strings",
@@ -28,19 +27,8 @@ public static class TwoWayStringsProfile
         new List<DriverProfileAnalysisRule>(),
         new List<string>(),
         Array.Empty<AdditionalInfoSheetSchema>(),
-        Mapper,
         ResultMapper);
 
-    private sealed class LegacyTwoWayStringsMapper : IDriverProfileMapper
-    {
-        public bool TryMap(string rawText, ProjectDataBundle bundle, out string mappedText, out bool unresolved)
-        {
-            var result = ResultMapper.TryMap(rawText, bundle);
-            mappedText = result.Text;
-            unresolved = IsUnresolvedStatus(result.Status);
-            return result.Claimed;
-        }
-    }
 
     private sealed class TwoWayStringsResultMapper : IDriverProfileResultMapper
     {

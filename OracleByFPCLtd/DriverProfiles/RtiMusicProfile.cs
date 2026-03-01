@@ -17,7 +17,6 @@ public static class RtiMusicProfile
         RegexOptions.IgnoreCase | RegexOptions.Compiled);
 
     public static IDriverProfileResultMapper ResultMapper { get; } = new RtiMusicResultMapper();
-    public static IDriverProfileMapper Mapper { get; } = new LegacyRtiMusicMapper();
 
     public static DriverProfileDefinition Definition { get; } = new DriverProfileDefinition(
         "RTI Music",
@@ -28,19 +27,8 @@ public static class RtiMusicProfile
         new List<DriverProfileAnalysisRule>(),
         new List<string>(),
         Array.Empty<AdditionalInfoSheetSchema>(),
-        Mapper,
         ResultMapper);
 
-    private sealed class LegacyRtiMusicMapper : IDriverProfileMapper
-    {
-        public bool TryMap(string rawText, ProjectDataBundle bundle, out string mappedText, out bool unresolved)
-        {
-            var result = ResultMapper.TryMap(rawText, bundle);
-            mappedText = result.Text;
-            unresolved = IsUnresolvedStatus(result.Status);
-            return result.Claimed;
-        }
-    }
 
     private sealed class RtiMusicResultMapper : IDriverProfileResultMapper
     {

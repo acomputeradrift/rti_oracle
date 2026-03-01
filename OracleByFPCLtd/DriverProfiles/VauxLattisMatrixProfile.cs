@@ -16,7 +16,6 @@ public static class VauxLattisMatrixProfile
         RegexOptions.IgnoreCase | RegexOptions.Compiled);
 
     public static IDriverProfileResultMapper ResultMapper { get; } = new VauxLattisMatrixResultMapper();
-    public static IDriverProfileMapper Mapper { get; } = new LegacyVauxLattisMatrixMapper();
 
     public static DriverProfileDefinition Definition { get; } = new DriverProfileDefinition(
         "Vaux Lattis Matrix",
@@ -36,19 +35,8 @@ public static class VauxLattisMatrixProfile
                 new("Audio Zone Output Name", AdditionalInfoColumnRole.OutputName)
             })
         },
-        Mapper,
         ResultMapper);
 
-    private sealed class LegacyVauxLattisMatrixMapper : IDriverProfileMapper
-    {
-        public bool TryMap(string rawText, ProjectDataBundle bundle, out string mappedText, out bool unresolved)
-        {
-            var result = ResultMapper.TryMap(rawText, bundle);
-            mappedText = result.Text;
-            unresolved = IsUnresolvedStatus(result.Status);
-            return result.Claimed;
-        }
-    }
 
     private sealed class VauxLattisMatrixResultMapper : IDriverProfileResultMapper
     {

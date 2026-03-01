@@ -14,7 +14,6 @@ public static class RtiSystemVariableEventsProfile
         RegexOptions.IgnoreCase | RegexOptions.Compiled);
 
     public static IDriverProfileResultMapper ResultMapper { get; } = new SystemVariableEventsResultMapper();
-    public static IDriverProfileMapper Mapper { get; } = new LegacySystemVariableEventsMapper();
 
     public static DriverProfileDefinition Definition { get; } = new DriverProfileDefinition(
         "System Variable Events",
@@ -25,19 +24,8 @@ public static class RtiSystemVariableEventsProfile
         new List<DriverProfileAnalysisRule>(),
         new List<string>(),
         Array.Empty<AdditionalInfoSheetSchema>(),
-        Mapper,
         ResultMapper);
 
-    private sealed class LegacySystemVariableEventsMapper : IDriverProfileMapper
-    {
-        public bool TryMap(string rawText, ProjectDataBundle bundle, out string mappedText, out bool unresolved)
-        {
-            var result = ResultMapper.TryMap(rawText, bundle);
-            mappedText = result.Text;
-            unresolved = IsUnresolvedStatus(result.Status);
-            return result.Claimed;
-        }
-    }
 
     private sealed class SystemVariableEventsResultMapper : IDriverProfileResultMapper
     {

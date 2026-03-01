@@ -24,7 +24,6 @@ public static class SystemManagerProfile
         RegexOptions.IgnoreCase | RegexOptions.Compiled);
 
     public static IDriverProfileResultMapper ResultMapper { get; } = new SystemManagerResultMapper();
-    public static IDriverProfileMapper Mapper { get; } = new LegacySystemManagerMapper();
 
     public static DriverProfileDefinition Definition { get; } = new DriverProfileDefinition(
         "System Manager",
@@ -35,19 +34,8 @@ public static class SystemManagerProfile
         new List<DriverProfileAnalysisRule>(),
         new List<string>(),
         Array.Empty<AdditionalInfoSheetSchema>(),
-        Mapper,
         ResultMapper);
 
-    private sealed class LegacySystemManagerMapper : IDriverProfileMapper
-    {
-        public bool TryMap(string rawText, ProjectDataBundle bundle, out string mappedText, out bool unresolved)
-        {
-            var result = ResultMapper.TryMap(rawText, bundle);
-            mappedText = result.Text;
-            unresolved = IsUnresolvedStatus(result.Status);
-            return result.Claimed;
-        }
-    }
 
     private sealed class SystemManagerResultMapper : IDriverProfileResultMapper
     {

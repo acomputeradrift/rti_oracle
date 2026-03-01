@@ -17,7 +17,6 @@ public static class RtiAdDspMatrixProfile
         RegexOptions.IgnoreCase | RegexOptions.Compiled);
 
     public static IDriverProfileResultMapper ResultMapper { get; } = new RtiAdDspMatrixResultMapper();
-    public static IDriverProfileMapper Mapper { get; } = new LegacyRtiAdDspMatrixMapper();
 
     public static DriverProfileDefinition Definition { get; } = new DriverProfileDefinition(
         "RTI AD DSP Matrix",
@@ -28,19 +27,8 @@ public static class RtiAdDspMatrixProfile
         new List<DriverProfileAnalysisRule>(),
         new List<string>(),
         Array.Empty<AdditionalInfoSheetSchema>(),
-        Mapper,
         ResultMapper);
 
-    private sealed class LegacyRtiAdDspMatrixMapper : IDriverProfileMapper
-    {
-        public bool TryMap(string rawText, ProjectDataBundle bundle, out string mappedText, out bool unresolved)
-        {
-            var result = ResultMapper.TryMap(rawText, bundle);
-            mappedText = result.Text;
-            unresolved = IsUnresolvedStatus(result.Status);
-            return result.Claimed;
-        }
-    }
 
     private sealed class RtiAdDspMatrixResultMapper : IDriverProfileResultMapper
     {

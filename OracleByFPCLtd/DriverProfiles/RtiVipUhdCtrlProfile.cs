@@ -23,7 +23,6 @@ public static class RtiVipUhdCtrlProfile
         RegexOptions.IgnoreCase | RegexOptions.Compiled);
 
     public static IDriverProfileResultMapper ResultMapper { get; } = new RtiVipUhdCtrlResultMapper();
-    public static IDriverProfileMapper Mapper { get; } = new LegacyRtiVipUhdCtrlMapper();
 
     public static DriverProfileDefinition Definition { get; } = new DriverProfileDefinition(
         "RTI VIP-UHD-CTRL",
@@ -34,19 +33,8 @@ public static class RtiVipUhdCtrlProfile
         new List<DriverProfileAnalysisRule>(),
         new List<string>(),
         Array.Empty<AdditionalInfoSheetSchema>(),
-        Mapper,
         ResultMapper);
 
-    private sealed class LegacyRtiVipUhdCtrlMapper : IDriverProfileMapper
-    {
-        public bool TryMap(string rawText, ProjectDataBundle bundle, out string mappedText, out bool unresolved)
-        {
-            var result = ResultMapper.TryMap(rawText, bundle);
-            mappedText = result.Text;
-            unresolved = IsUnresolvedStatus(result.Status);
-            return result.Claimed;
-        }
-    }
 
     private sealed class RtiVipUhdCtrlResultMapper : IDriverProfileResultMapper
     {

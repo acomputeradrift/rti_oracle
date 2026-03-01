@@ -21,7 +21,6 @@ public static class RtiAd64Profile
         RegexOptions.IgnoreCase | RegexOptions.Compiled);
 
     public static IDriverProfileResultMapper ResultMapper { get; } = new RtiAd64ResultMapper();
-    public static IDriverProfileMapper Mapper { get; } = new LegacyRtiAd64Mapper();
 
     public static DriverProfileDefinition Definition { get; } = new DriverProfileDefinition(
         "RTI AD-64",
@@ -32,19 +31,8 @@ public static class RtiAd64Profile
         new List<DriverProfileAnalysisRule>(),
         new List<string>(),
         Array.Empty<AdditionalInfoSheetSchema>(),
-        Mapper,
         ResultMapper);
 
-    private sealed class LegacyRtiAd64Mapper : IDriverProfileMapper
-    {
-        public bool TryMap(string rawText, ProjectDataBundle bundle, out string mappedText, out bool unresolved)
-        {
-            var result = ResultMapper.TryMap(rawText, bundle);
-            mappedText = result.Text;
-            unresolved = IsUnresolvedStatus(result.Status);
-            return result.Claimed;
-        }
-    }
 
     private sealed class RtiAd64ResultMapper : IDriverProfileResultMapper
     {

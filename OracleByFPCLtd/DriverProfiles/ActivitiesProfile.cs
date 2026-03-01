@@ -17,7 +17,6 @@ public static class ActivitiesProfile
         RegexOptions.IgnoreCase | RegexOptions.Compiled);
 
     public static IDriverProfileResultMapper ResultMapper { get; } = new ActivitiesResultMapper();
-    public static IDriverProfileMapper Mapper { get; } = new LegacyActivitiesMapper();
 
     public static DriverProfileDefinition Definition { get; } = new DriverProfileDefinition(
         "Activities",
@@ -28,19 +27,8 @@ public static class ActivitiesProfile
         new List<DriverProfileAnalysisRule>(),
         new List<string>(),
         Array.Empty<AdditionalInfoSheetSchema>(),
-        Mapper,
         ResultMapper);
 
-    private sealed class LegacyActivitiesMapper : IDriverProfileMapper
-    {
-        public bool TryMap(string rawText, ProjectDataBundle bundle, out string mappedText, out bool unresolved)
-        {
-            var result = ResultMapper.TryMap(rawText, bundle);
-            mappedText = result.Text;
-            unresolved = IsUnresolvedStatus(result.Status);
-            return result.Claimed;
-        }
-    }
 
     private sealed class ActivitiesResultMapper : IDriverProfileResultMapper
     {

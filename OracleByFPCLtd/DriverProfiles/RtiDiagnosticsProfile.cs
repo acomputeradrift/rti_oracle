@@ -10,7 +10,6 @@ public static class RtiDiagnosticsProfile
 {
     private const string DiagnosticsPrimaryProcessorName = "Diagnostics: Primary Processor";
     public static IDriverProfileResultMapper ResultMapper { get; } = new RtiDiagnosticsResultMapper();
-    public static IDriverProfileMapper Mapper { get; } = new LegacyRtiDiagnosticsMapper();
 
     public static DriverProfileDefinition Definition { get; } = new DriverProfileDefinition(
         "RTI Diagnostics",
@@ -20,19 +19,8 @@ public static class RtiDiagnosticsProfile
         new List<DriverProfileDiscoveryRule>(),
         new List<DriverProfileAnalysisRule>(),
         new List<string>(),
-        Mapper: Mapper,
         ResultMapper: ResultMapper);
 
-    private sealed class LegacyRtiDiagnosticsMapper : IDriverProfileMapper
-    {
-        public bool TryMap(string rawText, ProjectDataBundle bundle, out string mappedText, out bool unresolved)
-        {
-            var result = ResultMapper.TryMap(rawText, bundle);
-            mappedText = result.Text;
-            unresolved = IsUnresolvedStatus(result.Status);
-            return result.Claimed;
-        }
-    }
 
     private sealed class RtiDiagnosticsResultMapper : IDriverProfileResultMapper
     {

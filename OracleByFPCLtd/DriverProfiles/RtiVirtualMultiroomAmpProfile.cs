@@ -17,7 +17,6 @@ public static class RtiVirtualMultiroomAmpProfile
         RegexOptions.IgnoreCase | RegexOptions.Compiled);
 
     public static IDriverProfileResultMapper ResultMapper { get; } = new RtiVirtualMultiroomAmpResultMapper();
-    public static IDriverProfileMapper Mapper { get; } = new LegacyRtiVirtualMultiroomAmpMapper();
 
     public static DriverProfileDefinition Definition { get; } = new DriverProfileDefinition(
         "RTI Virtual Multiroom Amp",
@@ -28,19 +27,8 @@ public static class RtiVirtualMultiroomAmpProfile
         new List<DriverProfileAnalysisRule>(),
         new List<string>(),
         Array.Empty<AdditionalInfoSheetSchema>(),
-        Mapper,
         ResultMapper);
 
-    private sealed class LegacyRtiVirtualMultiroomAmpMapper : IDriverProfileMapper
-    {
-        public bool TryMap(string rawText, ProjectDataBundle bundle, out string mappedText, out bool unresolved)
-        {
-            var result = ResultMapper.TryMap(rawText, bundle);
-            mappedText = result.Text;
-            unresolved = IsUnresolvedStatus(result.Status);
-            return result.Claimed;
-        }
-    }
 
     private sealed class RtiVirtualMultiroomAmpResultMapper : IDriverProfileResultMapper
     {

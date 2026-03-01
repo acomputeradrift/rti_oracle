@@ -23,7 +23,6 @@ public static class VhdxProfile
         RegexOptions.IgnoreCase | RegexOptions.Compiled);
 
     public static IDriverProfileResultMapper ResultMapper { get; } = new VhdxResultMapper();
-    public static IDriverProfileMapper Mapper { get; } = new LegacyVhdxMapper();
 
     public static DriverProfileDefinition Definition { get; } = new DriverProfileDefinition(
         "VHDx",
@@ -34,19 +33,8 @@ public static class VhdxProfile
         new List<DriverProfileAnalysisRule>(),
         new List<string>(),
         Array.Empty<AdditionalInfoSheetSchema>(),
-        Mapper,
         ResultMapper);
 
-    private sealed class LegacyVhdxMapper : IDriverProfileMapper
-    {
-        public bool TryMap(string rawText, ProjectDataBundle bundle, out string mappedText, out bool unresolved)
-        {
-            var result = ResultMapper.TryMap(rawText, bundle);
-            mappedText = result.Text;
-            unresolved = IsUnresolvedStatus(result.Status);
-            return result.Claimed;
-        }
-    }
 
     private sealed class VhdxResultMapper : IDriverProfileResultMapper
     {

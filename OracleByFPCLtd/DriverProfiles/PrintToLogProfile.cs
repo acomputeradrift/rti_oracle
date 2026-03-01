@@ -14,7 +14,6 @@ public static class PrintToLogProfile
         RegexOptions.IgnoreCase | RegexOptions.Compiled);
 
     public static IDriverProfileResultMapper ResultMapper { get; } = new PrintToLogResultMapper();
-    public static IDriverProfileMapper Mapper { get; } = new LegacyPrintToLogMapper();
 
     public static DriverProfileDefinition Definition { get; } = new DriverProfileDefinition(
         "Print To Log",
@@ -25,19 +24,8 @@ public static class PrintToLogProfile
         new List<DriverProfileAnalysisRule>(),
         new List<string>(),
         Array.Empty<AdditionalInfoSheetSchema>(),
-        Mapper,
         ResultMapper);
 
-    private sealed class LegacyPrintToLogMapper : IDriverProfileMapper
-    {
-        public bool TryMap(string rawText, ProjectDataBundle bundle, out string mappedText, out bool unresolved)
-        {
-            var result = ResultMapper.TryMap(rawText, bundle);
-            mappedText = result.Text;
-            unresolved = IsUnresolvedStatus(result.Status);
-            return result.Claimed;
-        }
-    }
 
     private sealed class PrintToLogResultMapper : IDriverProfileResultMapper
     {

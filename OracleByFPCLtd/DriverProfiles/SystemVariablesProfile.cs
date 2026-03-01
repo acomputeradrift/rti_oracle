@@ -14,7 +14,6 @@ public static class SystemVariablesProfile
         RegexOptions.IgnoreCase | RegexOptions.Compiled);
 
     public static IDriverProfileResultMapper ResultMapper { get; } = new SystemVariablesResultMapper();
-    public static IDriverProfileMapper Mapper { get; } = new LegacySystemVariablesMapper();
 
     public static DriverProfileDefinition Definition { get; } = new DriverProfileDefinition(
         "System Variables",
@@ -32,19 +31,8 @@ public static class SystemVariablesProfile
                 new("IntegerName", AdditionalInfoColumnRole.IntegerName)
             })
         },
-        Mapper,
         ResultMapper);
 
-    private sealed class LegacySystemVariablesMapper : IDriverProfileMapper
-    {
-        public bool TryMap(string rawText, ProjectDataBundle bundle, out string mappedText, out bool unresolved)
-        {
-            var result = ResultMapper.TryMap(rawText, bundle);
-            mappedText = result.Text;
-            unresolved = IsUnresolvedStatus(result.Status);
-            return result.Claimed;
-        }
-    }
 
     private sealed class SystemVariablesResultMapper : IDriverProfileResultMapper
     {

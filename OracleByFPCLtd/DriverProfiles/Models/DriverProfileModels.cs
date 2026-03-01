@@ -29,11 +29,6 @@ public enum AdditionalInfoColumnRole
     RelayName
 }
 
-public interface IDriverProfileMapper
-{
-    bool TryMap(string rawText, ProjectDataBundle bundle, out string mappedText, out bool unresolved);
-}
-
 public enum DriverProfileProcessingStatus
 {
     NoProfile,
@@ -67,7 +62,6 @@ public sealed record DriverProfileDefinition(
     IReadOnlyList<DriverProfileAnalysisRule> AnalysisRules,
     IReadOnlyList<string> Notes,
     IReadOnlyList<AdditionalInfoSheetSchema>? AdditionalInfoSchemas = null,
-    IDriverProfileMapper? Mapper = null,
     IDriverProfileResultMapper? ResultMapper = null);
 
 public sealed record DriverProfileMatch(int DriverDeviceId, DriverConfigEntry DriverConfig, DriverProfileDefinition Profile);

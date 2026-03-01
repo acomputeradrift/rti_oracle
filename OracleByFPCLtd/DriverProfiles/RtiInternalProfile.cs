@@ -73,7 +73,6 @@ public static class RtiInternalProfile
         RegexOptions.Compiled);
 
     public static IDriverProfileResultMapper ResultMapper { get; } = new RtiInternalResultMapper();
-    public static IDriverProfileMapper Mapper { get; } = new LegacyRtiInternalMapper();
 
     public static DriverProfileDefinition Definition { get; } = new DriverProfileDefinition(
         "RTI Internal",
@@ -106,19 +105,8 @@ ORDER BY d.DeviceId, p.PageOrder;
                 new("RelayName", AdditionalInfoColumnRole.RelayName)
             })
         },
-        Mapper: Mapper,
         ResultMapper: ResultMapper);
 
-    private sealed class LegacyRtiInternalMapper : IDriverProfileMapper
-    {
-        public bool TryMap(string rawText, ProjectDataBundle bundle, out string mappedText, out bool unresolved)
-        {
-            var result = ResultMapper.TryMap(rawText, bundle);
-            mappedText = result.Text;
-            unresolved = IsUnresolvedStatus(result.Status);
-            return result.Claimed;
-        }
-    }
 
     private sealed class RtiInternalResultMapper : IDriverProfileResultMapper
     {
