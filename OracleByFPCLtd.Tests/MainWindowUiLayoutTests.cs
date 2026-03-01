@@ -63,6 +63,10 @@ public sealed class MainWindowUiLayoutTests
             Assert.NotNull(diagnostics.FilterBar.FilterClearButton);
             Assert.NotNull(diagnostics.FilterBar.FilterCountText);
             Assert.NotNull(diagnostics.FilterBar.ClearDiagnosticsButton);
+            Assert.NotNull(diagnostics.FilterBar.DiagnosticsHeaderText);
+            Assert.NotNull(diagnostics.FilterBar.DiagnosticsZoomOutButton);
+            Assert.NotNull(diagnostics.FilterBar.DiagnosticsZoomResetButton);
+            Assert.NotNull(diagnostics.FilterBar.DiagnosticsZoomInButton);
 
             Assert.NotNull(diagnostics.RawOutputPanel.FindBar.FindTextBox);
             Assert.NotNull(diagnostics.RawOutputPanel.FindBar.FindPrevButton);
@@ -116,6 +120,63 @@ public sealed class MainWindowUiLayoutTests
             Assert.True(end.ActualWidth >= 160);
 
             window.Hide();
+        });
+    }
+
+    [Fact]
+    public void DiagnosticsZoomDefaultsToOneHundredPercent()
+    {
+        RunOnSta(() =>
+        {
+            var window = new MainWindow();
+
+            var diagnostics = (OracleByFPCLtd.UI.Panels.DiagnosticsPanel)window.FindName("DiagnosticsPanel")!;
+            Assert.Equal("100%", diagnostics.FilterBar.DiagnosticsZoomResetButton.Content);
+            Assert.Equal(12, diagnostics.RawOutputPanel.LogOutputView.LogTextBox.FontSize);
+            Assert.Equal(12, diagnostics.ProcessedOutputPanel.LogOutputView.LogTextBox.FontSize);
+        });
+    }
+
+    [Fact]
+    public void DiagnosticsZoomButtonsAdjustAndClampLogFontSize()
+    {
+        RunOnSta(() =>
+        {
+            var window = new MainWindow();
+            var diagnostics = (OracleByFPCLtd.UI.Panels.DiagnosticsPanel)window.FindName("DiagnosticsPanel")!;
+            var zoomOut = diagnostics.FilterBar.DiagnosticsZoomOutButton;
+            var zoomIn = diagnostics.FilterBar.DiagnosticsZoomInButton;
+            var zoomReset = diagnostics.FilterBar.DiagnosticsZoomResetButton;
+            var rawLog = diagnostics.RawOutputPanel.LogOutputView.LogTextBox;
+            var processedLog = diagnostics.ProcessedOutputPanel.LogOutputView.LogTextBox;
+
+            zoomIn.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+            Assert.Equal("101%", zoomReset.Content);
+            Assert.Equal(12.12, rawLog.FontSize, 2);
+            Assert.Equal(12.12, processedLog.FontSize, 2);
+
+            for (var i = 0; i < 50; i++)
+            {
+                zoomOut.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+            }
+
+            Assert.Equal("75%", zoomReset.Content);
+            Assert.Equal(9.0, rawLog.FontSize, 2);
+            Assert.Equal(9.0, processedLog.FontSize, 2);
+
+            for (var i = 0; i < 100; i++)
+            {
+                zoomIn.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+            }
+
+            Assert.Equal("125%", zoomReset.Content);
+            Assert.Equal(15.0, rawLog.FontSize, 2);
+            Assert.Equal(15.0, processedLog.FontSize, 2);
+
+            zoomReset.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+            Assert.Equal("100%", zoomReset.Content);
+            Assert.Equal(12.0, rawLog.FontSize, 2);
+            Assert.Equal(12.0, processedLog.FontSize, 2);
         });
     }
 

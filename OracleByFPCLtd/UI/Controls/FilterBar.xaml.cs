@@ -10,6 +10,10 @@ public partial class FilterBar : UserControl
         InitializeComponent();
     }
 
+    public TextBlock DiagnosticsHeaderText => DiagnosticsHeaderTextControl;
+    public Button DiagnosticsZoomOutButton => DiagnosticsZoomOutButtonControl;
+    public Button DiagnosticsZoomResetButton => DiagnosticsZoomResetButtonControl;
+    public Button DiagnosticsZoomInButton => DiagnosticsZoomInButtonControl;
     public TextBox FilterKeywordTextBox => FilterKeywordTextBoxControl;
     public TextBox FilterStartTextBox => FilterStartTextBoxControl;
     public TextBox FilterEndTextBox => FilterEndTextBoxControl;

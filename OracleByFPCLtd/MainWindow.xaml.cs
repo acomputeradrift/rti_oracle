@@ -59,6 +59,9 @@ public partial class MainWindow : Window
     private const int LogLevelsBaselineTimeoutMilliseconds = 3000;
     private const double ProcessedWidthPadding = 12;
     private const double RawWidthPadding = 12;
+    private const int DiagnosticsZoomPercentDefault = 100;
+    private const int DiagnosticsZoomPercentMinimum = 75;
+    private const int DiagnosticsZoomPercentMaximum = 125;
     private static readonly TimeSpan FindDebounceInterval = TimeSpan.FromMilliseconds(200);
     private static readonly string[] DateTimeFormats =
     {
@@ -153,6 +156,9 @@ public partial class MainWindow : Window
     private string? _lastConnectedIp;
     private bool _logLevelsBaselineCaptured;
     private TaskCompletionSource<bool>? _logLevelsBaselineTcs;
+    private int _diagnosticsZoomPercent = DiagnosticsZoomPercentDefault;
+    private double _rawLogBaseFontSize;
+    private double _processedLogBaseFontSize;
     private static readonly string DiagnosticsPrimaryProcessorName = "Diagnostics: Primary Processor";
     private string? _diagnosticsDriverDName;
     private ConnectionPhase _connectionPhase = ConnectionPhase.Disconnected;
@@ -192,6 +198,9 @@ public partial class MainWindow : Window
     private Button UploadAdditionalInfoButton => ProjectDataPanel.UploadAdditionalInfoButton;
     private TextBlock AdditionalInfoFileNameText => ProjectDataPanel.AdditionalInfoFileNameText;
     private ToggleButton DriverLogLevelsToggleButton => DriverLogLevelsPanel.DriverLogLevelsToggleButton;
+    private Button DiagnosticsZoomOutButton => DiagnosticsPanel.FilterBar.DiagnosticsZoomOutButton;
+    private Button DiagnosticsZoomResetButton => DiagnosticsPanel.FilterBar.DiagnosticsZoomResetButton;
+    private Button DiagnosticsZoomInButton => DiagnosticsPanel.FilterBar.DiagnosticsZoomInButton;
     private TextBox FilterKeywordTextBox => DiagnosticsPanel.FilterBar.FilterKeywordTextBox;
     private TextBox FilterStartTextBox => DiagnosticsPanel.FilterBar.FilterStartTextBox;
     private TextBox FilterEndTextBox => DiagnosticsPanel.FilterBar.FilterEndTextBox;
@@ -239,6 +248,7 @@ public partial class MainWindow : Window
         Title = $"Oracle by FP&C {AppVersion.CurrentLabel()}";
         WirePanelHandlers();
         ConfigureLogOutputBoxes();
+        InitializeDiagnosticsZoom();
         ConfigureFilterControls();
         UpdateDownloadLogsState();
         DownloadAdditionalInfoTemplateMenuItem.IsEnabled = false;
@@ -292,6 +302,9 @@ public partial class MainWindow : Window
         FilterEndHourCombo.SelectionChanged += FilterEndTimeCombo_SelectionChanged;
         FilterEndMinuteCombo.SelectionChanged += FilterEndTimeCombo_SelectionChanged;
         ClearDiagnosticsButton.Click += ClearDiagnostics_Click;
+        DiagnosticsZoomOutButton.Click += DiagnosticsZoomOutButton_Click;
+        DiagnosticsZoomResetButton.Click += DiagnosticsZoomResetButton_Click;
+        DiagnosticsZoomInButton.Click += DiagnosticsZoomInButton_Click;
         DownloadProcessedLogsMenuItem.Click += DownloadLogsButton_Click;
         DownloadAdditionalInfoTemplateMenuItem.Click += DownloadAdditionalInfoTemplateMenuItem_Click;
         AutoscrollMenuItem.Click += AutoscrollMenuItem_Click;
@@ -344,6 +357,57 @@ public partial class MainWindow : Window
         ProcessedLogTextBox.Document.PagePadding = new Thickness(0);
         ProcessedLogTextBox.Loaded += (_, _) => QueueProcessedLayoutUpdate();
         ProcessedLogTextBox.SizeChanged += (_, _) => QueueProcessedLayoutUpdate();
+    }
+
+    private void InitializeDiagnosticsZoom()
+    {
+        _rawLogBaseFontSize = RawLogTextBox.FontSize;
+        _processedLogBaseFontSize = ProcessedLogTextBox.FontSize;
+        _diagnosticsZoomPercent = DiagnosticsZoomPercentDefault;
+        ApplyDiagnosticsZoom();
+    }
+
+    private void DiagnosticsZoomOutButton_Click(object sender, RoutedEventArgs e)
+    {
+        if (_diagnosticsZoomPercent <= DiagnosticsZoomPercentMinimum)
+        {
+            return;
+        }
+
+        _diagnosticsZoomPercent--;
+        ApplyDiagnosticsZoom();
+    }
+
+    private void DiagnosticsZoomInButton_Click(object sender, RoutedEventArgs e)
+    {
+        if (_diagnosticsZoomPercent >= DiagnosticsZoomPercentMaximum)
+        {
+            return;
+        }
+
+        _diagnosticsZoomPercent++;
+        ApplyDiagnosticsZoom();
+    }
+
+    private void DiagnosticsZoomResetButton_Click(object sender, RoutedEventArgs e)
+    {
+        if (_diagnosticsZoomPercent == DiagnosticsZoomPercentDefault)
+        {
+            return;
+        }
+
+        _diagnosticsZoomPercent = DiagnosticsZoomPercentDefault;
+        ApplyDiagnosticsZoom();
+    }
+
+    private void ApplyDiagnosticsZoom()
+    {
+        DiagnosticsZoomResetButton.Content = _diagnosticsZoomPercent.ToString(CultureInfo.InvariantCulture) + "%";
+        var scale = _diagnosticsZoomPercent / 100.0;
+        RawLogTextBox.FontSize = _rawLogBaseFontSize * scale;
+        ProcessedLogTextBox.FontSize = _processedLogBaseFontSize * scale;
+        QueueRawLayoutUpdate();
+        QueueProcessedLayoutUpdate();
     }
 
     private void ConfigureFilterControls()

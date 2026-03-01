@@ -68,6 +68,16 @@ public sealed class UiLayoutContractTests
 
         var xaml = File.ReadAllText(xamlPath);
 
+        Assert.Contains("x:Name=\"DiagnosticsHeaderTextControl\"", xaml, StringComparison.Ordinal);
+        Assert.Contains("FontSize=\"16\"", xaml, StringComparison.Ordinal);
+        Assert.Contains("FontWeight=\"Bold\"", xaml, StringComparison.Ordinal);
+        Assert.Contains("x:Name=\"DiagnosticsZoomControlsBorder\"", xaml, StringComparison.Ordinal);
+        Assert.Contains("Height=\"24\"", xaml, StringComparison.Ordinal);
+        Assert.Contains("x:Name=\"DiagnosticsZoomOutButtonControl\"", xaml, StringComparison.Ordinal);
+        Assert.Contains("x:Name=\"DiagnosticsZoomResetButtonControl\"", xaml, StringComparison.Ordinal);
+        Assert.Contains("x:Name=\"DiagnosticsZoomInButtonControl\"", xaml, StringComparison.Ordinal);
+        Assert.Contains("Height=\"20\"", xaml, StringComparison.Ordinal);
+        Assert.Contains("Padding=\"6,0\"", xaml, StringComparison.Ordinal);
         Assert.Contains("<TextBox x:Name=\"FilterKeywordTextBoxControl\" Grid.Column=\"1\" MinWidth=\"200\" Height=\"24\"", xaml, StringComparison.Ordinal);
         Assert.Contains("<TextBox x:Name=\"FilterStartTextBoxControl\" Grid.Column=\"0\" Height=\"24\"", xaml, StringComparison.Ordinal);
         Assert.Contains("<Button x:Name=\"FilterStartPickerButtonControl\" Grid.Column=\"1\" Content=\"...\" Width=\"24\" Height=\"24\"", xaml, StringComparison.Ordinal);
