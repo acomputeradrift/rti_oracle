@@ -2134,8 +2134,8 @@ public partial class MainWindow : Window
 
     private void DriverLogLevelsToggleButton_Checked(object sender, RoutedEventArgs e)
     {
-        DriverLogRow.Height = new GridLength(DriverLogDefaultHeight);
-        DriverLogSplitter.Visibility = Visibility.Visible;
+        DriverLogRow.Height = GridLength.Auto;
+        DriverLogSplitter.Visibility = Visibility.Collapsed;
     }
 
     private void DriverLogLevelsToggleButton_Unchecked(object sender, RoutedEventArgs e)
@@ -4898,6 +4898,8 @@ public partial class MainWindow : Window
         {
             view.Refresh();
         }
+
+        DriverLogLevelsPanel.SetDriverCount(GetVisibleLogLevelDriversSnapshot().Count);
     }
 
     private async void DriverToggle_Click(object sender, RoutedEventArgs e)
@@ -4914,8 +4916,20 @@ public partial class MainWindow : Window
         }
 
         var isOn = toggle.IsChecked == true;
+        if (isOn && driver.LastNonZeroLevel <= 0)
+        {
+            driver.IsEnabled = false;
+            toggle.IsChecked = false;
+            return;
+        }
+
+        if (isOn)
+        {
+            driver.SelectedLevel = driver.LastNonZeroLevel;
+        }
+
         driver.IsEnabled = isOn;
-        var level = isOn ? driver.SelectedLevel : 0;
+        var level = isOn ? driver.LastNonZeroLevel : 0;
         await ApplyLogLevelCommandWithAckAsync(driver, level);
     }
 
@@ -5106,6 +5120,8 @@ public partial class MainWindow : Window
         {
             DriverLogLevelsPanel.UpdatePresetButtonSizing();
         }
+
+        DriverLogLevelsPanel.SetDriverCount(GetVisibleLogLevelDriversSnapshot().Count);
     }
 
     private void ResetLogLevelSyncState()
@@ -5212,6 +5228,7 @@ public partial class MainWindow : Window
     {
         private bool _isEnabled;
         private int _selectedLevel;
+        private int _lastNonZeroLevel;
         private string _name;
         private OperationStatus _operationStatus;
         private bool _isVisible = true;
@@ -5221,7 +5238,8 @@ public partial class MainWindow : Window
             Id = id;
             _name = name;
             DName = dName;
-            SelectedLevel = 3;
+            _selectedLevel = 3;
+            _lastNonZeroLevel = 0;
             OperationStatus = OperationStatus.Confirmed;
         }
 
@@ -5264,9 +5282,16 @@ public partial class MainWindow : Window
                     return;
                 }
                 _selectedLevel = value;
+                if (value > 0)
+                {
+                    _lastNonZeroLevel = value;
+                    OnPropertyChanged(nameof(LastNonZeroLevel));
+                }
                 OnPropertyChanged(nameof(SelectedLevel));
             }
         }
+
+        public int LastNonZeroLevel => _lastNonZeroLevel;
 
         public OperationStatus OperationStatus
         {

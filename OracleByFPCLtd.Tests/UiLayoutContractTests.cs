@@ -37,8 +37,11 @@ public sealed class UiLayoutContractTests
 
         var xaml = File.ReadAllText(xamlPath);
 
-        Assert.Contains("<TextBox x:Name=\"IpTextBoxControl\" Width=\"180\" Height=\"26\"", xaml, StringComparison.Ordinal);
-        Assert.Contains("<ComboBox x:Name=\"DiscoveredComboControl\" Width=\"180\" Height=\"26\" />", xaml, StringComparison.Ordinal);
+        Assert.Contains("<TextBox x:Name=\"IpTextBoxControl\" Width=\"180\" Height=\"24\"", xaml, StringComparison.Ordinal);
+        Assert.Contains("<Button x:Name=\"ConnectButtonControl\" Content=\"Connect\" Width=\"90\" Height=\"24\"", xaml, StringComparison.Ordinal);
+        Assert.Contains("<Button x:Name=\"DisconnectButtonControl\" Content=\"Disconnect\" Width=\"90\" Height=\"24\"", xaml, StringComparison.Ordinal);
+        Assert.Contains("<Button x:Name=\"DiscoverButtonControl\" Content=\"Discover\" Width=\"90\" Height=\"24\"", xaml, StringComparison.Ordinal);
+        Assert.Contains("<ComboBox x:Name=\"DiscoveredComboControl\" Width=\"180\" Height=\"24\" />", xaml, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -51,8 +54,58 @@ public sealed class UiLayoutContractTests
 
         Assert.Contains("x:Name=\"UploadProjectButtonControl\"", xaml, StringComparison.Ordinal);
         Assert.Contains("Width=\"180\"", xaml, StringComparison.Ordinal);
+        Assert.Contains("Height=\"24\"", xaml, StringComparison.Ordinal);
         Assert.Contains("<ComboBox x:Name=\"RecentProjectComboBoxControl\"", xaml, StringComparison.Ordinal);
         Assert.Contains("Width=\"180\"", xaml, StringComparison.Ordinal);
+        Assert.Contains("Height=\"24\"", xaml, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void FilterBarUsesLockedStandardControlHeights()
+    {
+        var xamlPath = Path.Combine(RepoRoot, "OracleByFPCLtd", "UI", "Controls", "FilterBar.xaml");
+        Assert.True(File.Exists(xamlPath), $"FilterBar XAML not found: {xamlPath}");
+
+        var xaml = File.ReadAllText(xamlPath);
+
+        Assert.Contains("<TextBox x:Name=\"FilterKeywordTextBoxControl\" Grid.Column=\"1\" MinWidth=\"200\" Height=\"24\"", xaml, StringComparison.Ordinal);
+        Assert.Contains("<TextBox x:Name=\"FilterStartTextBoxControl\" Grid.Column=\"0\" Height=\"24\"", xaml, StringComparison.Ordinal);
+        Assert.Contains("<Button x:Name=\"FilterStartPickerButtonControl\" Grid.Column=\"1\" Content=\"...\" Width=\"24\" Height=\"24\"", xaml, StringComparison.Ordinal);
+        Assert.Contains("<TextBox x:Name=\"FilterEndTextBoxControl\" Grid.Column=\"0\" Height=\"24\"", xaml, StringComparison.Ordinal);
+        Assert.Contains("<Button x:Name=\"FilterEndPickerButtonControl\" Grid.Column=\"1\" Content=\"...\" Width=\"24\" Height=\"24\"", xaml, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void DriverLogLevelsPanelUsesLockedLayoutContract()
+    {
+        var xamlPath = Path.Combine(RepoRoot, "OracleByFPCLtd", "UI", "Panels", "DriverLogLevelsPanel.xaml");
+        Assert.True(File.Exists(xamlPath), $"DriverLogLevelsPanel XAML not found: {xamlPath}");
+
+        var xaml = File.ReadAllText(xamlPath);
+
+        Assert.Contains("<Setter Property=\"Height\" Value=\"30\" />", xaml, StringComparison.Ordinal);
+        Assert.Contains("<Setter Property=\"Height\" Value=\"20\" />", xaml, StringComparison.Ordinal);
+        Assert.Contains("<Setter Property=\"Height\" Value=\"24\" />", xaml, StringComparison.Ordinal);
+        Assert.Contains("<UniformGrid Columns=\"4\" />", xaml, StringComparison.Ordinal);
+        Assert.Contains("x:Name=\"DriverLogLevelsExpandedHost\"", xaml, StringComparison.Ordinal);
+        Assert.Contains("Margin=\"0,6,0,0\"", xaml, StringComparison.Ordinal);
+        Assert.Contains("<ItemsControl ItemsSource=\"{Binding Drivers}\" Margin=\"0,0,-6,-6\">", xaml, StringComparison.Ordinal);
+        Assert.Contains("HorizontalContentAlignment=\"Stretch\"", xaml, StringComparison.Ordinal);
+        Assert.Contains("x:Name=\"DriverCountTextBlockControl\"", xaml, StringComparison.Ordinal);
+        Assert.Contains("Margin=\"0,0,6,0\"", xaml, StringComparison.Ordinal);
+        Assert.DoesNotContain("<ScrollViewer", xaml, StringComparison.Ordinal);
+        Assert.DoesNotContain("<Grid Grid.Row=\"0\" Margin=\"0,0,0,6\">", xaml, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void MainWindowUpdatesDriverCountFromVisibleDrivers()
+    {
+        var codePath = Path.Combine(RepoRoot, "OracleByFPCLtd", "MainWindow.xaml.cs");
+        Assert.True(File.Exists(codePath), $"MainWindow code-behind not found: {codePath}");
+
+        var code = File.ReadAllText(codePath);
+
+        Assert.Contains("DriverLogLevelsPanel.SetDriverCount(GetVisibleLogLevelDriversSnapshot().Count);", code, StringComparison.Ordinal);
     }
 
     private static string FindRepoRoot([CallerFilePath] string sourceFilePath = "")

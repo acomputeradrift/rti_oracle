@@ -23,7 +23,7 @@
               Grid.Column="0"
               Content="Upload Project (.apex)"
               Width="180"
-              Height="28" />
+              Height="24" />
       <ComboBox x:Name="RecentProjectComboBoxControl"
                 Grid.Row="0"
                 Grid.Column="1"
@@ -55,7 +55,7 @@
               Grid.Column="0"
               Content="Upload Additional Info (.xlsx)"
               Width="180"
-              Height="28"
+              Height="24"
               Margin="0,6,0,0" />
       <TextBlock x:Name="AdditionalInfoFileNameTextControl"
                  Grid.Row="1"

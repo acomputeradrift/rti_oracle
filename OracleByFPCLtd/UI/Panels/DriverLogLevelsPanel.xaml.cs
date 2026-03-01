@@ -22,6 +22,7 @@ public partial class DriverLogLevelsPanel : UserControl
     public Button AllLogLevelsButton => AllLogLevelsButtonControl;
     public Button SystemOnlyLogLevelsButton => SystemOnlyLogLevelsButtonControl;
     public Button NoneLogLevelsButton => NoneLogLevelsButtonControl;
+    public TextBlock DriverCountText => DriverCountTextBlockControl;
 
     private void DriverToggle_Click(object sender, RoutedEventArgs e)
     {
@@ -76,5 +77,10 @@ public partial class DriverLogLevelsPanel : UserControl
         {
             button.Width = rounded;
         }
+    }
+
+    public void SetDriverCount(int count)
+    {
+        DriverCountTextBlockControl.Text = Math.Max(0, count).ToString();
     }
 }
