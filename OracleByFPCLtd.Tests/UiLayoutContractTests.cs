@@ -30,18 +30,27 @@ public sealed class UiLayoutContractTests
     }
 
     [Fact]
-    public void ConnectionPanelUsesLockedDiscoverDropdownWidth()
+    public void ConnectionPanelUsesAlignedProcessorAndDiscoveryLayout()
     {
         var xamlPath = Path.Combine(RepoRoot, "OracleByFPCLtd", "UI", "Panels", "ConnectionPanel.xaml");
         Assert.True(File.Exists(xamlPath), $"ConnectionPanel XAML not found: {xamlPath}");
 
         var xaml = File.ReadAllText(xamlPath);
 
-        Assert.Contains("<TextBox x:Name=\"IpTextBoxControl\" Width=\"180\" Height=\"24\"", xaml, StringComparison.Ordinal);
-        Assert.Contains("<Button x:Name=\"ConnectButtonControl\" Content=\"Connect\" Width=\"90\" Height=\"24\"", xaml, StringComparison.Ordinal);
-        Assert.Contains("<Button x:Name=\"DisconnectButtonControl\" Content=\"Disconnect\" Width=\"90\" Height=\"24\"", xaml, StringComparison.Ordinal);
-        Assert.Contains("<Button x:Name=\"DiscoverButtonControl\" Content=\"Discover\" Width=\"90\" Height=\"24\"", xaml, StringComparison.Ordinal);
-        Assert.Contains("<ComboBox x:Name=\"DiscoveredComboControl\" Width=\"180\" Height=\"24\" />", xaml, StringComparison.Ordinal);
+        Assert.Contains("Text=\"Processor IP:\"", xaml, StringComparison.Ordinal);
+        Assert.Contains("Text=\"Discovered IPs:\"", xaml, StringComparison.Ordinal);
+        Assert.Contains("x:Name=\"IpTextBoxControl\"", xaml, StringComparison.Ordinal);
+        Assert.Contains("x:Name=\"DiscoveredComboControl\"", xaml, StringComparison.Ordinal);
+        Assert.Contains("x:Name=\"ConnectButtonControl\"", xaml, StringComparison.Ordinal);
+        Assert.Contains("Content=\"Connect\"", xaml, StringComparison.Ordinal);
+        Assert.Contains("x:Name=\"DisconnectButtonControl\"", xaml, StringComparison.Ordinal);
+        Assert.Contains("Content=\"Disconnect\"", xaml, StringComparison.Ordinal);
+        Assert.Contains("x:Name=\"DiscoverButtonControl\"", xaml, StringComparison.Ordinal);
+        Assert.Contains("Content=\"Discover\"", xaml, StringComparison.Ordinal);
+        Assert.Contains("Width=\"180\"", xaml, StringComparison.Ordinal);
+        Assert.Contains("Height=\"24\"", xaml, StringComparison.Ordinal);
+        Assert.Contains("Width=\"90\"", xaml, StringComparison.Ordinal);
+        Assert.Contains("<ColumnDefinition Width=\"110\" />", xaml, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -58,6 +67,7 @@ public sealed class UiLayoutContractTests
         Assert.Contains("<ComboBox x:Name=\"RecentProjectComboBoxControl\"", xaml, StringComparison.Ordinal);
         Assert.Contains("Width=\"180\"", xaml, StringComparison.Ordinal);
         Assert.Contains("Height=\"24\"", xaml, StringComparison.Ordinal);
+        Assert.Contains("MaxWidth=\"160\"", xaml, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -78,6 +88,8 @@ public sealed class UiLayoutContractTests
         Assert.Contains("x:Name=\"DiagnosticsZoomInButtonControl\"", xaml, StringComparison.Ordinal);
         Assert.Contains("Height=\"20\"", xaml, StringComparison.Ordinal);
         Assert.Contains("Padding=\"6,0\"", xaml, StringComparison.Ordinal);
+        Assert.Contains("x:Name=\"FilterCountTextControl\"", xaml, StringComparison.Ordinal);
+        Assert.Contains("Width=\"90\"", xaml, StringComparison.Ordinal);
         Assert.Contains("<TextBox x:Name=\"FilterKeywordTextBoxControl\" Grid.Column=\"1\" MinWidth=\"200\" Height=\"24\"", xaml, StringComparison.Ordinal);
         Assert.Contains("<TextBox x:Name=\"FilterStartTextBoxControl\" Grid.Column=\"0\" Height=\"24\"", xaml, StringComparison.Ordinal);
         Assert.Contains("<Button x:Name=\"FilterStartPickerButtonControl\" Grid.Column=\"1\" Content=\"...\" Width=\"24\" Height=\"24\"", xaml, StringComparison.Ordinal);
@@ -103,6 +115,8 @@ public sealed class UiLayoutContractTests
         Assert.Contains("HorizontalContentAlignment=\"Stretch\"", xaml, StringComparison.Ordinal);
         Assert.Contains("x:Name=\"DriverCountTextBlockControl\"", xaml, StringComparison.Ordinal);
         Assert.Contains("Margin=\"0,0,6,0\"", xaml, StringComparison.Ordinal);
+        Assert.Contains("StackPanel Orientation=\"Horizontal\"", xaml, StringComparison.Ordinal);
+        Assert.Contains("Margin=\"6,0,0,0\"", xaml, StringComparison.Ordinal);
         Assert.DoesNotContain("<ScrollViewer", xaml, StringComparison.Ordinal);
         Assert.DoesNotContain("<Grid Grid.Row=\"0\" Margin=\"0,0,0,6\">", xaml, StringComparison.Ordinal);
     }

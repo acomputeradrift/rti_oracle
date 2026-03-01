@@ -79,7 +79,7 @@
       </Grid>
       <Button x:Name="FilterApplyButtonControl" Grid.Column="6" Content="Filter" Height="24" Padding="8,2" Margin="0,0,8,0" />
       <Button x:Name="FilterClearButtonControl" Grid.Column="7" Content="Clear" Height="24" Padding="8,2" Margin="0,0,8,0" />
-      <TextBlock x:Name="FilterCountTextControl" Grid.Column="8" Text="Count: 0" VerticalAlignment="Center" />
+      <TextBlock x:Name="FilterCountTextControl" Grid.Column="8" Text="Count: 0" Width="90" VerticalAlignment="Center" />
     </Grid>
     <Popup x:Name="FilterStartDatePopupControl" PlacementTarget="{Binding ElementName=FilterStartTextBoxControl}" StaysOpen="False">
       <Border BorderBrush="#CCCCCC" BorderThickness="1" Background="White">

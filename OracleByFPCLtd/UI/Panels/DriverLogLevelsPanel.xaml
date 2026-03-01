@@ -77,7 +77,7 @@
       <StackPanel Orientation="Horizontal"
                   HorizontalAlignment="Left"
                   VerticalAlignment="Center"
-                  Margin="8,0,0,0">
+                  Margin="6,0,0,0">
         <Button x:Name="AllLogLevelsButtonControl"
                 Content="All"
                 Style="{StaticResource PresetButtonStyle}"

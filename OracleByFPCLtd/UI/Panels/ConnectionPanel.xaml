@@ -8,19 +8,30 @@
       <RowDefinition Height="Auto" />
     </Grid.RowDefinitions>
     <TextBlock x:Name="ConnectHeaderTextControl" Text="Connect" FontWeight="SemiBold" Margin="0,0,0,8" />
-    <StackPanel Orientation="Horizontal" Grid.Row="1" Margin="0,0,0,6">
-      <TextBlock Text="SHP IP:" VerticalAlignment="Center" Margin="0,0,8,0" />
-      <TextBox x:Name="IpTextBoxControl" Width="180" Height="24" Margin="0,0,8,0" />
-      <Button x:Name="ConnectButtonControl" Content="Connect" Width="90" Height="24" Margin="0,0,8,0"
+    <Grid Grid.Row="1">
+      <Grid.RowDefinitions>
+        <RowDefinition Height="Auto" />
+        <RowDefinition Height="Auto" />
+      </Grid.RowDefinitions>
+      <Grid.ColumnDefinitions>
+        <ColumnDefinition Width="110" />
+        <ColumnDefinition Width="180" />
+        <ColumnDefinition Width="90" />
+        <ColumnDefinition Width="90" />
+        <ColumnDefinition Width="*" />
+      </Grid.ColumnDefinitions>
+
+      <TextBlock Text="Processor IP:" VerticalAlignment="Center" Margin="0,0,6,0" />
+      <TextBox x:Name="IpTextBoxControl" Grid.Column="1" Width="180" Height="24" />
+      <Button x:Name="ConnectButtonControl" Grid.Column="2" Content="Connect" Width="90" Height="24" Margin="6,0,0,0"
               IsEnabled="False"
               ToolTip="Upload a project (.apex) to enable connecting." />
-      <Button x:Name="DisconnectButtonControl" Content="Disconnect" Width="90" Height="24" IsEnabled="False" />
-      <TextBlock x:Name="StatusTextControl" Text="Idle" VerticalAlignment="Center" Margin="12,0,0,0" Visibility="Collapsed" />
-    </StackPanel>
-    <StackPanel Orientation="Horizontal" Grid.Row="2">
-      <Button x:Name="DiscoverButtonControl" Content="Discover" Width="90" Height="24" Margin="0,0,8,0" />
-      <TextBlock Text="Discovered:" VerticalAlignment="Center" Margin="0,0,8,0" />
-      <ComboBox x:Name="DiscoveredComboControl" Width="180" Height="24" />
-    </StackPanel>
+      <Button x:Name="DisconnectButtonControl" Grid.Column="3" Content="Disconnect" Width="90" Height="24" Margin="6,0,0,0" IsEnabled="False" />
+      <TextBlock x:Name="StatusTextControl" Grid.Column="4" Text="Idle" VerticalAlignment="Center" Margin="12,0,0,0" Visibility="Collapsed" />
+
+      <TextBlock Grid.Row="1" Text="Discovered IPs:" VerticalAlignment="Center" Margin="0,6,6,0" />
+      <ComboBox x:Name="DiscoveredComboControl" Grid.Row="1" Grid.Column="1" Width="180" Height="24" Margin="0,6,0,0" />
+      <Button x:Name="DiscoverButtonControl" Grid.Row="1" Grid.Column="2" Content="Discover" Width="90" Height="24" Margin="6,6,0,0" />
+    </Grid>
   </Grid>
 </UserControl>

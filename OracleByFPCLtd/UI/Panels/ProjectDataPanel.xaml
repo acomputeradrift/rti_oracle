@@ -35,6 +35,7 @@
         <ComboBox.ItemTemplate>
           <DataTemplate>
             <TextBlock Text="{Binding FileName}"
+                       MaxWidth="160"
                        TextWrapping="NoWrap"
                        TextTrimming="CharacterEllipsis" />
           </DataTemplate>
@@ -63,7 +64,7 @@
                  Text="No additional info"
                  VerticalAlignment="Center"
                  Margin="10,6,0,0"
-                 MaxWidth="220"
+                 MaxWidth="160"
                  TextWrapping="NoWrap"
                  TextTrimming="CharacterEllipsis" />
     </Grid>
