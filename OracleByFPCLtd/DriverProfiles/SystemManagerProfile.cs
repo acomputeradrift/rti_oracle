@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text.RegularExpressions;
 using OracleByFPCLtd.DriverProfiles.Models;
+using OracleByFPCLtd.DriverProfiles.Services;
 using OracleByFPCLtd.ProcessingEngine.Models;
 using OracleByFPCLtd.ProjectData.Models;
 
@@ -68,6 +69,16 @@ public static class SystemManagerProfile
                     return new DriverProfileMapResult(true, rawText, DriverProfileProcessingStatus.NoMap);
                 }
 
+                if (rawText.Contains("System Manager\\[Hide]\\", StringComparison.OrdinalIgnoreCase)
+                    && !CanFormatWithSharedDriverFormatter(rawText))
+                {
+                    return new DriverProfileMapResult(
+                        true,
+                        rawText,
+                        DriverProfileProcessingStatus.NoFormat,
+                        WarningMessage: "Driver profile claimed line but no format rule matched.");
+                }
+
                 return new DriverProfileMapResult(true, rawText, DriverProfileProcessingStatus.PassThrough);
             }
 
@@ -89,6 +100,12 @@ public static class SystemManagerProfile
             }
 
             return new DriverProfileMapResult(false, defaultText, DriverProfileProcessingStatus.NoProfile);
+        }
+
+        private static bool CanFormatWithSharedDriverFormatter(string rawText)
+        {
+            return DriverMessageTemplateFormatter.TryFormatDriverCommand(rawText, Definition.DeviceName, out _)
+                || DriverMessageTemplateFormatter.TryFormatDriverEvent(rawText, Definition.DeviceName, out _);
         }
 
         private static bool HasUnresolvedSourceIndex(string rawText)

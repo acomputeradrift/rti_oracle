@@ -15,8 +15,7 @@ $generatedDirectories = @(
     (Join-Path $repoRoot "OracleByFPCLtd\artifacts"),
     (Join-Path $repoRoot "OracleByFPCLtd.Tests\bin"),
     (Join-Path $repoRoot "OracleByFPCLtd.Tests\obj"),
-    (Join-Path $repoRoot "OracleByFPCLtd.Tests\artifacts"),
-    $testTempRoot
+    (Join-Path $repoRoot "OracleByFPCLtd.Tests\artifacts")
 )
 
 function Remove-GeneratedDirectory {
@@ -50,6 +49,59 @@ function Invoke-Cleanup {
         }
         catch {
             Write-Warning ("Cleanup failed for " + $path + ": " + $_.Exception.Message)
+        }
+    }
+
+    try {
+        Remove-TestLogArtifacts
+    }
+    catch {
+        Write-Warning ("Cleanup failed for test log artifacts: " + $_.Exception.Message)
+    }
+}
+
+function Remove-TestLogArtifacts {
+    $sessionLogPatterns = @(
+        @{
+            Directory = $testDefaultLogOverrideRoot
+            Filter = "*_oracle_event_logs.log"
+        },
+        @{
+            Directory = $testTempRoot
+            Filter = "*.log"
+        }
+    )
+
+    foreach ($entry in $sessionLogPatterns) {
+        $directory = $entry.Directory
+        if (-not [System.IO.Directory]::Exists($directory)) {
+            continue
+        }
+
+        foreach ($file in [System.IO.Directory]::EnumerateFiles($directory, $entry.Filter, [System.IO.SearchOption]::TopDirectoryOnly)) {
+            try {
+                [System.IO.File]::Delete($file)
+            }
+            catch {
+                Write-Warning ("Cleanup failed for " + $file + ": " + $_.Exception.Message)
+            }
+        }
+    }
+
+    foreach ($directory in @($testDefaultLogOverrideRoot, $testTempRoot)) {
+        if (-not [System.IO.Directory]::Exists($directory)) {
+            continue
+        }
+
+        try {
+            if ([System.IO.Directory]::EnumerateFileSystemEntries($directory).GetEnumerator().MoveNext()) {
+                continue
+            }
+
+            [System.IO.Directory]::Delete($directory, $false)
+        }
+        catch {
+            Write-Warning ("Cleanup failed for " + $directory + ": " + $_.Exception.Message)
         }
     }
 }

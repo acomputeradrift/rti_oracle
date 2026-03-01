@@ -256,6 +256,12 @@ public sealed class CentralLogger
             return options.LogDirectoryPath!;
         }
 
+        var overrideDirectory = Environment.GetEnvironmentVariable(LogDirectoryOverrideEnvironmentVariable);
+        if (!string.IsNullOrWhiteSpace(overrideDirectory))
+        {
+            return overrideDirectory;
+        }
+
         if (!string.IsNullOrWhiteSpace(options.LogFilePath))
         {
             var fromPath = Path.GetDirectoryName(options.LogFilePath);
@@ -263,12 +269,6 @@ public sealed class CentralLogger
             {
                 return fromPath;
             }
-        }
-
-        var overrideDirectory = Environment.GetEnvironmentVariable(LogDirectoryOverrideEnvironmentVariable);
-        if (!string.IsNullOrWhiteSpace(overrideDirectory))
-        {
-            return overrideDirectory;
         }
 
         return BuildDefaultLogDirectory();

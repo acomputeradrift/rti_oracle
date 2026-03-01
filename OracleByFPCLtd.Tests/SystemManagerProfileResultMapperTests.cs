@@ -10,15 +10,16 @@ namespace OracleByFPCLtd.Tests;
 public sealed class SystemManagerProfileResultMapperTests
 {
     [Fact]
-    public void ResultMapperReturnsPassThroughForUnhandledHiddenCommand()
+    public void ResultMapperReturnsNoFormatForUnhandledHiddenCommand()
     {
         var result = SystemManagerProfile.ResultMapper!.TryMap(
             "Driver - Command:'System Manager\\[Hide]\\Source Return' Sustain:NO",
             new ProjectDataBundle());
 
         Assert.True(result.Claimed);
-        Assert.Equal(DriverProfileProcessingStatus.PassThrough, result.Status);
+        Assert.Equal(DriverProfileProcessingStatus.NoFormat, result.Status);
         Assert.Equal("Driver - Command:'System Manager\\[Hide]\\Source Return' Sustain:NO", result.Text);
+        Assert.Equal("Driver profile claimed line but no format rule matched.", result.WarningMessage);
     }
 
     [Fact]

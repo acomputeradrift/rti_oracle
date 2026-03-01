@@ -75,34 +75,21 @@ public sealed class DriverMappingService
                 resultText = resultFormattedEvent;
             }
 
-            var effectiveStatus = result.Status;
-            var warningMessage = result.WarningMessage;
-            var warningDetails = result.WarningDetails;
+            var resultUnresolved = IsUnresolvedStatus(result.Status);
+            resultText = ApplyStatusTag(resultText, result.Status);
 
-            if (effectiveStatus == DriverProfileProcessingStatus.PassThrough
-                && string.Equals(resultText, rawText, StringComparison.Ordinal)
-                && !IsAllowedClaimedPassthrough(profile.DeviceName, rawText)
-                && IsClaimedDriverMessage(rawText))
-            {
-                effectiveStatus = DriverProfileProcessingStatus.NoFormat;
-                warningMessage ??= "Driver profile claimed line but no format rule matched.";
-            }
-
-            var resultUnresolved = IsUnresolvedStatus(effectiveStatus);
-            resultText = ApplyStatusTag(resultText, effectiveStatus);
-
-            if (!string.IsNullOrWhiteSpace(warningMessage))
+            if (!string.IsNullOrWhiteSpace(result.WarningMessage))
             {
                 WriteEventLogEntry(
                     SeverityLevel.Warn,
                     "Processing:Formatting",
-                    warningMessage!,
-                    BuildWarningDetails(evt.RawLineNumber, profile.DeviceName, rawText, warningDetails));
+                    result.WarningMessage!,
+                    BuildWarningDetails(evt.RawLineNumber, profile.DeviceName, rawText, result.WarningDetails));
             }
 
             MappingResolution? resolvedMapping = result.MappingResolution;
             if (resolvedMapping is null
-                && effectiveStatus == DriverProfileProcessingStatus.Resolved
+                && result.Status == DriverProfileProcessingStatus.Resolved
                 && TryExtractMappingTransition(rawText, result.Text ?? rawText, out var resultTransition))
             {
                 var transitionParts = resultTransition.Split(" -> ", 2, StringSplitOptions.None);
@@ -289,77 +276,6 @@ public sealed class DriverMappingService
     {
         return text.Contains("Driver - Command:", StringComparison.OrdinalIgnoreCase)
             || text.Contains("Driver Command (", StringComparison.OrdinalIgnoreCase);
-    }
-
-    private static bool IsClaimedDriverMessage(string rawText)
-    {
-        return rawText.Contains("Driver - Command:", StringComparison.OrdinalIgnoreCase)
-            || rawText.Contains("Driver event", StringComparison.OrdinalIgnoreCase);
-    }
-
-    private static bool IsAllowedClaimedPassthrough(string profileName, string rawText)
-    {
-        if (string.IsNullOrWhiteSpace(profileName))
-        {
-            return false;
-        }
-
-        if (string.Equals(profileName, "RTI Diagnostics", StringComparison.OrdinalIgnoreCase))
-        {
-            return true;
-        }
-
-        if (string.Equals(profileName, "RTI Virtual Multiroom Amp", StringComparison.OrdinalIgnoreCase))
-        {
-            return true;
-        }
-
-        if (string.Equals(profileName, "Activities", StringComparison.OrdinalIgnoreCase))
-        {
-            return true;
-        }
-
-        if (string.Equals(profileName, "Lutron Caseta / RA2 Select", StringComparison.OrdinalIgnoreCase))
-        {
-            return true;
-        }
-
-        if (string.Equals(profileName, "Venstar ColorTouch", StringComparison.OrdinalIgnoreCase)
-            && rawText.StartsWith("Venstar ColorTouch -", StringComparison.OrdinalIgnoreCase))
-        {
-            return true;
-        }
-
-        if (string.Equals(profileName, "RTI Internal", StringComparison.OrdinalIgnoreCase)
-            && rawText.Equals("Macro event", StringComparison.OrdinalIgnoreCase))
-        {
-            return true;
-        }
-
-        if (string.Equals(profileName, "System Manager", StringComparison.OrdinalIgnoreCase)
-            && rawText.Contains("Driver - Command:", StringComparison.OrdinalIgnoreCase)
-            && !rawText.Contains("System Manager\\[Hide]\\", StringComparison.OrdinalIgnoreCase))
-        {
-            return true;
-        }
-
-        return false;
-    }
-
-    private static bool ShouldAppendNoMap(string text)
-    {
-        return !text.Contains("[No Map!]", StringComparison.Ordinal)
-            && !text.Contains("[Unknown State!]", StringComparison.Ordinal)
-            && !text.Contains("[No Profile!]", StringComparison.Ordinal);
-    }
-
-    private static bool ShouldAppendUnresolved(string text)
-    {
-        return !text.Contains("[Unresolved!]", StringComparison.Ordinal)
-            && !text.Contains("[UNRESOLVED]", StringComparison.Ordinal)
-            && !text.Contains("[No Map!]", StringComparison.Ordinal)
-            && !text.Contains("[Unknown State!]", StringComparison.Ordinal)
-            && !text.Contains("[No Profile!]", StringComparison.Ordinal);
     }
 
     private static bool TryExtractAttributedDriverName(string rawText, out string driverName)
