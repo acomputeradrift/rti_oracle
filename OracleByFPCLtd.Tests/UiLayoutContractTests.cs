@@ -50,11 +50,14 @@ public sealed class UiLayoutContractTests
         Assert.Contains("Width=\"180\"", xaml, StringComparison.Ordinal);
         Assert.Contains("Height=\"24\"", xaml, StringComparison.Ordinal);
         Assert.Contains("Width=\"90\"", xaml, StringComparison.Ordinal);
-        Assert.Contains("<ColumnDefinition Width=\"110\" />", xaml, StringComparison.Ordinal);
+        Assert.Contains("<ColumnDefinition Width=\"Auto\" />", xaml, StringComparison.Ordinal);
+        Assert.Contains("<ColumnDefinition Width=\"12\" />", xaml, StringComparison.Ordinal);
+        Assert.Contains("HorizontalAlignment=\"Right\"", xaml, StringComparison.Ordinal);
+        Assert.Contains("Margin=\"0,6,0,0\"", xaml, StringComparison.Ordinal);
     }
 
     [Fact]
-    public void ProjectDataPanelUsesLockedRecentProjectDropdownWidth()
+    public void ProjectDataPanelUsesAlignedSiblingSpacing()
     {
         var xamlPath = Path.Combine(RepoRoot, "OracleByFPCLtd", "UI", "Panels", "ProjectDataPanel.xaml");
         Assert.True(File.Exists(xamlPath), $"ProjectDataPanel XAML not found: {xamlPath}");
@@ -68,6 +71,9 @@ public sealed class UiLayoutContractTests
         Assert.Contains("Width=\"180\"", xaml, StringComparison.Ordinal);
         Assert.Contains("Height=\"24\"", xaml, StringComparison.Ordinal);
         Assert.Contains("MaxWidth=\"160\"", xaml, StringComparison.Ordinal);
+        Assert.Contains("<ColumnDefinition Width=\"12\" />", xaml, StringComparison.Ordinal);
+        Assert.DoesNotContain("Margin=\"10,0,0,0\"", xaml, StringComparison.Ordinal);
+        Assert.DoesNotContain("Margin=\"10,6,0,0\"", xaml, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -110,13 +116,16 @@ public sealed class UiLayoutContractTests
         Assert.Contains("<Setter Property=\"Height\" Value=\"24\" />", xaml, StringComparison.Ordinal);
         Assert.Contains("<UniformGrid Columns=\"4\" />", xaml, StringComparison.Ordinal);
         Assert.Contains("x:Name=\"DriverLogLevelsExpandedHost\"", xaml, StringComparison.Ordinal);
-        Assert.Contains("Margin=\"0,6,0,0\"", xaml, StringComparison.Ordinal);
-        Assert.Contains("<ItemsControl ItemsSource=\"{Binding Drivers}\" Margin=\"0,0,-6,-6\">", xaml, StringComparison.Ordinal);
+        Assert.Contains("Margin=\"0\"", xaml, StringComparison.Ordinal);
+        Assert.Contains("<ItemsControl ItemsSource=\"{Binding Drivers}\" Margin=\"0,0,-12,-6\">", xaml, StringComparison.Ordinal);
         Assert.Contains("HorizontalContentAlignment=\"Stretch\"", xaml, StringComparison.Ordinal);
         Assert.Contains("x:Name=\"DriverCountTextBlockControl\"", xaml, StringComparison.Ordinal);
         Assert.Contains("Margin=\"0,0,6,0\"", xaml, StringComparison.Ordinal);
         Assert.Contains("StackPanel Orientation=\"Horizontal\"", xaml, StringComparison.Ordinal);
         Assert.Contains("Margin=\"6,0,0,0\"", xaml, StringComparison.Ordinal);
+        Assert.Contains("Margin=\"0,0,12,0\"", xaml, StringComparison.Ordinal);
+        Assert.Contains("Margin=\"6,0,0,0\"", xaml, StringComparison.Ordinal);
+        Assert.Contains("<Grid Height=\"24\" Margin=\"0,0,12,6\">", xaml, StringComparison.Ordinal);
         Assert.DoesNotContain("<ScrollViewer", xaml, StringComparison.Ordinal);
         Assert.DoesNotContain("<Grid Grid.Row=\"0\" Margin=\"0,0,0,6\">", xaml, StringComparison.Ordinal);
     }

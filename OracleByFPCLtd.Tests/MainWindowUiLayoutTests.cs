@@ -200,6 +200,27 @@ public sealed class MainWindowUiLayoutTests
     }
 
     [Fact]
+    public void DriverLogLevelsDoesNotAddExpandedGapWhenNoDriversExist()
+    {
+        RunOnSta(() =>
+        {
+            var window = new MainWindow();
+            var panel = (OracleByFPCLtd.UI.Panels.DriverLogLevelsPanel)window.FindName("DriverLogLevelsPanel")!;
+            var expandedHost = (Grid)panel.FindName("DriverLogLevelsExpandedHost")!;
+
+            panel.DriverLogLevelsToggleButton.IsChecked = true;
+            window.UpdateLayout();
+
+            Assert.Equal(new Thickness(0), expandedHost.Margin);
+
+            panel.SetDriverCount(1);
+            window.UpdateLayout();
+
+            Assert.Equal(new Thickness(0, 6, 0, 0), expandedHost.Margin);
+        });
+    }
+
+    [Fact]
     public void DateTimePickersDisableWithoutLogsAndClampToLogRange()
     {
         RunOnSta(() =>

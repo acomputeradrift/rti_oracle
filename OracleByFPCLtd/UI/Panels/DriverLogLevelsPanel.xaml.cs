@@ -7,9 +7,14 @@ namespace OracleByFPCLtd.UI.Panels;
 
 public partial class DriverLogLevelsPanel : UserControl
 {
+    private int _visibleDriverCount;
+
     public DriverLogLevelsPanel()
     {
         InitializeComponent();
+        DriverLogLevelsToggleButtonControl.Checked += (_, _) => UpdateExpandedHostSpacing();
+        DriverLogLevelsToggleButtonControl.Unchecked += (_, _) => UpdateExpandedHostSpacing();
+        UpdateExpandedHostSpacing();
     }
 
     public event RoutedEventHandler? DriverToggleClick;
@@ -81,6 +86,15 @@ public partial class DriverLogLevelsPanel : UserControl
 
     public void SetDriverCount(int count)
     {
-        DriverCountTextBlockControl.Text = Math.Max(0, count).ToString();
+        _visibleDriverCount = Math.Max(0, count);
+        DriverCountTextBlockControl.Text = _visibleDriverCount.ToString();
+        UpdateExpandedHostSpacing();
+    }
+
+    private void UpdateExpandedHostSpacing()
+    {
+        DriverLogLevelsExpandedHost.Margin = _visibleDriverCount > 0
+            ? new Thickness(0, 6, 0, 0)
+            : new Thickness(0);
     }
 }
