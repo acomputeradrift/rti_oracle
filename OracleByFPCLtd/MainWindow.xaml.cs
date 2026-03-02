@@ -3017,7 +3017,7 @@ public partial class MainWindow : Window
             additionalName = null;
         }
 
-        var exportTimestamp = _maxRawLogTimestamp ?? LogTimestampSource.GetTimestamp(DateTime.Now);
+        var exportTimestamp = DateTime.Now;
         var metadata = new ExportMetadata(exportTimestamp, apexFile, additionalName);
         var filterSummary = new FilterSummary(
             FilterKeywordTextBox.Text.Trim(),

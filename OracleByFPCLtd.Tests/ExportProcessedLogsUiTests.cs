@@ -70,19 +70,20 @@ public sealed class ExportProcessedLogsUiTests
     }
 
     [Fact]
-    public void BuildExportRequestUsesLatestProcessorTimestampForMetadata()
+    public void BuildExportRequestUsesLocalComputerTimeForMetadata()
     {
         RunOnSta(() =>
         {
             var window = new MainWindow();
-            var expected = new DateTime(2026, 1, 24, 10, 45, 30);
+            var before = DateTime.Now;
 
-            SetRawLogMaxTimestamp(window, expected);
-            LogTimestampSource.UpdateProcessorTimestamp(expected);
+            SetRawLogMaxTimestamp(window, new DateTime(2026, 1, 24, 10, 45, 30));
+            LogTimestampSource.UpdateProcessorTimestamp(new DateTime(2026, 1, 24, 10, 45, 30));
 
             var request = InvokeBuildExportRequest(window);
+            var after = DateTime.Now;
 
-            Assert.Equal(expected, request.Metadata.GeneratedAt);
+            Assert.InRange(request.Metadata.GeneratedAt, before.AddSeconds(-1), after.AddSeconds(1));
         });
     }
 
