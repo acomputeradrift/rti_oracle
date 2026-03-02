@@ -10,11 +10,11 @@
       </Grid.RowDefinitions>
       <Grid Margin="0,0,0,6">
         <Grid.ColumnDefinitions>
-          <ColumnDefinition Width="*" />
           <ColumnDefinition Width="Auto" />
+          <ColumnDefinition Width="*" />
         </Grid.ColumnDefinitions>
         <TextBlock Text="Raw Output" FontWeight="SemiBold" VerticalAlignment="Center" />
-        <controls:FindBar x:Name="FindBarControl" Grid.Column="1" />
+        <controls:FindBar x:Name="FindBarControl" Grid.Column="1" HorizontalAlignment="Right" />
       </Grid>
       <controls:LogOutputView x:Name="LogOutputViewControl" Grid.Row="1" />
     </Grid>

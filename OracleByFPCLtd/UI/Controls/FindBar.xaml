@@ -2,12 +2,22 @@
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              MinHeight="24">
-  <StackPanel Orientation="Horizontal">
+  <Grid>
+    <Grid.ColumnDefinitions>
+      <ColumnDefinition Width="Auto" />
+      <ColumnDefinition Width="Auto" />
+      <ColumnDefinition Width="Auto" />
+      <ColumnDefinition Width="Auto" />
+      <ColumnDefinition Width="Auto" />
+      <ColumnDefinition Width="76" />
+    </Grid.ColumnDefinitions>
     <TextBlock Text="Find:" VerticalAlignment="Center" Margin="0,0,6,0" />
-    <TextBox x:Name="FindTextBoxControl" Width="140" Height="24" Margin="0,0,8,0" />
-    <Button x:Name="FindPrevButtonControl" Content="Prev" Padding="6,2" Margin="0,0,4,0" IsEnabled="False" />
-    <Button x:Name="FindNextButtonControl" Content="Next" Padding="6,2" Margin="0,0,4,0" IsEnabled="False" />
-    <Button x:Name="FindClearButtonControl" Content="Clear" Padding="6,2" Margin="0,0,8,0" />
-    <TextBlock x:Name="FindCountTextControl" Text="Match: None" VerticalAlignment="Center" />
-  </StackPanel>
+    <TextBox x:Name="FindTextBoxControl" Grid.Column="1" Width="140" Height="24" Margin="0,0,12,0" />
+    <Button x:Name="FindPrevButtonControl" Grid.Column="2" Content="Prev" Padding="6,2" Margin="0,0,6,0" IsEnabled="False" />
+    <Button x:Name="FindNextButtonControl" Grid.Column="3" Content="Next" Padding="6,2" Margin="0,0,6,0" IsEnabled="False" />
+    <Button x:Name="FindClearButtonControl" Grid.Column="4" Content="Clear" Padding="6,2" Margin="0,0,6,0" />
+    <Border x:Name="FindCountHostControl" Grid.Column="5" Width="76" HorizontalAlignment="Right" Background="Transparent">
+      <TextBlock x:Name="FindCountTextControl" Text="Match: None" Margin="0,0,0,0" VerticalAlignment="Center" TextAlignment="Left" />
+    </Border>
+  </Grid>
 </UserControl>

@@ -87,6 +87,7 @@ public sealed class UiLayoutContractTests
         Assert.Contains("x:Name=\"DiagnosticsHeaderTextControl\"", xaml, StringComparison.Ordinal);
         Assert.Contains("FontSize=\"16\"", xaml, StringComparison.Ordinal);
         Assert.Contains("FontWeight=\"Bold\"", xaml, StringComparison.Ordinal);
+        Assert.Contains("Margin=\"0,0,12,0\"", xaml, StringComparison.Ordinal);
         Assert.Contains("x:Name=\"DiagnosticsZoomControlsBorder\"", xaml, StringComparison.Ordinal);
         Assert.Contains("Height=\"24\"", xaml, StringComparison.Ordinal);
         Assert.Contains("x:Name=\"DiagnosticsZoomOutButtonControl\"", xaml, StringComparison.Ordinal);
@@ -94,13 +95,75 @@ public sealed class UiLayoutContractTests
         Assert.Contains("x:Name=\"DiagnosticsZoomInButtonControl\"", xaml, StringComparison.Ordinal);
         Assert.Contains("Height=\"20\"", xaml, StringComparison.Ordinal);
         Assert.Contains("Padding=\"6,0\"", xaml, StringComparison.Ordinal);
+        Assert.Contains("x:Name=\"FilterApplyButtonControl\"", xaml, StringComparison.Ordinal);
+        Assert.Contains("x:Name=\"FilterClearButtonControl\"", xaml, StringComparison.Ordinal);
         Assert.Contains("x:Name=\"FilterCountTextControl\"", xaml, StringComparison.Ordinal);
+        Assert.Contains("x:Name=\"ClearDiagnosticsButtonControl\"", xaml, StringComparison.Ordinal);
         Assert.Contains("Width=\"90\"", xaml, StringComparison.Ordinal);
-        Assert.Contains("<TextBox x:Name=\"FilterKeywordTextBoxControl\" Grid.Column=\"1\" MinWidth=\"200\" Height=\"24\"", xaml, StringComparison.Ordinal);
-        Assert.Contains("<TextBox x:Name=\"FilterStartTextBoxControl\" Grid.Column=\"0\" Height=\"24\"", xaml, StringComparison.Ordinal);
+        Assert.Contains("Content=\"Filter\" Width=\"90\" Height=\"24\"", xaml, StringComparison.Ordinal);
+        Assert.Contains("Content=\"Clear\" Width=\"90\" Height=\"24\"", xaml, StringComparison.Ordinal);
+        Assert.Contains("Content=\"Clear Logs\"", xaml, StringComparison.Ordinal);
+        Assert.Contains("Text=\"Keywords:\"", xaml, StringComparison.Ordinal);
+        Assert.DoesNotContain("Text=\"Filter: Keyword\"", xaml, StringComparison.Ordinal);
+        Assert.Contains("<TextBox x:Name=\"FilterKeywordTextBoxControl\" Grid.Column=\"1\" Width=\"180\" Height=\"24\" Margin=\"0,0,12,0\"", xaml, StringComparison.Ordinal);
+        Assert.Contains("<Grid Grid.Column=\"3\" Width=\"180\"", xaml, StringComparison.Ordinal);
+        Assert.Contains("<TextBox x:Name=\"FilterStartTextBoxControl\" Grid.Column=\"0\" Width=\"156\" Height=\"24\"", xaml, StringComparison.Ordinal);
+        Assert.Contains("Text=\"Start:\" VerticalAlignment=\"Center\" Margin=\"0,0,6,0\"", xaml, StringComparison.Ordinal);
         Assert.Contains("<Button x:Name=\"FilterStartPickerButtonControl\" Grid.Column=\"1\" Content=\"...\" Width=\"24\" Height=\"24\"", xaml, StringComparison.Ordinal);
-        Assert.Contains("<TextBox x:Name=\"FilterEndTextBoxControl\" Grid.Column=\"0\" Height=\"24\"", xaml, StringComparison.Ordinal);
+        Assert.Contains("<Grid Grid.Column=\"3\" Width=\"180\" Margin=\"0,0,12,0\">", xaml, StringComparison.Ordinal);
+        Assert.Contains("<Grid Grid.Column=\"5\" Width=\"180\"", xaml, StringComparison.Ordinal);
+        Assert.Contains("<TextBox x:Name=\"FilterEndTextBoxControl\" Grid.Column=\"0\" Width=\"156\" Height=\"24\"", xaml, StringComparison.Ordinal);
+        Assert.Contains("Text=\"End:\" VerticalAlignment=\"Center\" Margin=\"0,0,6,0\"", xaml, StringComparison.Ordinal);
         Assert.Contains("<Button x:Name=\"FilterEndPickerButtonControl\" Grid.Column=\"1\" Content=\"...\" Width=\"24\" Height=\"24\"", xaml, StringComparison.Ordinal);
+        Assert.Contains("<Grid Grid.Column=\"5\" Width=\"180\" Margin=\"0,0,12,0\">", xaml, StringComparison.Ordinal);
+        Assert.Contains("Content=\"Filter\" Width=\"90\" Height=\"24\" Padding=\"8,2\" Margin=\"0,0,6,0\"", xaml, StringComparison.Ordinal);
+        Assert.Contains("Content=\"Clear\" Width=\"90\" Height=\"24\" Padding=\"8,2\" Margin=\"0,0,6,0\"", xaml, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void FindBarUsesLockedSpacingAndFixedMatchWidth()
+    {
+        var xamlPath = Path.Combine(RepoRoot, "OracleByFPCLtd", "UI", "Controls", "FindBar.xaml");
+        Assert.True(File.Exists(xamlPath), $"FindBar XAML not found: {xamlPath}");
+
+        var xaml = File.ReadAllText(xamlPath);
+
+        Assert.Contains("<Grid>", xaml, StringComparison.Ordinal);
+        Assert.DoesNotContain("<ColumnDefinition Width=\"*\" />", xaml, StringComparison.Ordinal);
+        Assert.Contains("Text=\"Find:\" VerticalAlignment=\"Center\" Margin=\"0,0,6,0\"", xaml, StringComparison.Ordinal);
+        Assert.Contains("x:Name=\"FindTextBoxControl\"", xaml, StringComparison.Ordinal);
+        Assert.Contains("Width=\"140\"", xaml, StringComparison.Ordinal);
+        Assert.Contains("Height=\"24\"", xaml, StringComparison.Ordinal);
+        Assert.Contains("Margin=\"0,0,12,0\"", xaml, StringComparison.Ordinal);
+        Assert.Contains("x:Name=\"FindPrevButtonControl\"", xaml, StringComparison.Ordinal);
+        Assert.Contains("Margin=\"0,0,6,0\"", xaml, StringComparison.Ordinal);
+        Assert.Contains("x:Name=\"FindNextButtonControl\"", xaml, StringComparison.Ordinal);
+        Assert.Contains("x:Name=\"FindClearButtonControl\"", xaml, StringComparison.Ordinal);
+        Assert.Contains("x:Name=\"FindCountHostControl\"", xaml, StringComparison.Ordinal);
+        Assert.Contains("x:Name=\"FindCountTextControl\"", xaml, StringComparison.Ordinal);
+        Assert.Contains("Margin=\"0,0,0,0\"", xaml, StringComparison.Ordinal);
+        Assert.Contains("Width=\"76\"", xaml, StringComparison.Ordinal);
+        Assert.Contains("TextAlignment=\"Left\"", xaml, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void OutputPanelsStretchFindBarToHeaderEdge()
+    {
+        var rawPath = Path.Combine(RepoRoot, "OracleByFPCLtd", "UI", "Panels", "RawOutputPanel.xaml");
+        var processedPath = Path.Combine(RepoRoot, "OracleByFPCLtd", "UI", "Panels", "ProcessedOutputPanel.xaml");
+        Assert.True(File.Exists(rawPath), $"RawOutputPanel XAML not found: {rawPath}");
+        Assert.True(File.Exists(processedPath), $"ProcessedOutputPanel XAML not found: {processedPath}");
+
+        var rawXaml = File.ReadAllText(rawPath);
+        var processedXaml = File.ReadAllText(processedPath);
+
+        Assert.Contains("<ColumnDefinition Width=\"Auto\" />", rawXaml, StringComparison.Ordinal);
+        Assert.Contains("<ColumnDefinition Width=\"*\" />", rawXaml, StringComparison.Ordinal);
+        Assert.Contains("<controls:FindBar x:Name=\"FindBarControl\" Grid.Column=\"1\" HorizontalAlignment=\"Right\" />", rawXaml, StringComparison.Ordinal);
+
+        Assert.Contains("<ColumnDefinition Width=\"Auto\" />", processedXaml, StringComparison.Ordinal);
+        Assert.Contains("<ColumnDefinition Width=\"*\" />", processedXaml, StringComparison.Ordinal);
+        Assert.Contains("<controls:FindBar x:Name=\"FindBarControl\" Grid.Column=\"1\" HorizontalAlignment=\"Right\" />", processedXaml, StringComparison.Ordinal);
     }
 
     [Fact]

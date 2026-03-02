@@ -115,9 +115,9 @@ public sealed class MainWindowUiLayoutTests
             var start = diagnostics.FilterBar.FilterStartTextBox;
             var end = diagnostics.FilterBar.FilterEndTextBox;
 
-            Assert.True(keyword.ActualWidth >= 180);
-            Assert.True(start.ActualWidth >= 160);
-            Assert.True(end.ActualWidth >= 160);
+            Assert.Equal(180, Math.Round(keyword.ActualWidth));
+            Assert.Equal(156, Math.Round(start.ActualWidth));
+            Assert.Equal(156, Math.Round(end.ActualWidth));
 
             window.Hide();
         });
