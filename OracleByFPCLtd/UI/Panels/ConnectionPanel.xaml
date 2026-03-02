@@ -25,10 +25,12 @@
       </Grid.ColumnDefinitions>
 
       <TextBlock Text="Processor IP:" VerticalAlignment="Center" HorizontalAlignment="Right" />
-      <TextBox x:Name="IpTextBoxControl" Grid.Column="2" Width="180" Height="24" />
+      <TextBox x:Name="IpTextBoxControl" Grid.Column="2" Width="180" Height="24"
+               ToolTip="Enter the IP address of the RTI main processor" />
       <Button x:Name="ConnectButtonControl" Grid.Column="4" Content="Connect" Width="90" Height="24"
               IsEnabled="False"
-              ToolTip="Upload a project (.apex) to enable connecting." />
+              ToolTipService.ShowOnDisabled="True"
+              ToolTip="Upload Apex file first" />
       <Button x:Name="DisconnectButtonControl" Grid.Column="6" Content="Disconnect" Width="90" Height="24" IsEnabled="False" />
       <TextBlock x:Name="StatusTextControl" Grid.Column="7" Text="Idle" VerticalAlignment="Center" Margin="12,0,0,0" Visibility="Collapsed" />
 

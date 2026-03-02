@@ -57,6 +57,9 @@
               Content="Upload Additional Info (.xlsx)"
               Width="180"
               Height="24"
+              IsEnabled="False"
+              ToolTipService.ShowOnDisabled="True"
+              ToolTip="Upload Apex file first"
               Margin="0,6,0,0" />
       <TextBlock x:Name="AdditionalInfoFileNameTextControl"
                  Grid.Row="1"

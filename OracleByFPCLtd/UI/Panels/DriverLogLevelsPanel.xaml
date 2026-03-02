@@ -54,6 +54,7 @@
                     FontWeight="SemiBold"
                     HorizontalContentAlignment="Stretch"
                     IsChecked="False"
+                    ToolTip="Click here to manage log level subscriptions"
                     Style="{StaticResource DriverLogLevelsHeaderToggleStyle}">
         <Grid>
           <Grid.ColumnDefinitions>

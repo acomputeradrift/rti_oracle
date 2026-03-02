@@ -262,6 +262,7 @@ public partial class MainWindow : Window
         ConfigureFilterControls();
         UpdateDownloadLogsState();
         DownloadAdditionalInfoTemplateMenuItem.IsEnabled = false;
+        UpdateProjectDataActionStates();
         ConfigureFindTimers();
         LoadSettings();
         DataContext = this;
@@ -1570,6 +1571,23 @@ public partial class MainWindow : Window
         }
     }
 
+    private void UpdateAdditionalInfoGuidanceTooltip()
+    {
+        var showGuidance = _apexUploaded
+            && string.Equals(AdditionalInfoFileNameText.Text, "No additional info", StringComparison.OrdinalIgnoreCase);
+        AdditionalInfoFileNameText.ToolTip = showGuidance
+            ? "See generated project template for Additional Info under File menu"
+            : null;
+    }
+
+    private void UpdateProjectDataActionStates()
+    {
+        var requiresApex = !_apexUploaded;
+        ConnectButton.ToolTip = requiresApex ? "Upload Apex file first" : null;
+        UploadAdditionalInfoButton.IsEnabled = !requiresApex;
+        UploadAdditionalInfoButton.ToolTip = requiresApex ? "Upload Apex file first" : null;
+    }
+
     private void UpdateDateTimeTextFromPicker(TextBox target, System.Windows.Controls.Calendar calendar, ComboBox hourCombo, ComboBox minuteCombo, ComboBox periodCombo, bool isStart)
     {
         if (isStart)
@@ -2679,6 +2697,7 @@ public partial class MainWindow : Window
         _settingsStore.Save(_settings);
         _additionalInfoPath = dialog.FileName;
         AdditionalInfoFileNameText.Text = Path.GetFileName(dialog.FileName);
+        UpdateAdditionalInfoGuidanceTooltip();
         if (_lastProjectExtractionResult is not null)
         {
             _ = InitializeProcessingAsync(_lastProjectExtractionResult);
@@ -2705,6 +2724,8 @@ public partial class MainWindow : Window
             _lastAdditionalData = null;
         }
         ProjectDataHeaderText.Text = "Project Data";
+        UpdateProjectDataActionStates();
+        UpdateAdditionalInfoGuidanceTooltip();
 
         _recentProjectService.RecordProjectSelection(_settings, filePath);
         _settingsStore.Save(_settings);

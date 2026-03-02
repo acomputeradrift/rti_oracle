@@ -269,6 +269,51 @@ public sealed class MainWindowUiLayoutTests
     }
 
     [Fact]
+    public void AdditionalInfoGuidanceTooltipAppearsOnlyAfterApexUpload()
+    {
+        RunOnSta(() =>
+        {
+            var window = new MainWindow();
+            var projectData = (OracleByFPCLtd.UI.Panels.ProjectDataPanel)window.FindName("ProjectDataPanel")!;
+
+            Assert.Null(projectData.AdditionalInfoFileNameText.ToolTip);
+
+            InvokeSetPrivateField(window, "_apexUploaded", true);
+            InvokeUpdateAdditionalInfoGuidanceTooltip(window);
+
+            Assert.Equal(
+                "See generated project template for Additional Info under File menu",
+                projectData.AdditionalInfoFileNameText.ToolTip);
+
+            projectData.AdditionalInfoFileNameText.Text = "info.xlsx";
+            InvokeUpdateAdditionalInfoGuidanceTooltip(window);
+            Assert.Null(projectData.AdditionalInfoFileNameText.ToolTip);
+        });
+    }
+
+    [Fact]
+    public void ProjectDataActionsRequireApexBeforeAdditionalInfoUpload()
+    {
+        RunOnSta(() =>
+        {
+            var window = new MainWindow();
+            var connection = (OracleByFPCLtd.UI.Panels.ConnectionPanel)window.FindName("ConnectionPanel")!;
+            var projectData = (OracleByFPCLtd.UI.Panels.ProjectDataPanel)window.FindName("ProjectDataPanel")!;
+
+            Assert.Equal("Upload Apex file first", connection.ConnectButton.ToolTip);
+            Assert.False(projectData.UploadAdditionalInfoButton.IsEnabled);
+            Assert.Equal("Upload Apex file first", projectData.UploadAdditionalInfoButton.ToolTip);
+
+            InvokeSetPrivateField(window, "_apexUploaded", true);
+            InvokeUpdateProjectDataActionStates(window);
+
+            Assert.Null(connection.ConnectButton.ToolTip);
+            Assert.True(projectData.UploadAdditionalInfoButton.IsEnabled);
+            Assert.Null(projectData.UploadAdditionalInfoButton.ToolTip);
+        });
+    }
+
+    [Fact]
     public void DateTimePickerWritesTwelveHourAmPmFormat()
     {
         RunOnSta(() =>
@@ -526,6 +571,27 @@ public sealed class MainWindowUiLayoutTests
         var method = typeof(MainWindow).GetMethod("SyncPickerFromText", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic);
         Assert.NotNull(method);
         method!.Invoke(window, new object[] { text, calendar, hourCombo, minuteCombo, periodCombo, isStart });
+    }
+
+    private static void InvokeUpdateAdditionalInfoGuidanceTooltip(MainWindow window)
+    {
+        var method = typeof(MainWindow).GetMethod("UpdateAdditionalInfoGuidanceTooltip", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic);
+        Assert.NotNull(method);
+        method!.Invoke(window, Array.Empty<object>());
+    }
+
+    private static void InvokeUpdateProjectDataActionStates(MainWindow window)
+    {
+        var method = typeof(MainWindow).GetMethod("UpdateProjectDataActionStates", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic);
+        Assert.NotNull(method);
+        method!.Invoke(window, Array.Empty<object>());
+    }
+
+    private static void InvokeSetPrivateField(MainWindow window, string fieldName, object value)
+    {
+        var field = typeof(MainWindow).GetField(fieldName, System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic);
+        Assert.NotNull(field);
+        field!.SetValue(window, value);
     }
 
     private static void FlushLayout(FrameworkElement element)

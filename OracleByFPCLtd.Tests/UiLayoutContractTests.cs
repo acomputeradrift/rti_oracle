@@ -54,6 +54,9 @@ public sealed class UiLayoutContractTests
         Assert.Contains("<ColumnDefinition Width=\"12\" />", xaml, StringComparison.Ordinal);
         Assert.Contains("HorizontalAlignment=\"Right\"", xaml, StringComparison.Ordinal);
         Assert.Contains("Margin=\"0,6,0,0\"", xaml, StringComparison.Ordinal);
+        Assert.Contains("ToolTip=\"Enter the IP address of the RTI main processor\"", xaml, StringComparison.Ordinal);
+        Assert.Contains("ToolTip=\"Upload Apex file first\"", xaml, StringComparison.Ordinal);
+        Assert.Contains("ToolTipService.ShowOnDisabled=\"True\"", xaml, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -71,6 +74,10 @@ public sealed class UiLayoutContractTests
         Assert.Contains("Width=\"180\"", xaml, StringComparison.Ordinal);
         Assert.Contains("Height=\"24\"", xaml, StringComparison.Ordinal);
         Assert.Contains("MaxWidth=\"160\"", xaml, StringComparison.Ordinal);
+        Assert.Contains("x:Name=\"UploadAdditionalInfoButtonControl\"", xaml, StringComparison.Ordinal);
+        Assert.Contains("IsEnabled=\"False\"", xaml, StringComparison.Ordinal);
+        Assert.Contains("ToolTip=\"Upload Apex file first\"", xaml, StringComparison.Ordinal);
+        Assert.Contains("ToolTipService.ShowOnDisabled=\"True\"", xaml, StringComparison.Ordinal);
         Assert.Contains("<ColumnDefinition Width=\"12\" />", xaml, StringComparison.Ordinal);
         Assert.DoesNotContain("Margin=\"10,0,0,0\"", xaml, StringComparison.Ordinal);
         Assert.DoesNotContain("Margin=\"10,6,0,0\"", xaml, StringComparison.Ordinal);
@@ -191,6 +198,7 @@ public sealed class UiLayoutContractTests
         Assert.Contains("<Grid Height=\"24\" Margin=\"0,0,12,6\">", xaml, StringComparison.Ordinal);
         Assert.DoesNotContain("<ScrollViewer", xaml, StringComparison.Ordinal);
         Assert.DoesNotContain("<Grid Grid.Row=\"0\" Margin=\"0,0,0,6\">", xaml, StringComparison.Ordinal);
+        Assert.Contains("ToolTip=\"Click here to manage log level subscriptions\"", xaml, StringComparison.Ordinal);
     }
 
     [Fact]
