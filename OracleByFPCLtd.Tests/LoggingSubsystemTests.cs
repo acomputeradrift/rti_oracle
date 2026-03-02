@@ -420,6 +420,7 @@ public sealed class LoggingSubsystemTests
 
             var log = File.ReadAllText(files[0]);
             Assert.Equal(1, log.Split("------Processor Time", StringSplitOptions.None).Length - 1);
+            Assert.Contains($"{Environment.NewLine}{Environment.NewLine}------Processor Time", log, StringComparison.Ordinal);
             Assert.Contains("26-02-28 1:44:12.345 PM", log, StringComparison.Ordinal);
             Assert.Contains("Connected to Websocket", log, StringComparison.Ordinal);
             Assert.Contains("Connected after timestamp", log, StringComparison.Ordinal);

@@ -46,27 +46,9 @@ public static class ProcessingEngineRunner
                 continue;
             }
 
-            WriteEventLogEntry(
-                SeverityLevel.Info,
-                "Formatting",
-                "formatted with DateTime, line number",
-                new Dictionary<string, string>
-                {
-                    ["line"] = evt.RawLineNumber.ToString()
-                });
-
             var processed = engine.ProcessEvent(evt);
             var formattedLine = ProcessedLineFormatter.Format(processed);
             results.Add(formattedLine);
-
-            WriteEventLogEntry(
-                SeverityLevel.Info,
-                "Processing",
-                "formatted for readability",
-                new Dictionary<string, string>
-                {
-                    ["line"] = evt.RawLineNumber.ToString()
-                });
 
             processedCount++;
             progress?.Invoke(processedCount, total);

@@ -7,6 +7,7 @@ using System.Diagnostics;
 using System.Globalization;
 using System.IO;
 using System.Linq;
+using System.Net.Http;
 using System.Text.Json;
 using System.Text.RegularExpressions;
 using System.Threading;
@@ -64,6 +65,10 @@ public partial class MainWindow : Window
     private const int DiagnosticsZoomPercentMinimum = 75;
     private const int DiagnosticsZoomPercentMaximum = 125;
     private static readonly TimeSpan FindDebounceInterval = TimeSpan.FromMilliseconds(200);
+    private static readonly HttpClient ProcessorTimeHttpClient = new()
+    {
+        Timeout = TimeSpan.FromSeconds(5)
+    };
     private static readonly string[] DateTimeFormats =
     {
         DateTimeDisplayFormatter.FilterDisplayPattern,
@@ -126,6 +131,7 @@ public partial class MainWindow : Window
     private List<string> _filterExcludeTerms = new();
     private readonly List<string> _rawLogLines = new();
     private readonly List<string> _processedLogLines = new();
+    private Func<string, Task<DateTime?>> _processorTimeProbeAsync = FetchProcessorTimestampFromSystemStatusAsync;
     private readonly WebSocketMessageFormatter _messageFormatter = new(DateOnly.FromDateTime(DateTime.Today));
     private readonly Dictionary<string, string> _friendlyNames = new(StringComparer.OrdinalIgnoreCase);
     private readonly Dictionary<string, int> _deviceNameToId = new(StringComparer.OrdinalIgnoreCase);
@@ -571,6 +577,7 @@ public partial class MainWindow : Window
         if (!TryParseKeywordFilter(FilterKeywordTextBox.Text, out var include, out var exclude, out _)
             || !TryParseDateRange(FilterStartTextBox.Text, FilterEndTextBox.Text, out var start, out var end, out _))
         {
+            ResetFilterDatePickers();
             EmitPhaseStatus(
                 "Filtering",
                 "WARN",
@@ -591,6 +598,7 @@ public partial class MainWindow : Window
             _filterActive = _filterIncludeTerms.Count > 0 || _filterExcludeTerms.Count > 0 || _filterStart.HasValue || _filterEnd.HasValue;
 
             ApplyCurrentFilter();
+            ResetFilterDatePickers();
             EmitPhaseStatus(
                 "Filtering",
                 "SUCCESS",
@@ -616,8 +624,7 @@ public partial class MainWindow : Window
         FilterKeywordTextBox.Text = "";
         FilterStartTextBox.Text = "";
         FilterEndTextBox.Text = "";
-        FilterStartCalendar.SelectedDate = null;
-        FilterEndCalendar.SelectedDate = null;
+        ResetFilterDatePickers();
         _filterIncludeTerms = new List<string>();
         _filterExcludeTerms = new List<string>();
         _filterStart = null;
@@ -1478,9 +1485,65 @@ public partial class MainWindow : Window
             return;
         }
 
-        var fallbackDate = calendar.SelectedDate ?? DateTime.Today;
-        var fallback = new DateTime(fallbackDate.Year, fallbackDate.Month, fallbackDate.Day, 0, 0, 0);
+        var fallback = GetDefaultPickerValue(calendar.SelectedDate, isStart);
         SetPickerValues(calendar, hourCombo, minuteCombo, periodCombo, fallback, isStart);
+    }
+
+    private DateTime GetDefaultPickerValue(DateTime? selectedDate, bool isStart)
+    {
+        if (isStart)
+        {
+            if (_filterStart.HasValue)
+            {
+                return ClampToLogRange(_filterStart.Value);
+            }
+
+            if (_minRawLogTimestamp.HasValue)
+            {
+                return _minRawLogTimestamp.Value;
+            }
+        }
+        else
+        {
+            if (_filterEnd.HasValue)
+            {
+                return ClampToLogRange(_filterEnd.Value);
+            }
+
+            if (_maxRawLogTimestamp.HasValue)
+            {
+                return _maxRawLogTimestamp.Value;
+            }
+        }
+
+        var fallbackDate = selectedDate ?? DateTime.Today;
+        var hour = isStart ? 0 : 23;
+        var minute = isStart ? 0 : 59;
+        return new DateTime(fallbackDate.Year, fallbackDate.Month, fallbackDate.Day, hour, minute, 0);
+    }
+
+    private void ResetFilterDatePickers()
+    {
+        _isUpdatingStartPicker = true;
+        _isUpdatingEndPicker = true;
+        try
+        {
+            FilterStartDatePopup.IsOpen = false;
+            FilterEndDatePopup.IsOpen = false;
+            FilterStartCalendar.SelectedDate = null;
+            FilterEndCalendar.SelectedDate = null;
+            FilterStartHourCombo.SelectedItem = null;
+            FilterStartMinuteCombo.SelectedItem = null;
+            FilterStartPeriodCombo.SelectedItem = null;
+            FilterEndHourCombo.SelectedItem = null;
+            FilterEndMinuteCombo.SelectedItem = null;
+            FilterEndPeriodCombo.SelectedItem = null;
+        }
+        finally
+        {
+            _isUpdatingStartPicker = false;
+            _isUpdatingEndPicker = false;
+        }
     }
 
     private void SetPickerValues(System.Windows.Controls.Calendar calendar, ComboBox hourCombo, ComboBox minuteCombo, ComboBox periodCombo, DateTime value, bool isStart)
@@ -1801,6 +1864,87 @@ public partial class MainWindow : Window
         return DateTimeDisplayFormatter.TryParseHighPrecisionInput(rawTimestamp, out timestamp);
     }
 
+    private async Task TryInitializeProcessorTimestampFromSystemStatusAsync(string ip)
+    {
+        if (string.IsNullOrWhiteSpace(ip))
+        {
+            return;
+        }
+
+        try
+        {
+            var timestamp = await _processorTimeProbeAsync(ip);
+            if (!timestamp.HasValue)
+            {
+                return;
+            }
+
+            _lastProcessorTimestamp = timestamp.Value;
+            LogTimestampSource.UpdateProcessorTimestamp(timestamp.Value);
+            if (!_minRawLogTimestamp.HasValue || timestamp.Value < _minRawLogTimestamp.Value)
+            {
+                _minRawLogTimestamp = timestamp.Value;
+            }
+
+            if (!_maxRawLogTimestamp.HasValue || timestamp.Value > _maxRawLogTimestamp.Value)
+            {
+                _maxRawLogTimestamp = timestamp.Value;
+            }
+        }
+        catch
+        {
+            // Best effort only; websocket connection must continue if the time probe fails.
+        }
+    }
+
+    private static async Task<DateTime?> FetchProcessorTimestampFromSystemStatusAsync(string ip)
+    {
+        if (string.IsNullOrWhiteSpace(ip))
+        {
+            return null;
+        }
+
+        var json = await ProcessorTimeHttpClient.GetStringAsync($"http://{ip}:5000/diagnostics/data/system_status");
+        return TryExtractProcessorTimestampFromSystemStatusJson(json, out var timestamp)
+            ? timestamp
+            : null;
+    }
+
+    private static bool TryExtractProcessorTimestampFromSystemStatusJson(string json, out DateTime timestamp)
+    {
+        timestamp = default;
+        if (string.IsNullOrWhiteSpace(json))
+        {
+            return false;
+        }
+
+        try
+        {
+            using var document = JsonDocument.Parse(json);
+            if (!document.RootElement.TryGetProperty("memory_history", out var history)
+                || history.ValueKind != JsonValueKind.Array
+                || history.GetArrayLength() == 0)
+            {
+                return false;
+            }
+
+            var first = history[0];
+            if (!first.TryGetProperty("timestamp", out var timestampElement)
+                || timestampElement.ValueKind != JsonValueKind.Number
+                || !timestampElement.TryGetInt64(out var timestampMilliseconds))
+            {
+                return false;
+            }
+
+            timestamp = new DateTime(1970, 1, 1, 0, 0, 0, DateTimeKind.Local).AddMilliseconds(timestampMilliseconds);
+            return true;
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
     private void Transport_RawMessageReceived(object? sender, string raw)
     {
         if (_useTcpCapture)
@@ -2048,6 +2192,7 @@ public partial class MainWindow : Window
             await _transport.ConnectAsync(ip);
             if (!_useTcpCapture)
             {
+                await TryInitializeProcessorTimestampFromSystemStatusAsync(ip);
                 EmitPhaseStatus(
                     "Connection",
                     "SUCCESS",
@@ -3428,6 +3573,11 @@ public partial class MainWindow : Window
         _centralLogger = logger ?? throw new ArgumentNullException(nameof(logger));
     }
 
+    private void OverrideProcessorTimeProbeForTesting(Func<string, Task<DateTime?>> probe)
+    {
+        _processorTimeProbeAsync = probe ?? throw new ArgumentNullException(nameof(probe));
+    }
+
     private void EmitPhaseStatus(
         string phase,
         string level,
@@ -3458,6 +3608,8 @@ public partial class MainWindow : Window
             "hard_diag_project_confirm_ack_ok" => true,
             "hard_diag_system_set_ack_ok" => true,
             "hard_diag_sequence_complete_ok" => true,
+            "startup_ack_settle_begin" => true,
+            "startup_ack_settle_ok" => true,
             _ => false
         };
     }

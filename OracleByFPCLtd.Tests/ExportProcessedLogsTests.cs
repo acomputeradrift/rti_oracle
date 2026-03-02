@@ -1,10 +1,12 @@
 using System;
 using System.Collections.Generic;
+using System.IO;
 using OracleByFPCLtd.ExportProcessedLogs.Builders;
 using OracleByFPCLtd.ExportProcessedLogs.IO;
 using OracleByFPCLtd.ExportProcessedLogs.Models;
 using OracleByFPCLtd.ExportProcessedLogs.Rendering;
 using OracleByFPCLtd.ExportProcessedLogs.Services;
+using OracleByFPCLtd.Logging;
 using Xunit;
 
 namespace OracleByFPCLtd.Tests;
@@ -70,6 +72,76 @@ public sealed class ExportProcessedLogsTests
         Assert.Same(request, renderer.LastRequest);
         Assert.Equal("output.pdf", writer.LastPath);
         Assert.Equal(renderer.LastBytes, writer.LastBytes);
+    }
+
+    [Fact]
+    public void ExportServiceDoesNotWriteSuccessEventLogOnSuccessfulExport()
+    {
+        var original = Environment.GetEnvironmentVariable("ORACLE_EVENT_LOG_DIRECTORY_OVERRIDE");
+        var overrideDirectory = TestTempPaths.CreateDirectoryPath();
+        try
+        {
+            Environment.SetEnvironmentVariable("ORACLE_EVENT_LOG_DIRECTORY_OVERRIDE", overrideDirectory);
+            LogTimestampSource.Reset();
+            var request = new ExportRequest(
+                new List<string> { "1 Line one" },
+                new ExportMetadata(DateTime.UnixEpoch, "Project.apex", null),
+                new FilterSummary("", "", ""));
+            var renderer = new FakePdfRenderer();
+            var writer = new FakeExportFileWriter();
+            var service = new ProcessedLogsExportService(renderer, writer);
+
+            service.Export(request, "output.pdf");
+
+            var files = Directory.GetFiles(overrideDirectory, "*_oracle_event_logs.log");
+            Assert.Single(files);
+            var log = File.ReadAllText(files[0]);
+            Assert.DoesNotContain("Processed logs export completed.", log, StringComparison.Ordinal);
+        }
+        finally
+        {
+            LogTimestampSource.Reset();
+            Environment.SetEnvironmentVariable("ORACLE_EVENT_LOG_DIRECTORY_OVERRIDE", original);
+            if (Directory.Exists(overrideDirectory))
+            {
+                Directory.Delete(overrideDirectory, recursive: true);
+            }
+        }
+    }
+
+    [Fact]
+    public void ExportFileWriterDoesNotWriteSuccessEventLogOnSuccessfulWrite()
+    {
+        var original = Environment.GetEnvironmentVariable("ORACLE_EVENT_LOG_DIRECTORY_OVERRIDE");
+        var overrideDirectory = TestTempPaths.CreateDirectoryPath();
+        var outputPath = TestTempPaths.CreateFilePath(".pdf");
+        try
+        {
+            Environment.SetEnvironmentVariable("ORACLE_EVENT_LOG_DIRECTORY_OVERRIDE", overrideDirectory);
+            LogTimestampSource.Reset();
+            var writer = new ExportFileWriter();
+
+            writer.Write(outputPath, new byte[] { 0x01, 0x02, 0x03 });
+
+            var files = Directory.GetFiles(overrideDirectory, "*_oracle_event_logs.log");
+            Assert.Single(files);
+            var log = File.ReadAllText(files[0]);
+            Assert.DoesNotContain("Export file write completed.", log, StringComparison.Ordinal);
+        }
+        finally
+        {
+            LogTimestampSource.Reset();
+            Environment.SetEnvironmentVariable("ORACLE_EVENT_LOG_DIRECTORY_OVERRIDE", original);
+            if (File.Exists(outputPath))
+            {
+                File.Delete(outputPath);
+            }
+
+            if (Directory.Exists(overrideDirectory))
+            {
+                Directory.Delete(overrideDirectory, recursive: true);
+            }
+        }
     }
 
     [Fact]

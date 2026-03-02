@@ -47,15 +47,6 @@ public sealed class ProcessedLogsExportService
 
         var bytes = _renderer.Render(request);
         _writer.Write(outputPath, bytes);
-        WriteEventLogEntry(
-            SeverityLevel.Info,
-            "Export",
-            "Processed logs export completed.",
-            new Dictionary<string, string>
-            {
-                ["path"] = outputPath,
-                ["bytes"] = bytes.Length.ToString()
-            });
     }
 
     private void WriteEventLogEntry(

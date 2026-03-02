@@ -138,6 +138,17 @@ public sealed class CentralLogger
         });
     }
 
+    private void AppendBlankLine()
+    {
+        ExecuteFileIoWithRetry(() =>
+        {
+            lock (GetPathLock(_eventLogPath))
+            {
+                File.AppendAllText(_eventLogPath, Environment.NewLine);
+            }
+        });
+    }
+
     private static string BuildStructuredLine(LogEntry entry, DateTime timestamp)
     {
         var source = BuildSource(entry.Module, entry.Phase);
@@ -332,6 +343,7 @@ public sealed class CentralLogger
         {
             if (TrySwitchToProcessorMode())
             {
+                AppendBlankLine();
                 AppendLine(ProcessorTimeDivider);
             }
         }

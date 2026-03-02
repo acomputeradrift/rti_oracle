@@ -137,6 +137,31 @@ public sealed class ProcessingEngineMappingTests
     }
 
     [Fact]
+    public void ProcessingEngineRunnerDoesNotEmitRoutineFormattingStageInfoLogs()
+    {
+        var logPath = TestTempPaths.CreateFilePath(".log");
+        OverrideProcessingEngineRunnerLogger(new CentralLogger(new CentralLoggerOptions
+        {
+            SessionLogPath = logPath,
+            TimestampProvider = () => new DateTime(2026, 2, 28, 11, 50, 0, DateTimeKind.Local)
+        }));
+
+        var engine = new OracleByFPCLtd.ProcessingEngine.ProcessingEngine(new ProcessingContext(
+            new Dictionary<string, int> { ["RTiPanel (iPhone X or newer)"] = 81 },
+            new Dictionary<string, string> { ["81|0"] = "Room Select" }));
+
+        _ = ProcessingEngineRunner.ProcessNumberedLines(
+            new[] { "16 [2026-01-24 10:00:00.000] Change to page 1 on device 'RTiPanel (iPhone X or newer)'" },
+            engine);
+
+        var log = File.ReadAllText(logPath);
+        Assert.DoesNotContain("formatted with DateTime, line number", log, StringComparison.Ordinal);
+        Assert.DoesNotContain("formatted for readability", log, StringComparison.Ordinal);
+
+        File.Delete(logPath);
+    }
+
+    [Fact]
     public void DriverMappingServiceLogsLineNumberWhenProfileIsMissing()
     {
         var logPath = TestTempPaths.CreateFilePath(".log");

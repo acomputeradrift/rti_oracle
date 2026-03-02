@@ -35,15 +35,6 @@ public sealed class ExportFileWriter : IExportFileWriter
         }
 
         File.WriteAllBytes(outputPath, bytes);
-        WriteEventLogEntry(
-            SeverityLevel.Info,
-            "Write",
-            "Export file write completed.",
-            new Dictionary<string, string>
-            {
-                ["path"] = outputPath,
-                ["bytes"] = bytes.Length.ToString()
-            });
     }
 
     private void WriteEventLogEntry(

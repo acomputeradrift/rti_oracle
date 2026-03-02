@@ -197,6 +197,117 @@ public sealed class MainWindowProcessedOutputTests
     }
 
     [Fact]
+    public void StartupAckSettleMilestonesLogButDoNotRenderInStatusArea()
+    {
+        RunOnSta(() =>
+        {
+            var logPath = TestTempPaths.CreateFilePath(".log");
+            var logger = new CentralLogger(new CentralLoggerOptions
+            {
+                SessionLogPath = logPath,
+                TimestampProvider = () => new DateTime(2026, 3, 2, 13, 11, 34, DateTimeKind.Local)
+            });
+            var window = new MainWindow();
+            InvokeOverrideCentralLogger(window, logger);
+
+            InvokeEmitPhaseStatus(
+                window,
+                "LogLevels:Status",
+                "INFO",
+                "Waiting for startup log-level ACK chatter to settle",
+                "startup_ack_settle_begin",
+                new Dictionary<string, string>
+                {
+                    ["observedAckCount"] = "2",
+                    ["quietMs"] = "2000",
+                    ["maxMs"] = "8000"
+                },
+                exception: null);
+            InvokeEmitPhaseStatus(
+                window,
+                "LogLevels:Status",
+                "INFO",
+                "Startup log-level ACK chatter settled",
+                "startup_ack_settle_ok",
+                new Dictionary<string, string>
+                {
+                    ["observedAckCount"] = "2"
+                },
+                exception: null);
+
+            var statusText = GetStatusText(window);
+            var logText = File.ReadAllText(logPath);
+
+            Assert.DoesNotContain("Waiting for startup log-level ACK chatter to settle", statusText, StringComparison.Ordinal);
+            Assert.DoesNotContain("Startup log-level ACK chatter settled", statusText, StringComparison.Ordinal);
+
+            Assert.Contains("Waiting for startup log-level ACK chatter to settle", logText, StringComparison.Ordinal);
+            Assert.Contains("Startup log-level ACK chatter settled", logText, StringComparison.Ordinal);
+
+            window.Close();
+            File.Delete(logPath);
+        });
+    }
+
+    [Fact]
+    public void ProcessorSystemStatusJsonParsesMemoryHistoryTimestamp()
+    {
+        const string json = "{\"memory_history\":[{\"timestamp\":1772450666000}]}";
+
+        var parsed = InvokeTryExtractProcessorTimestampFromSystemStatusJson(json, out var timestamp);
+
+        Assert.True(parsed);
+        Assert.Equal(new DateTime(2026, 3, 2, 11, 24, 26, 0, DateTimeKind.Local), timestamp);
+    }
+
+    [Fact]
+    public void ProcessorTimeProbeSwitchesLogBeforeConnectedStatusEntry()
+    {
+        RunOnSta(() =>
+        {
+            var logPath = TestTempPaths.CreateFilePath(".log");
+            try
+            {
+                LogTimestampSource.Reset();
+                var logger = new CentralLogger(new CentralLoggerOptions
+                {
+                    SessionLogPath = logPath
+                });
+                var window = new MainWindow();
+                InvokeOverrideCentralLogger(window, logger);
+                InvokeOverrideProcessorTimeProbe(window, _ => Task.FromResult<DateTime?>(new DateTime(2026, 3, 2, 11, 24, 26, 600, DateTimeKind.Local)));
+
+                WaitForTaskWithDoEvents(InvokeTryInitializeProcessorTimestampFromSystemStatus(window, "192.168.1.143"));
+                InvokeEmitPhaseStatus(
+                    window,
+                    "Connection",
+                    "SUCCESS",
+                    "Connected to Websocket",
+                    "connect_success",
+                    new Dictionary<string, string> { ["ip"] = "192.168.1.143" },
+                    exception: null);
+
+                var log = File.ReadAllText(logPath);
+                var localIndex = log.IndexOf("------Local Time", StringComparison.Ordinal);
+                var processorIndex = log.IndexOf("------Processor Time", StringComparison.Ordinal);
+                var connectedIndex = log.IndexOf("Connected to Websocket", StringComparison.Ordinal);
+
+                Assert.True(localIndex >= 0);
+                Assert.True(processorIndex > localIndex);
+                Assert.True(connectedIndex > processorIndex);
+            }
+            finally
+            {
+                LogTimestampSource.Reset();
+                if (File.Exists(logPath))
+                {
+                    File.Delete(logPath);
+                }
+            }
+        });
+    }
+
+    [Fact]
     public void ClearDiagnosticsClearsRawAndProcessedOutput()
     {
         RunOnSta(() =>
@@ -828,6 +939,30 @@ public sealed class MainWindowProcessedOutputTests
         var method = typeof(MainWindow).GetMethod("OverrideCentralLoggerForTesting", BindingFlags.Instance | BindingFlags.NonPublic);
         Assert.NotNull(method);
         method!.Invoke(window, new object[] { logger });
+    }
+
+    private static void InvokeOverrideProcessorTimeProbe(MainWindow window, Func<string, Task<DateTime?>> probe)
+    {
+        var method = typeof(MainWindow).GetMethod("OverrideProcessorTimeProbeForTesting", BindingFlags.Instance | BindingFlags.NonPublic);
+        Assert.NotNull(method);
+        method!.Invoke(window, new object[] { probe });
+    }
+
+    private static Task InvokeTryInitializeProcessorTimestampFromSystemStatus(MainWindow window, string ip)
+    {
+        var method = typeof(MainWindow).GetMethod("TryInitializeProcessorTimestampFromSystemStatusAsync", BindingFlags.Instance | BindingFlags.NonPublic);
+        Assert.NotNull(method);
+        return (Task)method!.Invoke(window, new object[] { ip })!;
+    }
+
+    private static bool InvokeTryExtractProcessorTimestampFromSystemStatusJson(string json, out DateTime timestamp)
+    {
+        var method = typeof(MainWindow).GetMethod("TryExtractProcessorTimestampFromSystemStatusJson", BindingFlags.Static | BindingFlags.NonPublic);
+        Assert.NotNull(method);
+        var args = new object?[] { json, null };
+        var result = (bool)method!.Invoke(null, args)!;
+        timestamp = result ? (DateTime)args[1]! : default;
+        return result;
     }
 
     private static List<string> GetProcessedLines(MainWindow window)
