@@ -4,6 +4,7 @@ using System.Globalization;
 using System.IO;
 using System.Linq;
 using System.Threading;
+using OracleByFPCLtd.Formatting;
 
 namespace OracleByFPCLtd.Logging;
 
@@ -39,6 +40,8 @@ public sealed class CentralLogger
 {
     private const string LogDirectoryOverrideEnvironmentVariable = "ORACLE_EVENT_LOG_DIRECTORY_OVERRIDE";
     private const string SessionFileSuffix = "_oracle_event_logs.log";
+    private const string LocalTimeDivider = "------Local Time";
+    private const string ProcessorTimeDivider = "------Processor Time";
     private static readonly HashSet<string> AllowedStatusLevels = new(StringComparer.OrdinalIgnoreCase)
     {
         "SUCCESS",
@@ -49,11 +52,18 @@ public sealed class CentralLogger
 
     private static readonly object SessionLock = new();
     private static readonly Dictionary<string, string> SessionLogPathsByDirectory = new(StringComparer.OrdinalIgnoreCase);
+    private static readonly Dictionary<string, TimestampMode> TimestampModesByPath = new(StringComparer.OrdinalIgnoreCase);
     private static readonly Dictionary<string, object> PathLocks = new(StringComparer.OrdinalIgnoreCase);
 
     private readonly string _eventLogPath;
-    private readonly Func<DateTime> _timestampProvider;
+    private readonly Func<DateTime>? _timestampProvider;
     private readonly Action<string, string> _statusSink;
+
+    private enum TimestampMode
+    {
+        Local,
+        Processor
+    }
 
     public CentralLogger(CentralLoggerOptions options)
     {
@@ -62,11 +72,19 @@ public sealed class CentralLogger
             throw new ArgumentNullException(nameof(options));
         }
 
-        _timestampProvider = options.TimestampProvider ?? (() => LogTimestampSource.GetTimestamp(DateTime.Now));
+        _timestampProvider = options.TimestampProvider;
         _statusSink = options.StatusSink ?? ((_, _) => { });
-        _eventLogPath = ResolveLogPath(options, _timestampProvider());
+        var sessionTimestamp = options.TimestampProvider?.Invoke()
+            ?? LogTimestampSource.GetTimestamp(DateTime.Now);
+        _eventLogPath = ResolveLogPath(options, sessionTimestamp);
         EnsureLogFileExists(_eventLogPath);
         ApplyRetention(_eventLogPath, options.RetainedSessionFileCount);
+
+        if (_timestampProvider is null)
+        {
+            WriteInitialDividerIfNeeded();
+            LogTimestampSource.ProcessorTimestampUpdated += HandleProcessorTimestampUpdated;
+        }
     }
 
     public void LogEvent(LogEntry entry)
@@ -76,9 +94,9 @@ public sealed class CentralLogger
             throw new ArgumentNullException(nameof(entry));
         }
 
-        var timestamp = _timestampProvider();
         try
         {
+            var timestamp = GetTimestampForEntry();
             AppendLine(BuildStructuredLine(entry, timestamp));
         }
         catch (Exception ex) when (IsNonFatalFileException(ex))
@@ -127,7 +145,7 @@ public sealed class CentralLogger
         var quotedMessage = BuildQuotedMessage(entry.Message, detailPairs);
         var line = string.Create(
             CultureInfo.InvariantCulture,
-            $"{timestamp:yyyy-MM-dd HH:mm} [{entry.Severity.ToString().ToUpperInvariant()}] {source}: \"{quotedMessage}\"");
+            $"{DateTimeDisplayFormatter.FormatHighPrecisionDisplay(timestamp)} [{entry.Severity.ToString().ToUpperInvariant()}] {source}: \"{quotedMessage}\"");
 
         foreach (var pair in detailPairs)
         {
@@ -246,6 +264,80 @@ public sealed class CentralLogger
             }
 
             return path;
+        }
+    }
+
+    private void WriteInitialDividerIfNeeded()
+    {
+        string? divider = null;
+        lock (SessionLock)
+        {
+            if (!TimestampModesByPath.ContainsKey(_eventLogPath))
+            {
+                var mode = LogTimestampSource.TryGetTimestamp(out _)
+                    ? TimestampMode.Processor
+                    : TimestampMode.Local;
+                TimestampModesByPath[_eventLogPath] = mode;
+                divider = mode == TimestampMode.Processor
+                    ? ProcessorTimeDivider
+                    : LocalTimeDivider;
+            }
+        }
+
+        if (divider is not null)
+        {
+            AppendLine(divider);
+        }
+    }
+
+    private DateTime GetTimestampForEntry()
+    {
+        if (_timestampProvider is not null)
+        {
+            return _timestampProvider();
+        }
+
+        return GetCurrentTimestampMode() == TimestampMode.Processor
+            ? LogTimestampSource.GetTimestamp(DateTime.Now)
+            : DateTime.Now;
+    }
+
+    private TimestampMode GetCurrentTimestampMode()
+    {
+        lock (SessionLock)
+        {
+            return TimestampModesByPath.TryGetValue(_eventLogPath, out var mode)
+                ? mode
+                : TimestampMode.Local;
+        }
+    }
+
+    private bool TrySwitchToProcessorMode()
+    {
+        lock (SessionLock)
+        {
+            if (TimestampModesByPath.TryGetValue(_eventLogPath, out var mode) && mode == TimestampMode.Processor)
+            {
+                return false;
+            }
+
+            TimestampModesByPath[_eventLogPath] = TimestampMode.Processor;
+            return true;
+        }
+    }
+
+    private void HandleProcessorTimestampUpdated(DateTime timestamp)
+    {
+        try
+        {
+            if (TrySwitchToProcessorMode())
+            {
+                AppendLine(ProcessorTimeDivider);
+            }
+        }
+        catch (Exception ex) when (IsNonFatalFileException(ex))
+        {
+            // Best-effort logging only; never fail producer workflows due to log file locks.
         }
     }
 

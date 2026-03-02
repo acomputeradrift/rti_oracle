@@ -35,7 +35,7 @@ public sealed class LoggingSubsystemTests
         logger.LogEvent(entry);
 
         var log = File.ReadAllText(logPath);
-        Assert.Contains("2026-01-18 12:34", log, StringComparison.Ordinal);
+        Assert.Contains("26-01-18 12:34:56.789 PM", log, StringComparison.Ordinal);
         Assert.Contains("[WARN]", log, StringComparison.Ordinal);
         Assert.Contains("DiagnosticsTransport/Connect", log, StringComparison.Ordinal);
         Assert.Contains("\"WebSocket closed by remote host\"", log, StringComparison.Ordinal);
@@ -98,7 +98,7 @@ public sealed class LoggingSubsystemTests
             }));
 
         var log = File.ReadAllText(logPath);
-        Assert.Contains("2026-02-28 12:32 [INFO] ProcessingEngineRunner/Formatting: \"Line 42 - formatted with DateTime, line number\"", log, StringComparison.Ordinal);
+        Assert.Contains("26-02-28 12:32:44.000 PM [INFO] ProcessingEngineRunner/Formatting: \"Line 42 - formatted with DateTime, line number\"", log, StringComparison.Ordinal);
         Assert.DoesNotContain(" line=\"42\"", log, StringComparison.Ordinal);
 
         File.Delete(logPath);
@@ -128,7 +128,7 @@ public sealed class LoggingSubsystemTests
             }));
 
         var log = File.ReadAllText(logPath);
-        Assert.Contains("2026-02-28 12:32 [SUCCESS] ProcessingEngineRunner/Processing: \"Line 42 - mapped index 81 for Room Select\" profile=\"Clipsal C-Bus\"", log, StringComparison.Ordinal);
+        Assert.Contains("26-02-28 12:32:44.000 PM [SUCCESS] ProcessingEngineRunner/Processing: \"Line 42 - mapped index 81 for Room Select\" profile=\"Clipsal C-Bus\"", log, StringComparison.Ordinal);
         Assert.DoesNotContain("driver=\"DRIVER//5\"", log, StringComparison.Ordinal);
 
         File.Delete(logPath);
@@ -330,6 +330,103 @@ public sealed class LoggingSubsystemTests
         }
         finally
         {
+            Environment.SetEnvironmentVariable("ORACLE_EVENT_LOG_DIRECTORY_OVERRIDE", original);
+            if (Directory.Exists(overrideDirectory))
+            {
+                Directory.Delete(overrideDirectory, recursive: true);
+            }
+        }
+    }
+
+    [Fact]
+    public void TestAssemblySetsDefaultEventLogOverrideForAllTests()
+    {
+        Assert.Equal(
+            TestTempPaths.DefaultEventLogOverrideDirectory,
+            Environment.GetEnvironmentVariable("ORACLE_EVENT_LOG_DIRECTORY_OVERRIDE"));
+    }
+
+    [Fact]
+    public void DefaultLoggerWritesImmediatelyUsingLocalTimeUntilProcessorTimestampExists()
+    {
+        var original = Environment.GetEnvironmentVariable("ORACLE_EVENT_LOG_DIRECTORY_OVERRIDE");
+        var overrideDirectory = TestTempPaths.CreateDirectoryPath();
+
+        try
+        {
+            Environment.SetEnvironmentVariable("ORACLE_EVENT_LOG_DIRECTORY_OVERRIDE", overrideDirectory);
+            LogTimestampSource.Reset();
+            var logger = new CentralLogger(new CentralLoggerOptions());
+
+            logger.LogEvent(new LogEntry(
+                SeverityLevel.Info,
+                "abc123",
+                "MainWindow",
+                "Connection",
+                "Connected to Websocket"));
+
+            var files = Directory.GetFiles(overrideDirectory, "*_oracle_event_logs.log");
+            Assert.Single(files);
+            var fileInfo = new FileInfo(files[0]);
+            Assert.True(fileInfo.Length > 0);
+            var log = File.ReadAllText(files[0]);
+            Assert.Contains("------Local Time", log, StringComparison.Ordinal);
+            Assert.Contains("Connected to Websocket", log, StringComparison.Ordinal);
+            Assert.DoesNotContain("------Processor Time", log, StringComparison.Ordinal);
+        }
+        finally
+        {
+            LogTimestampSource.Reset();
+            Environment.SetEnvironmentVariable("ORACLE_EVENT_LOG_DIRECTORY_OVERRIDE", original);
+            if (Directory.Exists(overrideDirectory))
+            {
+                Directory.Delete(overrideDirectory, recursive: true);
+            }
+        }
+    }
+
+    [Fact]
+    public void DefaultLoggerSwitchesToProcessorTimeExactlyOnce()
+    {
+        var original = Environment.GetEnvironmentVariable("ORACLE_EVENT_LOG_DIRECTORY_OVERRIDE");
+        var overrideDirectory = TestTempPaths.CreateDirectoryPath();
+
+        try
+        {
+            Environment.SetEnvironmentVariable("ORACLE_EVENT_LOG_DIRECTORY_OVERRIDE", overrideDirectory);
+            LogTimestampSource.Reset();
+            var logger = new CentralLogger(new CentralLoggerOptions());
+
+            logger.LogEvent(new LogEntry(
+                SeverityLevel.Info,
+                "abc123",
+                "MainWindow",
+                "Connection",
+                "Connected to Websocket"));
+
+            var files = Directory.GetFiles(overrideDirectory, "*_oracle_event_logs.log");
+            Assert.Single(files);
+            Assert.Contains("------Local Time", File.ReadAllText(files[0]), StringComparison.Ordinal);
+
+            var processorTime = new DateTime(2026, 2, 28, 13, 44, 12, 345, DateTimeKind.Local);
+            LogTimestampSource.UpdateProcessorTimestamp(processorTime);
+
+            logger.LogEvent(new LogEntry(
+                SeverityLevel.Info,
+                "def456",
+                "MainWindow",
+                "Connection",
+                "Connected after timestamp"));
+
+            var log = File.ReadAllText(files[0]);
+            Assert.Equal(1, log.Split("------Processor Time", StringSplitOptions.None).Length - 1);
+            Assert.Contains("26-02-28 1:44:12.345 PM", log, StringComparison.Ordinal);
+            Assert.Contains("Connected to Websocket", log, StringComparison.Ordinal);
+            Assert.Contains("Connected after timestamp", log, StringComparison.Ordinal);
+        }
+        finally
+        {
+            LogTimestampSource.Reset();
             Environment.SetEnvironmentVariable("ORACLE_EVENT_LOG_DIRECTORY_OVERRIDE", original);
             if (Directory.Exists(overrideDirectory))
             {

@@ -15,14 +15,14 @@ public sealed class ExportProcessedLogsTests
     public void HeaderBuilderBuildsMetadataLines()
     {
         var metadata = new ExportMetadata(
-            new DateTime(2026, 1, 24, 10, 30, 0),
+            new DateTime(2026, 1, 24, 10, 30, 0, DateTimeKind.Local),
             "Project.apex",
             "Additional.xlsx");
         var builder = new HeaderBuilder();
 
         var lines = builder.Build(metadata);
 
-        Assert.Contains("Date: 2026-01-24 10:30", lines);
+        Assert.Contains("Date: 26-01-24 10:30 AM (Local Time)", lines);
         Assert.Contains("Apex File: Project.apex", lines);
         Assert.Contains("Additional Info File: Additional.xlsx", lines);
     }

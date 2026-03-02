@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using OracleByFPCLtd.Formatting;
 using OracleByFPCLtd.ExportProcessedLogs.Models;
 
 namespace OracleByFPCLtd.ExportProcessedLogs.Builders;
@@ -9,7 +10,7 @@ public sealed class HeaderBuilder
     {
         var lines = new List<string>
         {
-            $"Date: {metadata.GeneratedAt:yyyy-MM-dd HH:mm}",
+            $"Date: {DateTimeDisplayFormatter.FormatFilterDisplay(metadata.GeneratedAt.ToLocalTime())} (Local Time)",
             $"Apex File: {metadata.ApexFileName}"
         };
 

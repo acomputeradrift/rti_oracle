@@ -21,8 +21,10 @@ public partial class FilterBar : UserControl
     public Button FilterEndPickerButton => FilterEndPickerButtonControl;
     public ComboBox FilterStartHourCombo => FilterStartHourComboControl;
     public ComboBox FilterStartMinuteCombo => FilterStartMinuteComboControl;
+    public ComboBox FilterStartPeriodCombo => FilterStartPeriodComboControl;
     public ComboBox FilterEndHourCombo => FilterEndHourComboControl;
     public ComboBox FilterEndMinuteCombo => FilterEndMinuteComboControl;
+    public ComboBox FilterEndPeriodCombo => FilterEndPeriodComboControl;
     public Button FilterApplyButton => FilterApplyButtonControl;
     public Button FilterClearButton => FilterClearButtonControl;
     public TextBlock FilterCountText => FilterCountTextControl;

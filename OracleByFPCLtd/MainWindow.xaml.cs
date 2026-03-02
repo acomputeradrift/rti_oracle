@@ -28,8 +28,9 @@ using OracleByFPCLtd.ExportProcessedLogs.IO;
 using OracleByFPCLtd.ExportProcessedLogs.Models;
 using OracleByFPCLtd.ExportProcessedLogs.Rendering;
 using OracleByFPCLtd.ExportProcessedLogs.Services;
-using OracleByFPCLtd.DriverProfiles.Models;
 using OracleByFPCLtd.Logging;
+using OracleByFPCLtd.Formatting;
+using OracleByFPCLtd.DriverProfiles.Models;
 using OracleByFPCLtd.ProjectData;
 using OracleByFPCLtd.ProjectData.Extractors;
 using OracleByFPCLtd.ProjectData.Models;
@@ -47,7 +48,7 @@ public partial class MainWindow : Window
     private const double DriverLogDefaultHeight = 160;
     private const string ProcessedPlaceholderText = "No processed information available";
     private const string FilterInvalidKeywordMessage = "Invalid keyword filter. Use comma-separated terms, with optional +include / -exclude.";
-    private const string FilterInvalidDateMessage = "Invalid date/time filter. Use yyyy-MM-dd HH:mm.";
+    private const string FilterInvalidDateMessage = "Invalid date/time filter. Use yy-MM-dd h:mm AM/PM.";
     private const string FilterInvalidRangeMessage = "Invalid date/time range. Start must be before End.";
     private const int ReconnectDelaySeconds = 3;
     private const int ReconnectInitialDelaySeconds = 3;
@@ -65,6 +66,7 @@ public partial class MainWindow : Window
     private static readonly TimeSpan FindDebounceInterval = TimeSpan.FromMilliseconds(200);
     private static readonly string[] DateTimeFormats =
     {
+        DateTimeDisplayFormatter.FilterDisplayPattern,
         "yyyy-MM-dd HH:mm"
     };
     private IDiagnosticsTransport _transport;
@@ -208,8 +210,10 @@ public partial class MainWindow : Window
     private Button FilterEndPickerButton => DiagnosticsPanel.FilterBar.FilterEndPickerButton;
     private ComboBox FilterStartHourCombo => DiagnosticsPanel.FilterBar.FilterStartHourCombo;
     private ComboBox FilterStartMinuteCombo => DiagnosticsPanel.FilterBar.FilterStartMinuteCombo;
+    private ComboBox FilterStartPeriodCombo => DiagnosticsPanel.FilterBar.FilterStartPeriodCombo;
     private ComboBox FilterEndHourCombo => DiagnosticsPanel.FilterBar.FilterEndHourCombo;
     private ComboBox FilterEndMinuteCombo => DiagnosticsPanel.FilterBar.FilterEndMinuteCombo;
+    private ComboBox FilterEndPeriodCombo => DiagnosticsPanel.FilterBar.FilterEndPeriodCombo;
     private Button FilterApplyButton => DiagnosticsPanel.FilterBar.FilterApplyButton;
     private Button FilterClearButton => DiagnosticsPanel.FilterBar.FilterClearButton;
     private TextBlock FilterCountText => DiagnosticsPanel.FilterBar.FilterCountText;
@@ -299,8 +303,10 @@ public partial class MainWindow : Window
         FilterEndCalendar.SelectedDatesChanged += FilterEndCalendar_SelectedDatesChanged;
         FilterStartHourCombo.SelectionChanged += FilterStartTimeCombo_SelectionChanged;
         FilterStartMinuteCombo.SelectionChanged += FilterStartTimeCombo_SelectionChanged;
+        FilterStartPeriodCombo.SelectionChanged += FilterStartTimeCombo_SelectionChanged;
         FilterEndHourCombo.SelectionChanged += FilterEndTimeCombo_SelectionChanged;
         FilterEndMinuteCombo.SelectionChanged += FilterEndTimeCombo_SelectionChanged;
+        FilterEndPeriodCombo.SelectionChanged += FilterEndTimeCombo_SelectionChanged;
         ClearDiagnosticsButton.Click += ClearDiagnostics_Click;
         DiagnosticsZoomOutButton.Click += DiagnosticsZoomOutButton_Click;
         DiagnosticsZoomResetButton.Click += DiagnosticsZoomResetButton_Click;
@@ -469,9 +475,9 @@ public partial class MainWindow : Window
 
     private void InitializeTimePickers()
     {
-        for (var hour = 0; hour < 24; hour++)
+        for (var hour = 1; hour <= 12; hour++)
         {
-            var value = hour.ToString("00", CultureInfo.InvariantCulture);
+            var value = hour.ToString(CultureInfo.InvariantCulture);
             FilterStartHourCombo.Items.Add(value);
             FilterEndHourCombo.Items.Add(value);
         }
@@ -482,6 +488,11 @@ public partial class MainWindow : Window
             FilterStartMinuteCombo.Items.Add(value);
             FilterEndMinuteCombo.Items.Add(value);
         }
+
+        FilterStartPeriodCombo.Items.Add("AM");
+        FilterStartPeriodCombo.Items.Add("PM");
+        FilterEndPeriodCombo.Items.Add("AM");
+        FilterEndPeriodCombo.Items.Add("PM");
     }
 
     private void FilterKeywordTextBox_TextChanged(object sender, TextChangedEventArgs e)
@@ -502,15 +513,17 @@ public partial class MainWindow : Window
     private void FilterStartPickerButton_Click(object sender, RoutedEventArgs e)
     {
         UpdateDateTimePickerBounds();
-        SyncPickerFromText(FilterStartTextBox.Text, FilterStartCalendar, FilterStartHourCombo, FilterStartMinuteCombo, isStart: true);
-        FilterStartDatePopup.IsOpen = true;
+        SyncPickerFromText(FilterStartTextBox.Text, FilterStartCalendar, FilterStartHourCombo, FilterStartMinuteCombo, FilterStartPeriodCombo, isStart: true);
+        FilterEndDatePopup.IsOpen = false;
+        FilterStartDatePopup.IsOpen = !FilterStartDatePopup.IsOpen;
     }
 
     private void FilterEndPickerButton_Click(object sender, RoutedEventArgs e)
     {
         UpdateDateTimePickerBounds();
-        SyncPickerFromText(FilterEndTextBox.Text, FilterEndCalendar, FilterEndHourCombo, FilterEndMinuteCombo, isStart: false);
-        FilterEndDatePopup.IsOpen = true;
+        SyncPickerFromText(FilterEndTextBox.Text, FilterEndCalendar, FilterEndHourCombo, FilterEndMinuteCombo, FilterEndPeriodCombo, isStart: false);
+        FilterStartDatePopup.IsOpen = false;
+        FilterEndDatePopup.IsOpen = !FilterEndDatePopup.IsOpen;
     }
 
     private void FilterStartCalendar_SelectedDatesChanged(object? sender, SelectionChangedEventArgs e)
@@ -520,7 +533,7 @@ public partial class MainWindow : Window
             return;
         }
 
-        UpdateDateTimeTextFromPicker(FilterStartTextBox, FilterStartCalendar, FilterStartHourCombo, FilterStartMinuteCombo, isStart: true);
+        UpdateDateTimeTextFromPicker(FilterStartTextBox, FilterStartCalendar, FilterStartHourCombo, FilterStartMinuteCombo, FilterStartPeriodCombo, isStart: true);
     }
 
     private void FilterEndCalendar_SelectedDatesChanged(object? sender, SelectionChangedEventArgs e)
@@ -530,7 +543,7 @@ public partial class MainWindow : Window
             return;
         }
 
-        UpdateDateTimeTextFromPicker(FilterEndTextBox, FilterEndCalendar, FilterEndHourCombo, FilterEndMinuteCombo, isStart: false);
+        UpdateDateTimeTextFromPicker(FilterEndTextBox, FilterEndCalendar, FilterEndHourCombo, FilterEndMinuteCombo, FilterEndPeriodCombo, isStart: false);
     }
 
     private void FilterStartTimeCombo_SelectionChanged(object sender, SelectionChangedEventArgs e)
@@ -540,7 +553,7 @@ public partial class MainWindow : Window
             return;
         }
 
-        UpdateDateTimeTextFromPicker(FilterStartTextBox, FilterStartCalendar, FilterStartHourCombo, FilterStartMinuteCombo, isStart: true);
+        UpdateDateTimeTextFromPicker(FilterStartTextBox, FilterStartCalendar, FilterStartHourCombo, FilterStartMinuteCombo, FilterStartPeriodCombo, isStart: true);
     }
 
     private void FilterEndTimeCombo_SelectionChanged(object sender, SelectionChangedEventArgs e)
@@ -550,7 +563,7 @@ public partial class MainWindow : Window
             return;
         }
 
-        UpdateDateTimeTextFromPicker(FilterEndTextBox, FilterEndCalendar, FilterEndHourCombo, FilterEndMinuteCombo, isStart: false);
+        UpdateDateTimeTextFromPicker(FilterEndTextBox, FilterEndCalendar, FilterEndHourCombo, FilterEndMinuteCombo, FilterEndPeriodCombo, isStart: false);
     }
 
     private void FilterApplyButton_Click(object sender, RoutedEventArgs e)
@@ -574,6 +587,7 @@ public partial class MainWindow : Window
             _filterExcludeTerms = exclude;
             _filterStart = start;
             _filterEnd = end;
+            NormalizeFilterDateText(start, end);
             _filterActive = _filterIncludeTerms.Count > 0 || _filterExcludeTerms.Count > 0 || _filterStart.HasValue || _filterEnd.HasValue;
 
             ApplyCurrentFilter();
@@ -1168,6 +1182,18 @@ public partial class MainWindow : Window
         FilterEndCalendar.DisplayDateEnd = maxDate;
     }
 
+    private void AutoPopulateStartFilterFromFirstLog()
+    {
+        if (!_minRawLogTimestamp.HasValue || !string.IsNullOrWhiteSpace(FilterStartTextBox.Text))
+        {
+            return;
+        }
+
+        var firstTimestamp = ClampToLogRange(_minRawLogTimestamp.Value);
+        FilterStartTextBox.Text = DateTimeDisplayFormatter.FormatFilterDisplay(firstTimestamp);
+        _filterStart = firstTimestamp;
+    }
+
     private void ApplyCurrentFilter()
     {
         if (!_filterActive)
@@ -1443,21 +1469,21 @@ public partial class MainWindow : Window
         return true;
     }
 
-    private void SyncPickerFromText(string text, System.Windows.Controls.Calendar calendar, ComboBox hourCombo, ComboBox minuteCombo, bool isStart)
+    private void SyncPickerFromText(string text, System.Windows.Controls.Calendar calendar, ComboBox hourCombo, ComboBox minuteCombo, ComboBox periodCombo, bool isStart)
     {
         if (TryParseDateTime(text, out var value))
         {
             value = ClampToLogRange(value);
-            SetPickerValues(calendar, hourCombo, minuteCombo, value, isStart);
+            SetPickerValues(calendar, hourCombo, minuteCombo, periodCombo, value, isStart);
             return;
         }
 
         var fallbackDate = calendar.SelectedDate ?? DateTime.Today;
         var fallback = new DateTime(fallbackDate.Year, fallbackDate.Month, fallbackDate.Day, 0, 0, 0);
-        SetPickerValues(calendar, hourCombo, minuteCombo, fallback, isStart);
+        SetPickerValues(calendar, hourCombo, minuteCombo, periodCombo, fallback, isStart);
     }
 
-    private void SetPickerValues(System.Windows.Controls.Calendar calendar, ComboBox hourCombo, ComboBox minuteCombo, DateTime value, bool isStart)
+    private void SetPickerValues(System.Windows.Controls.Calendar calendar, ComboBox hourCombo, ComboBox minuteCombo, ComboBox periodCombo, DateTime value, bool isStart)
     {
         if (isStart)
         {
@@ -1469,8 +1495,7 @@ public partial class MainWindow : Window
         }
 
         calendar.SelectedDate = value.Date;
-        hourCombo.SelectedItem = value.Hour.ToString("00", CultureInfo.InvariantCulture);
-        minuteCombo.SelectedItem = value.Minute.ToString("00", CultureInfo.InvariantCulture);
+        PopulatePickerChoices(calendar, hourCombo, minuteCombo, periodCombo, value);
 
         if (isStart)
         {
@@ -1482,7 +1507,7 @@ public partial class MainWindow : Window
         }
     }
 
-    private void UpdateDateTimeTextFromPicker(TextBox target, System.Windows.Controls.Calendar calendar, ComboBox hourCombo, ComboBox minuteCombo, bool isStart)
+    private void UpdateDateTimeTextFromPicker(TextBox target, System.Windows.Controls.Calendar calendar, ComboBox hourCombo, ComboBox minuteCombo, ComboBox periodCombo, bool isStart)
     {
         if (isStart)
         {
@@ -1494,11 +1519,17 @@ public partial class MainWindow : Window
         }
 
         var date = calendar.SelectedDate ?? DateTime.Today;
-        var hour = ParseComboValue(hourCombo, 0);
+        var hour = ParseComboValue(hourCombo, 12);
         var minute = ParseComboValue(minuteCombo, 0);
-        var value = new DateTime(date.Year, date.Month, date.Day, hour, minute, 0);
+        var period = ParsePeriodValue(periodCombo);
+        var desired = new DateTime(date.Year, date.Month, date.Day, ConvertToTwentyFourHour(hour, period), minute, 0);
+        PopulatePickerChoices(calendar, hourCombo, minuteCombo, periodCombo, desired);
+        hour = ParseComboValue(hourCombo, 12);
+        minute = ParseComboValue(minuteCombo, 0);
+        period = ParsePeriodValue(periodCombo);
+        var value = new DateTime(date.Year, date.Month, date.Day, ConvertToTwentyFourHour(hour, period), minute, 0);
         value = ClampToLogRange(value);
-        target.Text = value.ToString("yyyy-MM-dd HH:mm", CultureInfo.InvariantCulture);
+        target.Text = DateTimeDisplayFormatter.FormatFilterDisplay(value);
 
         if (isStart)
         {
@@ -1508,6 +1539,141 @@ public partial class MainWindow : Window
         {
             _isUpdatingEndPicker = false;
         }
+    }
+
+    private void PopulatePickerChoices(System.Windows.Controls.Calendar calendar, ComboBox hourCombo, ComboBox minuteCombo, ComboBox periodCombo, DateTime desiredValue)
+    {
+        var selectedDate = calendar.SelectedDate ?? desiredValue.Date;
+        var dayRange = GetPickerDayRange(selectedDate);
+        var availablePeriods = new List<string>();
+
+        foreach (var period in new[] { "AM", "PM" })
+        {
+            if (GetAvailableHours(selectedDate, period, dayRange.Min, dayRange.Max).Count > 0)
+            {
+                availablePeriods.Add(period);
+            }
+        }
+
+        if (availablePeriods.Count == 0)
+        {
+            availablePeriods.Add("AM");
+        }
+
+        var (_, desiredPeriod) = ConvertToTwelveHour(desiredValue);
+        SetComboItems(periodCombo, availablePeriods, desiredPeriod);
+
+        var activePeriod = ParsePeriodValue(periodCombo);
+        var availableHours = GetAvailableHours(selectedDate, activePeriod, dayRange.Min, dayRange.Max);
+        if (availableHours.Count == 0)
+        {
+            availableHours.Add("12");
+        }
+
+        var (desiredHour, _) = ConvertToTwelveHour(desiredValue);
+        SetComboItems(hourCombo, availableHours, desiredHour.ToString(CultureInfo.InvariantCulture));
+
+        var activeHour = ParseComboValue(hourCombo, desiredHour);
+        var availableMinutes = GetAvailableMinutes(selectedDate, activeHour, activePeriod, dayRange.Min, dayRange.Max);
+        if (availableMinutes.Count == 0)
+        {
+            availableMinutes.Add("00");
+        }
+
+        SetComboItems(minuteCombo, availableMinutes, desiredValue.Minute.ToString("00", CultureInfo.InvariantCulture));
+    }
+
+    private (DateTime Min, DateTime Max) GetPickerDayRange(DateTime selectedDate)
+    {
+        var min = new DateTime(selectedDate.Year, selectedDate.Month, selectedDate.Day, 0, 0, 0);
+        var max = new DateTime(selectedDate.Year, selectedDate.Month, selectedDate.Day, 23, 59, 0);
+
+        if (_minRawLogTimestamp.HasValue && _minRawLogTimestamp.Value.Date == selectedDate.Date && _minRawLogTimestamp.Value > min)
+        {
+            min = new DateTime(selectedDate.Year, selectedDate.Month, selectedDate.Day, _minRawLogTimestamp.Value.Hour, _minRawLogTimestamp.Value.Minute, 0);
+        }
+
+        if (_maxRawLogTimestamp.HasValue && _maxRawLogTimestamp.Value.Date == selectedDate.Date && _maxRawLogTimestamp.Value < max)
+        {
+            max = new DateTime(selectedDate.Year, selectedDate.Month, selectedDate.Day, _maxRawLogTimestamp.Value.Hour, _maxRawLogTimestamp.Value.Minute, 0);
+        }
+
+        return (min, max);
+    }
+
+    private static List<string> GetAvailableHours(DateTime selectedDate, string period, DateTime min, DateTime max)
+    {
+        var hours = new List<string>();
+        for (var hour = 1; hour <= 12; hour++)
+        {
+            var hourStart = new DateTime(selectedDate.Year, selectedDate.Month, selectedDate.Day, ConvertToTwentyFourHour(hour, period), 0, 0);
+            var hourEnd = hourStart.AddMinutes(59);
+            if (hourEnd >= min && hourStart <= max)
+            {
+                hours.Add(hour.ToString(CultureInfo.InvariantCulture));
+            }
+        }
+
+        return hours;
+    }
+
+    private static List<string> GetAvailableMinutes(DateTime selectedDate, int hour, string period, DateTime min, DateTime max)
+    {
+        var minutes = new List<string>();
+        var hour24 = ConvertToTwentyFourHour(hour, period);
+        for (var minute = 0; minute < 60; minute++)
+        {
+            var candidate = new DateTime(selectedDate.Year, selectedDate.Month, selectedDate.Day, hour24, minute, 0);
+            if (candidate >= min && candidate <= max)
+            {
+                minutes.Add(minute.ToString("00", CultureInfo.InvariantCulture));
+            }
+        }
+
+        return minutes;
+    }
+
+    private static void SetComboItems(ComboBox combo, IReadOnlyList<string> items, string preferredSelection)
+    {
+        combo.Items.Clear();
+        foreach (var item in items)
+        {
+            combo.Items.Add(item);
+        }
+
+        if (items.Count == 0)
+        {
+            combo.SelectedItem = null;
+            return;
+        }
+
+        combo.SelectedItem = items.Contains(preferredSelection, StringComparer.Ordinal)
+            ? preferredSelection
+            : items[0];
+    }
+
+    private static (int Hour, string Period) ConvertToTwelveHour(DateTime value)
+    {
+        var period = value.Hour >= 12 ? "PM" : "AM";
+        var hour = value.Hour % 12;
+        if (hour == 0)
+        {
+            hour = 12;
+        }
+
+        return (hour, period);
+    }
+
+    private static int ConvertToTwentyFourHour(int hour, string period)
+    {
+        hour = Math.Clamp(hour, 1, 12);
+
+        if (string.Equals(period, "PM", StringComparison.OrdinalIgnoreCase))
+        {
+            return hour == 12 ? 12 : hour + 12;
+        }
+
+        return hour == 12 ? 0 : hour;
     }
 
     private static int ParseComboValue(ComboBox combo, int fallback)
@@ -1520,9 +1686,29 @@ public partial class MainWindow : Window
         return fallback;
     }
 
+    private static string ParsePeriodValue(ComboBox combo)
+    {
+        if (combo.SelectedItem is string text && (string.Equals(text, "AM", StringComparison.OrdinalIgnoreCase) || string.Equals(text, "PM", StringComparison.OrdinalIgnoreCase)))
+        {
+            return text.ToUpperInvariant();
+        }
+
+        return "AM";
+    }
+
     private static bool TryParseDateTime(string text, out DateTime value)
     {
-        return DateTime.TryParseExact(text, DateTimeFormats, CultureInfo.InvariantCulture, DateTimeStyles.AssumeLocal, out value);
+        return DateTimeDisplayFormatter.TryParseFilterInput(text, out value);
+    }
+
+    private void NormalizeFilterDateText(DateTime? start, DateTime? end)
+    {
+        FilterStartTextBox.Text = start.HasValue
+            ? DateTimeDisplayFormatter.FormatFilterDisplay(start.Value)
+            : "";
+        FilterEndTextBox.Text = end.HasValue
+            ? DateTimeDisplayFormatter.FormatFilterDisplay(end.Value)
+            : "";
     }
 
     private DateTime ClampToLogRange(DateTime value)
@@ -1612,7 +1798,7 @@ public partial class MainWindow : Window
         }
 
         var rawTimestamp = line.Substring(openIndex + 1, closeIndex - openIndex - 1);
-        return DateTime.TryParse(rawTimestamp, CultureInfo.InvariantCulture, DateTimeStyles.AssumeLocal, out timestamp);
+        return DateTimeDisplayFormatter.TryParseHighPrecisionInput(rawTimestamp, out timestamp);
     }
 
     private void Transport_RawMessageReceived(object? sender, string raw)
@@ -2665,7 +2851,8 @@ public partial class MainWindow : Window
             additionalName = null;
         }
 
-        var metadata = new ExportMetadata(DateTime.Now, apexFile, additionalName);
+        var exportTimestamp = _maxRawLogTimestamp ?? LogTimestampSource.GetTimestamp(DateTime.Now);
+        var metadata = new ExportMetadata(exportTimestamp, apexFile, additionalName);
         var filterSummary = new FilterSummary(
             FilterKeywordTextBox.Text.Trim(),
             FilterStartTextBox.Text.Trim(),
@@ -3400,6 +3587,7 @@ public partial class MainWindow : Window
         }
 
         UpdateDateTimePickerBounds();
+        AutoPopulateStartFilterFromFirstLog();
     }
 
     private async Task<IReadOnlyList<DiagnosticsTransport.DriverInfo>> LoadDriversAsync(string ip)

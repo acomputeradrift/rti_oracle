@@ -105,8 +105,10 @@ public sealed class UiDecompositionTests
             Assert.NotNull(bar.FilterEndPickerButton);
             Assert.NotNull(bar.FilterStartHourCombo);
             Assert.NotNull(bar.FilterStartMinuteCombo);
+            Assert.NotNull(bar.FilterStartPeriodCombo);
             Assert.NotNull(bar.FilterEndHourCombo);
             Assert.NotNull(bar.FilterEndMinuteCombo);
+            Assert.NotNull(bar.FilterEndPeriodCombo);
             Assert.NotNull(bar.FilterApplyButton);
             Assert.NotNull(bar.FilterClearButton);
             Assert.NotNull(bar.FilterCountText);

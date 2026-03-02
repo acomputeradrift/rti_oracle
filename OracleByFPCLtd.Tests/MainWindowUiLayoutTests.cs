@@ -1,8 +1,10 @@
 using System;
+using System.Linq;
 using System.Threading;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Threading;
+using System.IO;
 using Xunit;
 
 namespace OracleByFPCLtd.Tests;
@@ -57,8 +59,10 @@ public sealed class MainWindowUiLayoutTests
             Assert.NotNull(diagnostics.FilterBar.FilterEndPickerButton);
             Assert.NotNull(diagnostics.FilterBar.FilterStartHourCombo);
             Assert.NotNull(diagnostics.FilterBar.FilterStartMinuteCombo);
+            Assert.NotNull(diagnostics.FilterBar.FilterStartPeriodCombo);
             Assert.NotNull(diagnostics.FilterBar.FilterEndHourCombo);
             Assert.NotNull(diagnostics.FilterBar.FilterEndMinuteCombo);
+            Assert.NotNull(diagnostics.FilterBar.FilterEndPeriodCombo);
             Assert.NotNull(diagnostics.FilterBar.FilterApplyButton);
             Assert.NotNull(diagnostics.FilterBar.FilterClearButton);
             Assert.NotNull(diagnostics.FilterBar.FilterCountText);
@@ -249,17 +253,172 @@ public sealed class MainWindowUiLayoutTests
             var startCalendar = diagnostics.FilterBar.FilterStartCalendar;
             var startHour = diagnostics.FilterBar.FilterStartHourCombo;
             var startMinute = diagnostics.FilterBar.FilterStartMinuteCombo;
+            var startPeriod = diagnostics.FilterBar.FilterStartPeriodCombo;
             startCalendar.SelectedDate = new DateTime(2026, 1, 23);
-            startHour.SelectedItem = "00";
+            startHour.SelectedItem = "12";
             startMinute.SelectedItem = "00";
+            startPeriod.SelectedItem = "AM";
 
-            InvokeUpdateDateTimeTextFromPicker(window, "FilterStartTextBox", startCalendar, startHour, startMinute);
+            InvokeUpdateDateTimeTextFromPicker(window, "FilterStartTextBox", startCalendar, startHour, startMinute, startPeriod);
 
             var startText = diagnostics.FilterBar.FilterStartTextBox;
-            Assert.Equal("2026-01-24 10:00", startText.Text);
+            Assert.Equal("26-01-24 10:00 AM", startText.Text);
 
             window.Hide();
         });
+    }
+
+    [Fact]
+    public void DateTimePickerWritesTwelveHourAmPmFormat()
+    {
+        RunOnSta(() =>
+        {
+            var window = new MainWindow();
+            var diagnostics = (OracleByFPCLtd.UI.Panels.DiagnosticsPanel)window.FindName("DiagnosticsPanel")!;
+
+            var startCalendar = diagnostics.FilterBar.FilterStartCalendar;
+            var startHour = diagnostics.FilterBar.FilterStartHourCombo;
+            var startMinute = diagnostics.FilterBar.FilterStartMinuteCombo;
+            var startPeriod = diagnostics.FilterBar.FilterStartPeriodCombo;
+            startCalendar.SelectedDate = new DateTime(2026, 1, 24);
+            startHour.SelectedItem = "1";
+            startMinute.SelectedItem = "15";
+            startPeriod.SelectedItem = "PM";
+
+            InvokeUpdateDateTimeTextFromPicker(window, "FilterStartTextBox", startCalendar, startHour, startMinute, startPeriod);
+
+            Assert.Equal("26-01-24 1:15 PM", diagnostics.FilterBar.FilterStartTextBox.Text);
+        });
+    }
+
+    [Fact]
+    public void SyncPickerFromTextUsesTwelveHourSelections()
+    {
+        RunOnSta(() =>
+        {
+            var window = new MainWindow();
+            var diagnostics = (OracleByFPCLtd.UI.Panels.DiagnosticsPanel)window.FindName("DiagnosticsPanel")!;
+
+            var startCalendar = diagnostics.FilterBar.FilterStartCalendar;
+            var startHour = diagnostics.FilterBar.FilterStartHourCombo;
+            var startMinute = diagnostics.FilterBar.FilterStartMinuteCombo;
+            var startPeriod = diagnostics.FilterBar.FilterStartPeriodCombo;
+
+            InvokeSyncPickerFromText(window, "26-01-24 1:15 PM", startCalendar, startHour, startMinute, startPeriod);
+
+            Assert.Equal(new DateTime(2026, 1, 24), startCalendar.SelectedDate);
+            Assert.Equal("1", startHour.SelectedItem);
+            Assert.Equal("15", startMinute.SelectedItem);
+            Assert.Equal("PM", startPeriod.SelectedItem);
+        });
+    }
+
+    [Fact]
+    public void StartFilterAutoPopulatesFromFirstLogTimestamp()
+    {
+        RunOnSta(() =>
+        {
+            var window = new MainWindow();
+            var diagnostics = (OracleByFPCLtd.UI.Panels.DiagnosticsPanel)window.FindName("DiagnosticsPanel")!;
+
+            Assert.Equal(string.Empty, diagnostics.FilterBar.FilterStartTextBox.Text);
+
+            InvokeAppendLog(window, "1 [2026-01-24 10:15:00.000] test");
+
+            Assert.Equal("26-01-24 10:15 AM", diagnostics.FilterBar.FilterStartTextBox.Text);
+        });
+    }
+
+    [Fact]
+    public void StartPickerDoesNotOfferChoicesBeforeFirstLogTime()
+    {
+        RunOnSta(() =>
+        {
+            var window = new MainWindow();
+            var diagnostics = (OracleByFPCLtd.UI.Panels.DiagnosticsPanel)window.FindName("DiagnosticsPanel")!;
+
+            InvokeAppendLog(window, "1 [2026-01-24 10:15:00.000] test");
+            InvokeAppendLog(window, "2 [2026-01-24 11:45:00.000] test");
+            FlushLayout(window);
+
+            diagnostics.FilterBar.FilterStartPickerButton.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+
+            var periods = diagnostics.FilterBar.FilterStartPeriodCombo.Items.Cast<string>().ToList();
+            var hours = diagnostics.FilterBar.FilterStartHourCombo.Items.Cast<string>().ToList();
+            var minutes = diagnostics.FilterBar.FilterStartMinuteCombo.Items.Cast<string>().ToList();
+
+            Assert.Single(periods);
+            Assert.Equal("AM", periods[0]);
+            Assert.DoesNotContain("9", hours);
+            Assert.Contains("10", hours);
+            Assert.Contains("11", hours);
+            Assert.DoesNotContain("14", minutes);
+            Assert.Contains("15", minutes);
+        });
+    }
+
+    [Fact]
+    public void StartPickerButtonTogglesPopupOpen()
+    {
+        RunOnSta(() =>
+        {
+            var window = new MainWindow();
+            var diagnostics = (OracleByFPCLtd.UI.Panels.DiagnosticsPanel)window.FindName("DiagnosticsPanel")!;
+            window.Show();
+            window.UpdateLayout();
+
+            InvokeAppendLog(window, "1 [2026-01-24 10:15:00.000] test");
+            FlushLayout(window);
+
+            diagnostics.FilterBar.FilterStartPickerButton.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+            FlushLayout(window);
+            Assert.True(diagnostics.FilterBar.FilterStartDatePopup.IsOpen);
+
+            diagnostics.FilterBar.FilterStartPickerButton.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+            FlushLayout(window);
+            Assert.False(diagnostics.FilterBar.FilterStartDatePopup.IsOpen);
+
+            window.Hide();
+        });
+    }
+
+    [Fact]
+    public void MainWindowDefaultEventLogFlushesAfterFirstProcessorLine()
+    {
+        var original = Environment.GetEnvironmentVariable("ORACLE_EVENT_LOG_DIRECTORY_OVERRIDE");
+        var overrideDirectory = TestTempPaths.CreateDirectoryPath();
+
+        try
+        {
+            Environment.SetEnvironmentVariable("ORACLE_EVENT_LOG_DIRECTORY_OVERRIDE", overrideDirectory);
+
+            RunOnSta(() =>
+            {
+                OracleByFPCLtd.Logging.LogTimestampSource.Reset();
+                var window = new MainWindow();
+
+                var files = Directory.GetFiles(overrideDirectory, "*_oracle_event_logs.log");
+                Assert.Single(files);
+                var startupLog = File.ReadAllText(files[0]);
+                Assert.Contains("------Local Time", startupLog, StringComparison.Ordinal);
+                Assert.Contains("Settings loaded", startupLog, StringComparison.Ordinal);
+
+                InvokeAppendLog(window, "1 [26-01-24 10:15:00.000 AM] test");
+
+                var log = File.ReadAllText(files[0]);
+                Assert.Contains("------Processor Time", log, StringComparison.Ordinal);
+                Assert.Contains("Settings loaded", log, StringComparison.Ordinal);
+            });
+        }
+        finally
+        {
+            OracleByFPCLtd.Logging.LogTimestampSource.Reset();
+            Environment.SetEnvironmentVariable("ORACLE_EVENT_LOG_DIRECTORY_OVERRIDE", original);
+            if (Directory.Exists(overrideDirectory))
+            {
+                Directory.Delete(overrideDirectory, recursive: true);
+            }
+        }
     }
 
     private static void InvokeAppendLog(MainWindow window, string line)
@@ -269,7 +428,7 @@ public sealed class MainWindowUiLayoutTests
         method!.Invoke(window, new object[] { line, false });
     }
 
-    private static void InvokeUpdateDateTimeTextFromPicker(MainWindow window, string textBoxName, System.Windows.Controls.Calendar calendar, ComboBox hourCombo, ComboBox minuteCombo)
+    private static void InvokeUpdateDateTimeTextFromPicker(MainWindow window, string textBoxName, System.Windows.Controls.Calendar calendar, ComboBox hourCombo, ComboBox minuteCombo, ComboBox periodCombo)
     {
         var diagnostics = (OracleByFPCLtd.UI.Panels.DiagnosticsPanel)window.FindName("DiagnosticsPanel")!;
         var textBox = textBoxName == "FilterStartTextBox"
@@ -277,7 +436,14 @@ public sealed class MainWindowUiLayoutTests
             : diagnostics.FilterBar.FilterEndTextBox;
         var method = typeof(MainWindow).GetMethod("UpdateDateTimeTextFromPicker", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic);
         Assert.NotNull(method);
-        method!.Invoke(window, new object[] { textBox, calendar, hourCombo, minuteCombo, true });
+        method!.Invoke(window, new object[] { textBox, calendar, hourCombo, minuteCombo, periodCombo, true });
+    }
+
+    private static void InvokeSyncPickerFromText(MainWindow window, string text, System.Windows.Controls.Calendar calendar, ComboBox hourCombo, ComboBox minuteCombo, ComboBox periodCombo)
+    {
+        var method = typeof(MainWindow).GetMethod("SyncPickerFromText", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic);
+        Assert.NotNull(method);
+        method!.Invoke(window, new object[] { text, calendar, hourCombo, minuteCombo, periodCombo, true });
     }
 
     private static void FlushLayout(FrameworkElement element)

@@ -5,6 +5,7 @@ using System.Threading;
 using System.Windows;
 using System.Windows.Threading;
 using OracleByFPCLtd.ExportProcessedLogs.Models;
+using OracleByFPCLtd.Logging;
 using Xunit;
 
 namespace OracleByFPCLtd.Tests;
@@ -37,8 +38,8 @@ public sealed class ExportProcessedLogsUiTests
             Assert.Equal("Project.apex", request.Metadata.ApexFileName);
             Assert.Equal("Additional.xlsx", request.Metadata.AdditionalDataName);
             Assert.Equal("Driver", request.FilterSummary.Keywords);
-            Assert.Equal("2026-01-24 10:00", request.FilterSummary.Start);
-            Assert.Equal("2026-01-24 11:00", request.FilterSummary.End);
+            Assert.Equal("26-01-24 10:00 AM", request.FilterSummary.Start);
+            Assert.Equal("26-01-24 11:00 AM", request.FilterSummary.End);
             Assert.Equal(2, request.Lines.Count);
         });
     }
@@ -68,6 +69,23 @@ public sealed class ExportProcessedLogsUiTests
         });
     }
 
+    [Fact]
+    public void BuildExportRequestUsesLatestProcessorTimestampForMetadata()
+    {
+        RunOnSta(() =>
+        {
+            var window = new MainWindow();
+            var expected = new DateTime(2026, 1, 24, 10, 45, 30);
+
+            SetRawLogMaxTimestamp(window, expected);
+            LogTimestampSource.UpdateProcessorTimestamp(expected);
+
+            var request = InvokeBuildExportRequest(window);
+
+            Assert.Equal(expected, request.Metadata.GeneratedAt);
+        });
+    }
+
     private static List<string> GetProcessedLines(MainWindow window)
     {
         var field = typeof(MainWindow).GetField("_processedLogLines", BindingFlags.Instance | BindingFlags.NonPublic);
@@ -80,6 +98,13 @@ public sealed class ExportProcessedLogsUiTests
         var field = typeof(MainWindow).GetField("_projectFilePath", BindingFlags.Instance | BindingFlags.NonPublic);
         Assert.NotNull(field);
         field!.SetValue(window, path);
+    }
+
+    private static void SetRawLogMaxTimestamp(MainWindow window, DateTime value)
+    {
+        var field = typeof(MainWindow).GetField("_maxRawLogTimestamp", BindingFlags.Instance | BindingFlags.NonPublic);
+        Assert.NotNull(field);
+        field!.SetValue(window, value);
     }
 
     private static ExportRequest InvokeBuildExportRequest(MainWindow window)

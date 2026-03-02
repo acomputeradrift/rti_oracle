@@ -62,7 +62,7 @@
           <ColumnDefinition Width="24" />
         </Grid.ColumnDefinitions>
         <TextBox x:Name="FilterStartTextBoxControl" Grid.Column="0" Width="156" Height="24" Padding="0,0,4,0"
-                 ToolTip="Format: yyyy-MM-dd HH:mm" />
+                 ToolTip="Format: yy-MM-dd h:mm AM/PM" />
         <Button x:Name="FilterStartPickerButtonControl" Grid.Column="1" Content="..." Width="24" Height="24"
                 ToolTip="Pick start date" />
       </Grid>
@@ -73,7 +73,7 @@
           <ColumnDefinition Width="24" />
         </Grid.ColumnDefinitions>
         <TextBox x:Name="FilterEndTextBoxControl" Grid.Column="0" Width="156" Height="24" Padding="0,0,4,0"
-                 ToolTip="Format: yyyy-MM-dd HH:mm" />
+                 ToolTip="Format: yy-MM-dd h:mm AM/PM" />
         <Button x:Name="FilterEndPickerButtonControl" Grid.Column="1" Content="..." Width="24" Height="24"
                 ToolTip="Pick end date" />
       </Grid>
@@ -81,7 +81,7 @@
       <Button x:Name="FilterClearButtonControl" Grid.Column="7" Content="Clear" Width="90" Height="24" Padding="8,2" Margin="0,0,6,0" />
       <TextBlock x:Name="FilterCountTextControl" Grid.Column="8" Text="Count: 0" Width="90" VerticalAlignment="Center" />
     </Grid>
-    <Popup x:Name="FilterStartDatePopupControl" PlacementTarget="{Binding ElementName=FilterStartTextBoxControl}" StaysOpen="False">
+    <Popup x:Name="FilterStartDatePopupControl" PlacementTarget="{Binding ElementName=FilterStartTextBoxControl}" StaysOpen="True">
       <Border BorderBrush="#CCCCCC" BorderThickness="1" Background="White">
         <StackPanel Margin="8">
           <Calendar x:Name="FilterStartCalendarControl" />
@@ -91,16 +91,19 @@
               <ColumnDefinition Width="60" />
               <ColumnDefinition Width="Auto" />
               <ColumnDefinition Width="60" />
+              <ColumnDefinition Width="6" />
+              <ColumnDefinition Width="68" />
             </Grid.ColumnDefinitions>
             <TextBlock Text="Time" VerticalAlignment="Center" Margin="0,0,8,0" />
             <ComboBox x:Name="FilterStartHourComboControl" Grid.Column="1" Height="24" />
             <TextBlock Grid.Column="2" Text=":" VerticalAlignment="Center" Margin="6,0" />
             <ComboBox x:Name="FilterStartMinuteComboControl" Grid.Column="3" Height="24" />
+            <ComboBox x:Name="FilterStartPeriodComboControl" Grid.Column="5" Height="24" />
           </Grid>
         </StackPanel>
       </Border>
     </Popup>
-    <Popup x:Name="FilterEndDatePopupControl" PlacementTarget="{Binding ElementName=FilterEndTextBoxControl}" StaysOpen="False">
+    <Popup x:Name="FilterEndDatePopupControl" PlacementTarget="{Binding ElementName=FilterEndTextBoxControl}" StaysOpen="True">
       <Border BorderBrush="#CCCCCC" BorderThickness="1" Background="White">
         <StackPanel Margin="8">
           <Calendar x:Name="FilterEndCalendarControl" />
@@ -110,11 +113,14 @@
               <ColumnDefinition Width="60" />
               <ColumnDefinition Width="Auto" />
               <ColumnDefinition Width="60" />
+              <ColumnDefinition Width="6" />
+              <ColumnDefinition Width="68" />
             </Grid.ColumnDefinitions>
             <TextBlock Text="Time" VerticalAlignment="Center" Margin="0,0,8,0" />
             <ComboBox x:Name="FilterEndHourComboControl" Grid.Column="1" Height="24" />
             <TextBlock Grid.Column="2" Text=":" VerticalAlignment="Center" Margin="6,0" />
             <ComboBox x:Name="FilterEndMinuteComboControl" Grid.Column="3" Height="24" />
+            <ComboBox x:Name="FilterEndPeriodComboControl" Grid.Column="5" Height="24" />
           </Grid>
         </StackPanel>
       </Border>

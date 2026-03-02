@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.IO;
 using System.Text.Json;
+using OracleByFPCLtd.Formatting;
 using OracleByFPCLtd.Logging;
 
 namespace OracleByFPCLtd;
@@ -154,7 +155,8 @@ public sealed class WebSocketMessageFormatter
             }
 
             _lastMessageLogTime = timeOfDay;
-            var timestamp = $"[{_currentDate:yyyy-MM-dd} {timeOfDay:hh\\:mm\\:ss\\.fff}]";
+            var timestampValue = _currentDate.ToDateTime(TimeOnly.FromTimeSpan(timeOfDay));
+            var timestamp = $"[{DateTimeDisplayFormatter.FormatHighPrecisionDisplay(timestampValue)}]";
             return string.IsNullOrWhiteSpace(text) ? timestamp : $"{timestamp} {text}";
         }
 

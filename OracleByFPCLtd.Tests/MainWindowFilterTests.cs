@@ -71,6 +71,19 @@ public sealed class MainWindowFilterTests
     public void TryParseDateRangeAcceptsCombinedDateTime()
     {
         var method = GetStaticMethod("TryParseDateRange");
+        var args = new object?[] { "26-01-24 10:00 AM", "26-01-24 11:00 AM", null, null, null };
+
+        var result = (bool)method.Invoke(null, args)!;
+
+        Assert.True(result);
+        Assert.NotNull(args[2]);
+        Assert.NotNull(args[3]);
+    }
+
+    [Fact]
+    public void TryParseDateRangeAcceptsLegacyTwentyFourHourInput()
+    {
+        var method = GetStaticMethod("TryParseDateRange");
         var args = new object?[] { "2026-01-24 10:00", "2026-01-24 11:00", null, null, null };
 
         var result = (bool)method.Invoke(null, args)!;
@@ -97,7 +110,7 @@ public sealed class MainWindowFilterTests
     public void TryParseDateRangeRejectsEndBeforeStart()
     {
         var method = GetStaticMethod("TryParseDateRange");
-        var args = new object?[] { "2026-01-24 12:00", "2026-01-24 10:00", null, null, null };
+        var args = new object?[] { "26-01-24 12:00 PM", "26-01-24 10:00 AM", null, null, null };
 
         var result = (bool)method.Invoke(null, args)!;
 

@@ -15,7 +15,7 @@ public sealed class WebSocketMessageFormatterTests
         var formatted = formatter.Format(raw, out var isLogLine);
 
         Assert.True(isLogLine);
-        Assert.Equal("[2018-12-01 15:19:03.456] Driver event", formatted);
+        Assert.Equal("[18-12-01 3:19:03.456 PM] Driver event", formatted);
     }
 
     [Fact]
@@ -31,8 +31,8 @@ public sealed class WebSocketMessageFormatterTests
 
         Assert.True(isLogLineBefore);
         Assert.True(isLogLineAfter);
-        Assert.Equal("[2018-12-01 23:59:59.900] Last", formattedBefore);
-        Assert.Equal("[2018-12-02 00:00:00.100] First", formattedAfter);
+        Assert.Equal("[18-12-01 11:59:59.900 PM] Last", formattedBefore);
+        Assert.Equal("[18-12-02 12:00:00.100 AM] First", formattedAfter);
     }
 
     [Fact]
@@ -48,8 +48,8 @@ public sealed class WebSocketMessageFormatterTests
 
         Assert.True(isLogLineFirst);
         Assert.True(isLogLineSecond);
-        Assert.Equal("[2018-12-01 14:16:20.000] First", formattedFirst);
-        Assert.Equal("[2018-12-01 13:10:00.000] Second", formattedSecond);
+        Assert.Equal("[18-12-01 2:16:20.000 PM] First", formattedFirst);
+        Assert.Equal("[18-12-01 1:10:00.000 PM] Second", formattedSecond);
     }
 
     [Fact]
