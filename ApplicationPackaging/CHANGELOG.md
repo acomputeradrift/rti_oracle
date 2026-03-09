@@ -1,5 +1,22 @@
 # Changelog
 
+## [1.3] - 2026-03-05
+
+### Added
+- Diagnostics output now includes dedicated zoom controls with a one-click reset to 100%.
+- Added guidance tooltips across connection, project-data, driver-log-level, and filter controls.
+
+### Changed
+- Date/time display now uses a 12-hour AM/PM format across diagnostics views, filtering, and exports for easier reading.
+- Top-panel layout was tightened for more consistent spacing across Connect, Project Data, Driver Log Levels, Filter, and Find areas.
+- Driver log-level toggles now remember their prior on/off choices to reduce repetitive setup.
+- Log mapping and rendering were streamlined to improve responsiveness on larger diagnostic sessions.
+
+### Fixed
+- Start/end time filters now apply correctly and consistently in both on-screen filtering and processed-log export.
+- Local-time versus processor-time handling was corrected to prevent timestamp drift in filtered/exported results.
+- Tagged/unresolved report classification was corrected to prevent mis-tagged output lines.
+
 ## [1.2.1] - 2026-02-27
 
 ### Changed
